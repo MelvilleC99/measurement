@@ -1,38 +1,171 @@
+/* src/App.css */
+
 .App {
   text-align: center;
-}
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
+  font-family: Arial, sans-serif;
+  padding: 20px;
+  background-color: #f8f9fa;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+}
+
+h1 {
+  color: #333;
+}
+
+.time-display,
+.target-input,
+.units-display,
+.efficiency-display,
+.buttons,
+.active-downtimes,
+.downtime-logs {
+  margin: 20px 0;
+}
+
+.target-input input {
+  padding: 5px;
+  font-size: 1em;
+  width: 100px;
+}
+
+.units-display,
+.efficiency-display {
+  font-size: 1.5em;
+}
+
+.buttons button {
+  margin: 0 10px;
+  padding: 15px 30px;
+  font-size: 1.1em;
+  cursor: pointer;
+  border: none;
+  border-radius: 5px;
+  transition: background-color 0.3s ease;
+}
+
+.offline-button {
+  background-color: #28a745; /* Green */
   color: white;
 }
 
-.App-link {
-  color: #61dafb;
+.offline-button:hover {
+  background-color: #218838;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.downtime-button {
+  background-color: #dc3545; /* Red */
+  color: white;
+}
+
+.downtime-button:hover {
+  background-color: #c82333;
+}
+
+.active-downtimes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.downtime-block {
+  background-color: #f8d7da; /* Light Red */
+  border: 1px solid #f5c6cb;
+  border-radius: 5px;
+  padding: 15px;
+  margin: 10px;
+  width: 250px;
+  position: relative;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.downtime-info p {
+  margin: 5px 0;
+}
+
+.resolve-button {
+  background-color: #ffc107; /* Yellow */
+  color: #212529;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+}
+
+.resolve-button:hover {
+  background-color: #e0a800;
+}
+
+.downtime-logs ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.downtime-logs li {
+  background-color: #e2e3e5;
+  margin: 5px 0;
+  padding: 10px;
+  border-radius: 5px;
+  text-align: left;
+}
+
+.modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 30px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  width: 300px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.overlay {
+  background-color: rgba(0, 0, 0, 0.75);
+}
+
+.modal input {
+  width: 90%;
+  padding: 10px;
+  margin: 15px 0;
+  font-size: 1em;
+  border: 1px solid #ced4da;
+  border-radius: 5px;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: space-between;
+}
+
+.modal-buttons button {
+  padding: 10px 20px;
+  font-size: 1em;
+  cursor: pointer;
+  border: none;
+  border-radius: 5px;
+}
+
+.modal-buttons button:first-child {
+  background-color: #007bff; /* Blue */
+  color: white;
+}
+
+.modal-buttons button:first-child:hover {
+  background-color: #0069d9;
+}
+
+.modal-buttons button:last-child {
+  background-color: #6c757d; /* Gray */
+  color: white;
+}
+
+.modal-buttons button:last-child:hover {
+  background-color: #5a6268;
 }
