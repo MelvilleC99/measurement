@@ -1,3 +1,5 @@
+// src/components/Admin/AdminDashboard.tsx
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import './AdminDashboard.css';
@@ -16,20 +18,26 @@ const AdminDashboard: React.FC = () => {
                 </div>
                 <div className="card-content">
                     <div className="button-group">
-                        <button className="admin-button" onClick={() => navigate('/timetables')}>
+                        <button className="admin-button" onClick={() => navigate('/admin/timetables')}>
                             Time Tables
                         </button>
-                        <button className="admin-button" onClick={() => navigate('/workdays')}>
+                        <button className="admin-button" onClick={() => navigate('/admin/workdays')}>
                             Work Days
                         </button>
-                        <button className="admin-button" onClick={() => navigate('/add-lines')}>
+                        <button className="admin-button" onClick={() => navigate('/admin/add-lines')}>
                             Add Production Lines
                         </button>
-                        <button className="admin-button" onClick={() => navigate('/production-schedule')}>
+                        <button className="admin-button" onClick={() => navigate('/admin/production-schedule')}>
                             Production Schedule
                         </button>
-                        <button className="admin-button" onClick={() => navigate('/downtime')}>
+                        <button className="admin-button" onClick={() => navigate('/admin/downtime')}>
                             Downtime
+                        </button>
+                        <button className="admin-button" onClick={() => navigate('/admin/support-functions')}>
+                            Support Functions
+                        </button>
+                        <button className="admin-button" onClick={() => navigate('/admin/machine-list')}>
+                            Machine List
                         </button>
                     </div>
                 </div>

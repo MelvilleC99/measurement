@@ -1,0 +1,91 @@
+/* src/components/Admin/DownTime.css */
+
+.downtime-container {
+    background-color: #f8f9fa;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.downtime-card {
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+    width: 90%;
+    max-width: 800px;
+    padding: 20px;
+}
+
+.card-header {
+    background-color: #003366;
+    color: white;
+    padding: 15px;
+    border-radius: 10px 10px 0 0;
+    position: relative;
+}
+
+.card-header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.card-content {
+    padding: 15px;
+}
+
+.categories-list {
+    margin-bottom: 20px;
+}
+
+.category-item {
+    background: #f0f0f0;
+    margin: 10px 0;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.reasons-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 10px 0;
+}
+
+.add-reason-button {
+    background-color: #003366;
+    color: white;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    margin-top: 10px;
+    cursor: pointer;
+}
+
+.reason-form {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.add-category {
+    background: #f0f0f0;
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+}
+
+.add-category input {
+    padding: 5px;
+    margin-right: 10px;
+    width: calc(100% - 120px);
+}
+
+.add-category button {
+    padding: 5px 10px;
+    background-color: #003366;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
