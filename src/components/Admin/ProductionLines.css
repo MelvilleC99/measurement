@@ -1,15 +1,12 @@
-/* src/components/Admin/ProductionLines.css */
-
+/* ProductionLines.css */
 .production-lines-container {
-    background-color: #003366;
-    color: white;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
     align-items: center;
-    height: 100vh;
-    width: 100%;
-    text-align: center;
-    font-size: 1rem;
+    min-height: 100vh;
+    background-color: #f8f9fa;
+    padding: 20px;
+    box-sizing: border-box;
 }
 
 .production-lines-card {
@@ -19,7 +16,7 @@
     width: 90%;
     max-width: 1000px;
     text-align: center;
-    padding: 20px;
+    padding-bottom: 40px;
 }
 
 .card-header {
@@ -53,70 +50,59 @@
     background-color: #5a6268;
 }
 
-.input-group {
+.add-line-section {
     display: flex;
     justify-content: center;
-    gap: 10px;
-    margin-top: 20px;
+    margin: 20px 0;
 }
 
-.input-group input {
+.add-line-section input {
     padding: 10px;
-    border-radius: 5px;
+    font-size: 1rem;
+    margin-right: 10px;
+    width: 300px;
     border: 1px solid #ccc;
-    flex-grow: 1;
+    border-radius: 5px;
 }
 
 .add-button {
-    background-color: #007bff;
+    padding: 10px 20px;
+    font-size: 1rem;
+    background-color: #003366;
     color: white;
     border: none;
-    padding: 10px 20px;
     border-radius: 5px;
     cursor: pointer;
 }
 
 .add-button:hover {
-    background-color: #0056b3;
+    background-color: #002244;
 }
 
-.bounded-box {
-    background-color: #f8f9fa;
-    border-radius: 5px;
-    padding: 15px;
-    margin-top: 20px;
-    text-align: left;
-}
-
-.bounded-box h2 {
-    color: #003366;
-    margin-bottom: 10px;
-}
-
-.lines-list {
-    list-style: none;
+.lines-list ul {
+    list-style-type: none;
     padding: 0;
-    margin: 0;
 }
 
 .lines-list li {
+    margin: 10px 0;
     display: flex;
     justify-content: space-between;
+    align-items: center;
     padding: 10px;
-    background: #e9ecef;
-    margin-bottom: 8px;
+    background-color: #e9ecef;
     border-radius: 5px;
 }
 
-.remove-button {
+.delete-button {
     background-color: #dc3545;
     color: white;
     border: none;
-    border-radius: 5px;
     padding: 5px 10px;
+    border-radius: 5px;
     cursor: pointer;
 }
 
-.remove-button:hover {
+.delete-button:hover {
     background-color: #c82333;
 }

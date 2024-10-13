@@ -1,192 +1,206 @@
-// src/components/Admin/ProductionSchedule.tsx
-
 import React, { useState, useEffect } from 'react';
 import './ProductionSchedule.css';
-
-interface Style {
-    id: number;
-    styleName: string;
-    styleNumber: string;
-    startDate: string;
-    deliveryDate: string;
-}
 
 interface ProductionLine {
     id: number;
     lineName: string;
-    styles: Style[];
+}
+
+interface ScheduledStyle {
+    id: number;
+    lineId: number;
+    styleName: string;
+    styleNumber: string;
+    plannedStartDate: string;
+    deliveryDate: string;
 }
 
 const ProductionSchedule: React.FC = () => {
     const [productionLines, setProductionLines] = useState<ProductionLine[]>([]);
+    const [scheduledStyles, setScheduledStyles] = useState<ScheduledStyle[]>([]);
     const [selectedLine, setSelectedLine] = useState<number | null>(null);
     const [styleName, setStyleName] = useState<string>('');
     const [styleNumber, setStyleNumber] = useState<string>('');
-    const [startDate, setStartDate] = useState<string>('');
+    const [plannedStartDate, setPlannedStartDate] = useState<string>('');
     const [deliveryDate, setDeliveryDate] = useState<string>('');
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-    const [editStyle, setEditStyle] = useState<Style | null>(null);
+    const [selectedStyle, setSelectedStyle] = useState<ScheduledStyle | null>(null);
 
+    // Load production lines from localStorage
     useEffect(() => {
-        const mockLines = [
-            { id: 1, lineName: 'Line A', styles: [] },
-            { id: 2, lineName: 'Line B', styles: [] },
-        ];
-        setProductionLines(mockLines);
+        const savedLines = localStorage.getItem('productionLines');
+        if (savedLines) {
+            setProductionLines(JSON.parse(savedLines));
+        }
+    }, []);
+
+    // Load scheduled styles from localStorage
+    useEffect(() => {
+        const savedSchedules = localStorage.getItem('scheduledStyles');
+        if (savedSchedules) {
+            setScheduledStyles(JSON.parse(savedSchedules));
+        }
     }, []);
 
     const openModal = () => setIsModalOpen(true);
     const closeModal = () => {
         setIsModalOpen(false);
-        setSelectedLine(null);
-        setStyleName('');
-        setStyleNumber('');
-        setStartDate('');
-        setDeliveryDate('');
-        setEditStyle(null);
+        resetForm();
     };
 
-    const handleAddOrEditStyle = () => {
-        if (!selectedLine || !styleName || !styleNumber || !startDate || !deliveryDate) {
-            alert('Please fill in all fields.');
+    const handleAddSchedule = () => {
+        if (!selectedLine || !styleName || !styleNumber || !plannedStartDate || !deliveryDate) {
+            alert('Please fill out all fields.');
             return;
         }
 
-        const newStyle: Style = {
-            id: editStyle ? editStyle.id : Date.now(),
+        const newSchedule: ScheduledStyle = {
+            id: scheduledStyles.length + 1,
+            lineId: selectedLine,
             styleName,
             styleNumber,
-            startDate,
+            plannedStartDate,
             deliveryDate,
         };
 
-        setProductionLines((prevLines) =>
-            prevLines.map((line) =>
-                line.id === selectedLine
-                    ? {
-                        ...line,
-                        styles: editStyle
-                            ? line.styles.map((style) =>
-                                style.id === editStyle.id ? newStyle : style
-                            )
-                            : [...line.styles, newStyle].sort(
-                                (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
-                            ),
-                    }
-                    : line
-            )
-        );
-
+        const updatedSchedules = [...scheduledStyles, newSchedule];
+        setScheduledStyles(updatedSchedules);
+        localStorage.setItem('scheduledStyles', JSON.stringify(updatedSchedules));
         closeModal();
     };
 
-    const handleRemoveStyle = (lineId: number, styleId: number) => {
-        setProductionLines((prevLines) =>
-            prevLines.map((line) =>
-                line.id === lineId
-                    ? { ...line, styles: line.styles.filter((style) => style.id !== styleId) }
-                    : line
-            )
-        );
+    const handleEditStyle = (schedule: ScheduledStyle) => {
+        setSelectedStyle(schedule);
+        setStyleName(schedule.styleName);
+        setStyleNumber(schedule.styleNumber);
+        setPlannedStartDate(schedule.plannedStartDate);
+        setDeliveryDate(schedule.deliveryDate);
+        setIsModalOpen(true);
     };
 
-    const handleEditStyle = (lineId: number, style: Style) => {
-        setSelectedLine(lineId);
-        setStyleName(style.styleName);
-        setStyleNumber(style.styleNumber);
-        setStartDate(style.startDate);
-        setDeliveryDate(style.deliveryDate);
-        setEditStyle(style);
-        openModal();
+    const handleDeleteStyle = (id: number) => {
+        const updatedSchedules = scheduledStyles.filter((schedule) => schedule.id !== id);
+        setScheduledStyles(updatedSchedules);
+        localStorage.setItem('scheduledStyles', JSON.stringify(updatedSchedules));
+    };
+
+    const resetForm = () => {
+        setSelectedLine(null);
+        setStyleName('');
+        setStyleNumber('');
+        setPlannedStartDate('');
+        setDeliveryDate('');
+        setSelectedStyle(null);
     };
 
     return (
         <div className="production-schedule-container">
             <div className="production-schedule-card">
                 <div className="card-header">
+                    <h1>Production Schedule</h1>
                     <button className="back-button" onClick={() => window.history.back()}>
                         Back to Admin
                     </button>
-                    <h1 className="title">Production Schedule</h1>
-                    <button className="schedule-button" onClick={openModal}>
+                </div>
+
+                <div className="card-content">
+                    <button className="schedule-line-button" onClick={openModal}>
                         Schedule Line
                     </button>
-                </div>
-                <div className="card-content">
-                    {productionLines.length > 0 ? (
-                        <div className="schedule-view">
-                            {productionLines.map((line) => (
-                                <div key={line.id} className="line-row">
-                                    <div className="line-name">{line.lineName}</div>
-                                    <div className="style-blocks">
-                                        {line.styles.length > 0 ? (
-                                            line.styles.map((style) => (
-                                                <div
-                                                    key={style.id}
-                                                    className="style-block"
-                                                    onClick={() => handleEditStyle(line.id, style)}
-                                                >
-                                                    <span>{style.styleNumber}</span>
-                                                    <button
-                                                        className="remove-style-button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleRemoveStyle(line.id, style.id);
-                                                        }}
-                                                    >
-                                                        X
-                                                    </button>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <span className="no-styles">No styles scheduled.</span>
-                                        )}
-                                    </div>
+
+                    <div className="gantt-chart">
+                        {productionLines.map((line) => (
+                            <div key={line.id} className="gantt-row">
+                                <div className="gantt-line-name">{line.lineName}</div>
+                                <div className="gantt-line-styles">
+                                    {scheduledStyles
+                                        .filter((style) => style.lineId === line.id)
+                                        .map((style) => (
+                                            <div
+                                                key={style.id}
+                                                className="gantt-style-block"
+                                                onClick={() => handleEditStyle(style)}
+                                            >
+                                                {style.styleNumber}
+                                            </div>
+                                        ))}
                                 </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <p>No production lines available. Please add lines in the Admin Dashboard.</p>
-                    )}
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
 
             {isModalOpen && (
                 <div className="modal-overlay">
                     <div className="modal-content">
-                        <h2>{editStyle ? 'Edit Style' : 'Schedule a Style'}</h2>
+                        <h2>{selectedStyle ? 'Edit Style' : 'Schedule Line'}</h2>
                         <label>
                             Select Line:
-                            <select value={selectedLine || ''} onChange={(e) => setSelectedLine(Number(e.target.value))}>
+                            <select
+                                value={selectedLine || ''}
+                                onChange={(e) => setSelectedLine(Number(e.target.value))}
+                                disabled={!!selectedStyle}
+                            >
                                 <option value="">Select a line</option>
-                                {productionLines.map((line) => (
-                                    <option key={line.id} value={line.id}>
-                                        {line.lineName}
-                                    </option>
-                                ))}
+                                {productionLines.length > 0 ? (
+                                    productionLines.map((line) => (
+                                        <option key={line.id} value={line.id}>
+                                            {line.lineName}
+                                        </option>
+                                    ))
+                                ) : (
+                                    <option value="">No lines available</option>
+                                )}
                             </select>
                         </label>
+
                         <label>
                             Style Name:
-                            <input type="text" value={styleName} onChange={(e) => setStyleName(e.target.value)} />
+                            <input
+                                type="text"
+                                value={styleName}
+                                onChange={(e) => setStyleName(e.target.value)}
+                            />
                         </label>
+
                         <label>
                             Style Number:
-                            <input type="text" value={styleNumber} onChange={(e) => setStyleNumber(e.target.value)} />
+                            <input
+                                type="text"
+                                value={styleNumber}
+                                onChange={(e) => setStyleNumber(e.target.value)}
+                            />
                         </label>
+
                         <label>
                             Planned Start Date:
-                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                            <input
+                                type="date"
+                                value={plannedStartDate}
+                                onChange={(e) => setPlannedStartDate(e.target.value)}
+                            />
                         </label>
+
                         <label>
                             Delivery Date:
-                            <input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
+                            <input
+                                type="date"
+                                value={deliveryDate}
+                                onChange={(e) => setDeliveryDate(e.target.value)}
+                            />
                         </label>
+
                         <div className="modal-buttons">
-                            <button onClick={handleAddOrEditStyle}>
-                                {editStyle ? 'Save Changes' : 'Save Schedule'}
+                            <button onClick={handleAddSchedule}>
+                                {selectedStyle ? 'Save Changes' : 'Schedule Line'}
                             </button>
                             <button onClick={closeModal}>Cancel</button>
+                            {selectedStyle && (
+                                <button onClick={() => handleDeleteStyle(selectedStyle.id)}>
+                                    Delete
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

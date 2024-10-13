@@ -1,5 +1,3 @@
-/* src/components/Admin/SupportFunctions.css */
-
 .support-functions-container {
     display: flex;
     flex-direction: column;
@@ -7,7 +5,6 @@
     min-height: 100vh;
     background-color: #f8f9fa;
     padding: 20px;
-    box-sizing: border-box;
 }
 
 .support-functions-card {
@@ -17,8 +14,7 @@
     width: 90%;
     max-width: 1000px;
     text-align: center;
-    padding-bottom: 40px;
-    flex-grow: 1;
+    padding: 20px;
 }
 
 .card-header {
@@ -27,24 +23,23 @@
     padding: 20px;
     border-top-left-radius: 10px;
     border-top-right-radius: 10px;
-    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.card-header h1 {
+.title {
     margin: 0;
     font-size: 2rem;
-    text-align: center;
+    color: white; /* Ensure the header text is white */
 }
 
 .back-button {
-    position: absolute;
-    top: 20px;
-    left: 20px;
     background-color: #6c757d;
     color: white;
     border: none;
     border-radius: 5px;
-    padding: 8px 16px;
+    padding: 10px 20px;
     cursor: pointer;
 }
 
@@ -52,53 +47,71 @@
     background-color: #5a6268;
 }
 
-.form-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    justify-content: center;
-    margin-top: 20px;
-}
-
-.form-group input,
-.form-group select {
-    padding: 10px;
-    font-size: 1rem;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    flex: 1 1 200px;
-}
-
-.form-group button {
+.create-button {
     background-color: #003366;
     color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-bottom: 20px;
+}
+
+.assign-password-button {
+    background-color: #28a745;
+    color: white;
+    padding: 8px 16px;
     border: none;
     border-radius: 5px;
-    padding: 10px 20px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    margin-top: 10px;
 }
 
-.form-group button:hover {
-    background-color: #002244;
+.assign-password-button:hover {
+    background-color: #218838;
 }
 
-.support-list {
-    margin-top: 20px;
-    list-style: none;
-    padding: 0;
+.support-functions-table {
     width: 100%;
-    max-width: 800px;
-    margin-left: auto;
-    margin-right: auto;
+    border-collapse: collapse;
 }
 
-.support-list li {
-    background-color: #e9ecef;
+.support-functions-table th, .support-functions-table td {
     padding: 10px;
-    margin-bottom: 5px;
-    border-radius: 5px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.support-functions-table th {
+    background-color: #003366;
+    color: white;
+}
+
+.support-functions-table tr:hover {
+    background-color: #f1f1f1;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    width: 400px;
+    max-width: 100%;
+}
+
+.modal-buttons {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    margin-top: 20px;
 }
