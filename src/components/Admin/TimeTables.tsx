@@ -1,182 +1,196 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './TimeTables.css';
-
-interface Break {
-    id: number;
-    name: string;
-    description: string;
-    duration: number; // in minutes
-}
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 interface TimeSlot {
-    id: number;
+    id: string;
     startTime: string;
     endTime: string;
-    breakId?: number; // Optional break associated with this slot
+    breakId?: string;
 }
 
 interface TimeTable {
-    id: number;
+    id: string;
     name: string;
+    description: string;
     slots: TimeSlot[];
 }
 
-const defaultTimeSlots: TimeSlot[] = [
-    { id: 1, startTime: '08:00', endTime: '09:00' },
-    { id: 2, startTime: '09:00', endTime: '10:00' },
-    { id: 3, startTime: '10:00', endTime: '10:20', breakId: 1 }, // Tea break
-    { id: 4, startTime: '10:20', endTime: '12:00' },
-    { id: 5, startTime: '12:00', endTime: '12:40', breakId: 2 }, // Lunch break
-    { id: 6, startTime: '12:40', endTime: '14:00' },
-    { id: 7, startTime: '14:00', endTime: '15:00' },
-    { id: 8, startTime: '15:00', endTime: '16:00' },
-];
-
-const defaultTimeTable: TimeTable = {
-    id: 0,
-    name: 'Default Time Table',
-    slots: defaultTimeSlots,
-};
+interface Break {
+    id: string;
+    name: string;
+    description: string;
+    duration: number; // Break duration in minutes
+}
 
 const TimeTables: React.FC = () => {
-    const [timeSlots, setTimeSlots] = useState<TimeSlot[]>(defaultTimeSlots);
-    const [breaks, setBreaks] = useState<Break[]>([
-        { id: 1, name: 'Tea Break', description: '20 min tea break', duration: 20 },
-        { id: 2, name: 'Lunch Break', description: '40 min lunch break', duration: 40 },
-    ]);
-    const [timeTables, setTimeTables] = useState<TimeTable[]>([defaultTimeTable]);
-    const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-    const [isBreakModalOpen, setIsBreakModalOpen] = useState<boolean>(false);
-    const [timeTableName, setTimeTableName] = useState<string>('');
-    const [viewingTimeTable, setViewingTimeTable] = useState<TimeTable | null>(null);
-    const [breakName, setBreakName] = useState<string>('');
-    const [breakDescription, setBreakDescription] = useState<string>('');
-    const [breakDuration, setBreakDuration] = useState<number>(0);
+    const [timeTables, setTimeTables] = useState<TimeTable[]>([]);
+    const [breaks, setBreaks] = useState<Break[]>([]);
+    const [timeTableName, setTimeTableName] = useState('');
+    const [timeTableDescription, setTimeTableDescription] = useState('');
+    const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([{ id: '1', startTime: '', endTime: '', breakId: '' }]);
+    const [selectedTimeTable, setSelectedTimeTable] = useState<TimeTable | null>(null);
+    const [selectedBreak, setSelectedBreak] = useState<Break | null>(null);
+    const [isTimeTableModalOpen, setIsTimeTableModalOpen] = useState(false);
+    const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
+    const [breakName, setBreakName] = useState('');
+    const [breakDescription, setBreakDescription] = useState('');
+    const [breakDuration, setBreakDuration] = useState(0);
 
-    const openModal = () => setIsModalOpen(true);
-    const closeModal = () => {
-        setIsModalOpen(false);
-        setTimeTableName('');
-        setTimeSlots(defaultTimeSlots);
-        setViewingTimeTable(null);
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const fetchData = async () => {
+        const timeTablesSnapshot = await getDocs(collection(db, 'timeTables'));
+        const breaksSnapshot = await getDocs(collection(db, 'breaks'));
+        const timeTablesData = timeTablesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TimeTable[];
+        const breaksData = breaksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Break[];
+        setTimeTables(timeTablesData);
+        setBreaks(breaksData);
     };
 
-    const openBreakModal = () => setIsBreakModalOpen(true);
-    const closeBreakModal = () => {
-        setIsBreakModalOpen(false);
-        setBreakName('');
-        setBreakDescription('');
-        setBreakDuration(0);
-    };
+    const handleSaveTimeTable = async () => {
+        const newTimeTable = {
+            name: timeTableName,
+            description: timeTableDescription,
+            slots: timeSlots,
+        };
 
-    const handleBreakSave = () => {
-        if (!breakName || breakDuration <= 0) {
-            alert('Please provide valid break details.');
-            return;
+        if (selectedTimeTable) {
+            const timeTableDoc = doc(db, 'timeTables', selectedTimeTable.id);
+            await updateDoc(timeTableDoc, newTimeTable);
+        } else {
+            await addDoc(collection(db, 'timeTables'), newTimeTable);
         }
 
-        const newBreak: Break = {
-            id: breaks.length + 1,
+        fetchData();
+        setIsTimeTableModalOpen(false);
+    };
+
+    const handleDeleteTimeTable = async () => {
+        if (selectedTimeTable) {
+            await deleteDoc(doc(db, 'timeTables', selectedTimeTable.id));
+            fetchData();
+            setIsTimeTableModalOpen(false);
+        }
+    };
+
+    const handleSaveBreak = async () => {
+        const newBreak = {
             name: breakName,
             description: breakDescription,
             duration: breakDuration,
         };
 
-        setBreaks([...breaks, newBreak]);
-        closeBreakModal();
+        if (selectedBreak) {
+            const breakDoc = doc(db, 'breaks', selectedBreak.id);
+            await updateDoc(breakDoc, newBreak);
+        } else {
+            await addDoc(collection(db, 'breaks'), newBreak);
+        }
+
+        fetchData();
+        setIsBreakModalOpen(false);
     };
 
-    const handleTimeSlotChange = (
-        slotId: number,
-        field: keyof TimeSlot,
-        value: string
-    ) => {
-        const updatedSlots = timeSlots.map((slot) =>
-            slot.id === slotId ? { ...slot, [field]: value } : slot
-        );
+    const handleDeleteBreak = async () => {
+        if (selectedBreak) {
+            await deleteDoc(doc(db, 'breaks', selectedBreak.id));
+            fetchData();
+            setIsBreakModalOpen(false);
+        }
+    };
+
+    const handleAddSlot = () => {
+        setTimeSlots([...timeSlots, { id: (timeSlots.length + 1).toString(), startTime: '', endTime: '', breakId: '' }]);
+    };
+
+    const handleSlotChange = (index: number, field: keyof TimeSlot, value: string) => {
+        const updatedSlots = [...timeSlots];
+        updatedSlots[index][field] = value;
         setTimeSlots(updatedSlots);
     };
 
-    const handleSaveTimeTable = () => {
-        if (!timeTableName || timeSlots.some((slot) => !slot.startTime || !slot.endTime)) {
-            alert('Please fill in all time slots and provide a name.');
-            return;
+    const openTimeTableModal = (timeTable?: TimeTable) => {
+        if (timeTable) {
+            setSelectedTimeTable(timeTable);
+            setTimeTableName(timeTable.name);
+            setTimeTableDescription(timeTable.description);
+            setTimeSlots(timeTable.slots);
+        } else {
+            setSelectedTimeTable(null);
+            setTimeTableName('');
+            setTimeTableDescription('');
+            setTimeSlots([{ id: '1', startTime: '', endTime: '', breakId: '' }]);
         }
-
-        const newTimeTable: TimeTable = {
-            id: timeTables.length + 1,
-            name: timeTableName,
-            slots: timeSlots,
-        };
-
-        setTimeTables([...timeTables, newTimeTable]);
-        closeModal();
+        setIsTimeTableModalOpen(true);
     };
 
-    const addTimeSlot = () => {
-        const newId = timeSlots.length + 1;
-        setTimeSlots([...timeSlots, { id: newId, startTime: '', endTime: '' }]);
-    };
-
-    const removeTimeSlot = (slotId: number) => {
-        if (timeSlots.length > 1) {
-            setTimeSlots(timeSlots.filter((slot) => slot.id !== slotId));
+    const openBreakModal = (breakData?: Break) => {
+        if (breakData) {
+            setSelectedBreak(breakData);
+            setBreakName(breakData.name);
+            setBreakDescription(breakData.description);
+            setBreakDuration(breakData.duration);
+        } else {
+            setSelectedBreak(null);
+            setBreakName('');
+            setBreakDescription('');
+            setBreakDuration(0);
         }
-    };
-
-    const viewTimeTable = (timeTable: TimeTable) => {
-        setViewingTimeTable(timeTable);
-        setTimeSlots(timeTable.slots);
-        setTimeTableName(timeTable.name);
-        setIsModalOpen(true);
+        setIsBreakModalOpen(true);
     };
 
     return (
         <div className="timetables-container">
-            <div className="timetables-card">
-                <div className="card-header">
-                    <h1 className="timetables-title">Time Tables</h1>
-                    <button className="back-button" onClick={() => window.history.back()}>
-                        Back to Admin
-                    </button>
+            <div className="toolbar">
+                <h2>Actions</h2>
+                <button onClick={() => openTimeTableModal()}>Create Time Table</button>
+                <button onClick={() => openBreakModal()}>Create Break</button>
+            </div>
+            <div className="content-area">
+                <div className="bounded-box">
+                    <h2>Existing Time Tables</h2>
+                    {timeTables.map((tt) => (
+                        <div key={tt.id} className="time-table-item">
+                            <strong>{tt.name}</strong> - {tt.description}
+                            <button onClick={() => openTimeTableModal(tt)}>View/Edit</button>
+                        </div>
+                    ))}
                 </div>
-                <div className="card-content">
-                    <div className="button-group">
-                        <button className="create-button" onClick={openModal}>Create Time Table</button>
-                        <button className="create-button" onClick={openBreakModal}>Create Break</button>
-                    </div>
 
-                    <div className="bounded-box">
-                        <h2>Existing Breaks</h2>
-                        {breaks.map((br) => (
-                            <div key={br.id} className="break-item">
-                                <strong>{br.name}</strong>: {br.description} ({br.duration} mins)
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="bounded-box">
-                        <h2>Existing Time Tables</h2>
-                        {timeTables.map((tt) => (
-                            <div key={tt.id} className="time-table-item" onClick={() => viewTimeTable(tt)}>
-                                <strong>{tt.name}</strong> - {tt.slots.length} slots
-                            </div>
-                        ))}
-                    </div>
+                <div className="bounded-box">
+                    <h2>Existing Breaks</h2>
+                    {breaks.map((br) => (
+                        <div key={br.id} className="break-item">
+                            <strong>{br.name}</strong> - {br.description}
+                            <button onClick={() => openBreakModal(br)}>View/Edit</button>
+                        </div>
+                    ))}
                 </div>
             </div>
 
             {/* Time Table Modal */}
-            {isModalOpen && (
+            {isTimeTableModalOpen && (
                 <div className="modal-overlay">
                     <div className="modal-content modal-wide">
-                        <h2>{viewingTimeTable ? `Edit Time Table: ${viewingTimeTable.name}` : 'Create Time Table'}</h2>
+                        <h2>{selectedTimeTable ? `Edit Time Table: ${selectedTimeTable.name}` : 'Create Time Table'}</h2>
                         <label>
                             Time Table Name:
                             <input
                                 type="text"
                                 value={timeTableName}
                                 onChange={(e) => setTimeTableName(e.target.value)}
+                            />
+                        </label>
+                        <label>
+                            Description:
+                            <input
+                                type="text"
+                                value={timeTableDescription}
+                                onChange={(e) => setTimeTableDescription(e.target.value)}
                             />
                         </label>
                         <table className="time-slots-table">
@@ -186,19 +200,18 @@ const TimeTables: React.FC = () => {
                                 <th>Start Time</th>
                                 <th>End Time</th>
                                 <th>Break</th>
-                                <th>Action</th>
                             </tr>
                             </thead>
                             <tbody>
-                            {timeSlots.map((slot) => (
+                            {timeSlots.map((slot, index) => (
                                 <tr key={slot.id}>
-                                    <td>{slot.id}</td>
+                                    <td>{index + 1}</td>
                                     <td>
                                         <input
                                             type="time"
                                             value={slot.startTime}
                                             onChange={(e) =>
-                                                handleTimeSlotChange(slot.id, 'startTime', e.target.value)
+                                                handleSlotChange(index, 'startTime', e.target.value)
                                             }
                                         />
                                     </td>
@@ -207,44 +220,34 @@ const TimeTables: React.FC = () => {
                                             type="time"
                                             value={slot.endTime}
                                             onChange={(e) =>
-                                                handleTimeSlotChange(slot.id, 'endTime', e.target.value)
+                                                handleSlotChange(index, 'endTime', e.target.value)
                                             }
                                         />
                                     </td>
                                     <td>
                                         <select
-                                            value={slot.breakId || ''}
+                                            value={slot.breakId}
                                             onChange={(e) =>
-                                                handleTimeSlotChange(slot.id, 'breakId', e.target.value)
+                                                handleSlotChange(index, 'breakId', e.target.value)
                                             }
-                                            className="dropdown-full"
                                         >
                                             <option value="">None</option>
                                             {breaks.map((br) => (
                                                 <option key={br.id} value={br.id}>
-                                                    {br.name}
+                                                    {br.name} ({br.duration} mins)
                                                 </option>
                                             ))}
                                         </select>
-                                    </td>
-                                    <td>
-                                        <button
-                                            onClick={() => removeTimeSlot(slot.id)}
-                                            disabled={timeSlots.length <= 1}
-                                        >
-                                            Remove
-                                        </button>
                                     </td>
                                 </tr>
                             ))}
                             </tbody>
                         </table>
                         <div className="modal-buttons">
-                            <button onClick={addTimeSlot}>Add Row</button>
-                            <button onClick={handleSaveTimeTable}>
-                                {viewingTimeTable ? 'Update Time Table' : 'Save Time Table'}
-                            </button>
-                            <button onClick={closeModal}>Cancel</button>
+                            <button onClick={handleAddSlot}>Add Row</button>
+                            <button onClick={handleSaveTimeTable}>Save</button>
+                            <button onClick={handleDeleteTimeTable}>Delete</button>
+                            <button onClick={() => setIsTimeTableModalOpen(false)}>Cancel</button>
                         </div>
                     </div>
                 </div>
@@ -254,7 +257,7 @@ const TimeTables: React.FC = () => {
             {isBreakModalOpen && (
                 <div className="modal-overlay">
                     <div className="modal-content modal-wide">
-                        <h2>Create Break</h2>
+                        <h2>{selectedBreak ? `Edit Break: ${selectedBreak.name}` : 'Create Break'}</h2>
                         <label>
                             Break Name:
                             <input
@@ -280,8 +283,9 @@ const TimeTables: React.FC = () => {
                             />
                         </label>
                         <div className="modal-buttons">
-                            <button onClick={handleBreakSave}>Save Break</button>
-                            <button onClick={closeBreakModal}>Cancel</button>
+                            <button onClick={handleSaveBreak}>Save</button>
+                            <button onClick={handleDeleteBreak}>Delete</button>
+                            <button onClick={() => setIsBreakModalOpen(false)}>Cancel</button>
                         </div>
                     </div>
                 </div>
