@@ -1,102 +1,82 @@
+/* SupportFunctions.css */
 .support-functions-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-height: 100vh;
-    background-color: #f8f9fa;
     padding: 20px;
 }
 
-.support-functions-card {
-    background-color: #ffffff;
-    border-radius: 10px;
-    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-    width: 90%;
-    max-width: 1000px;
-    text-align: center;
-    padding: 20px;
-}
-
-.card-header {
-    background-color: #003366;
-    color: white;
-    padding: 20px;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
+.header-bar {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    background-color: #f0f0f0; /* Light grey background for header */
+    padding: 10px;
+}
+
+.home-button {
+    background-color: #808080; /* Grey background for home button */
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    border-radius: 5px;
 }
 
 .title {
-    margin: 0;
     font-size: 2rem;
-    color: white; /* Ensure the header text is white */
+    color: black; /* Black text for title */
+    text-align: center; /* Center the title */
 }
 
-.back-button {
-    background-color: #6c757d;
+.support-functions-card {
+    background-color: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Add shadow for depth */
+    margin-top: 20px;
+}
+
+.green-button {
+    background-color: green;
     color: white;
     border: none;
-    border-radius: 5px;
-    padding: 10px 20px;
+    padding: 10px 15px;
+    margin-bottom: 10px;
     cursor: pointer;
-}
-
-.back-button:hover {
-    background-color: #5a6268;
-}
-
-.create-button {
-    background-color: #003366;
-    color: white;
-    padding: 10px 20px;
     border-radius: 5px;
-    cursor: pointer;
-    margin-bottom: 20px;
 }
 
-.assign-password-button {
-    background-color: #28a745;
+.red-button {
+    background-color: red;
     color: white;
-    padding: 8px 16px;
     border: none;
-    border-radius: 5px;
+    padding: 10px 15px;
     cursor: pointer;
-    margin-top: 10px;
-}
-
-.assign-password-button:hover {
-    background-color: #218838;
+    border-radius: 5px;
 }
 
 .support-functions-table {
     width: 100%;
     border-collapse: collapse;
+    margin-top: 20px;
 }
 
 .support-functions-table th, .support-functions-table td {
-    padding: 10px;
     border: 1px solid #ddd;
+    padding: 8px;
     text-align: left;
 }
 
 .support-functions-table th {
-    background-color: #003366;
-    color: white;
-}
-
-.support-functions-table tr:hover {
-    background-color: #f1f1f1;
+    background-color: #f2f2f2; /* Light grey for table headers */
+    color: black; /* Black text */
 }
 
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-color: rgba(0, 0, 0, 0.5);
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5); /* Overlay with transparency */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -105,13 +85,34 @@
 .modal-content {
     background-color: white;
     padding: 20px;
-    border-radius: 10px;
+    border-radius: 8px;
     width: 400px;
-    max-width: 100%;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Shadow for pop-up */
 }
 
 .modal-buttons {
     display: flex;
     justify-content: space-between;
     margin-top: 20px;
+}
+
+.modal-buttons button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+}
+
+.modal-buttons button:first-child {
+    background-color: green; /* Green for Save */
+    color: white;
+}
+
+.modal-buttons button:nth-child(2) {
+    background-color: blue; /* Blue for Cancel */
+    color: white;
+}
+
+.modal-buttons button:nth-child(3) {
+    background-color: red; /* Red for Delete */
+    color: white;
 }
