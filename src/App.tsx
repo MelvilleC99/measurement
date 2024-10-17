@@ -1,5 +1,3 @@
-// src/App.tsx
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from './components/LandingPage/LandingPage';
@@ -11,6 +9,7 @@ import ProductionSchedule from './components/Admin/ProductionSchedule';
 import DowntimePage from './components/Admin/DownTime';
 import SupportFunctions from './components/Admin/SupportFunctions';
 import MachineList from './components/Admin/MachineList';
+import ProductionBoard from './components/production/productionBoard'; // Import the ProductionBoard component
 import './App.css';
 
 const App: React.FC = () => {
@@ -26,6 +25,9 @@ const App: React.FC = () => {
                 <Route path="/admin/downtime" element={<DowntimePage />} />
                 <Route path="/admin/support-functions" element={<SupportFunctions />} />
                 <Route path="/admin/machine-list" element={<MachineList />} />
+
+                {/* Add the Production Board route */}
+                <Route path="/production-board" element={<ProductionBoard />} />
             </Routes>
         </Router>
     );

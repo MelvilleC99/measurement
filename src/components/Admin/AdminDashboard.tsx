@@ -1,62 +1,72 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import './AdminDashboard.css';
+import ProductionLines from './ProductionLines';
+import TimeTables from './TimeTables';
+import WorkDays from './Workdays';
+import SupportFunctions from './SupportFunctions';
+import MachineList from './MachineList';
+import ProductionSchedule from './ProductionSchedule';
+import Downtime from './DownTime';
+import StyleCard from './StyleCard'; // Import the StyleCard component
 
 const AdminDashboard: React.FC = () => {
-    const navigate = useNavigate();
-    const [selectedOption, setSelectedOption] = useState<string>('Dashboard');
+    const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
-    const handleNavigation = (option: string) => {
+    const handleOptionClick = (option: string) => {
         setSelectedOption(option);
-        switch (option) {
-            case 'Time Tables':
-                navigate('/admin/timetables');
-                break;
-            case 'Work Days':
-                navigate('/admin/workdays');
-                break;
-            case 'Add Production Lines':
-                navigate('/admin/add-lines');
-                break;
-            case 'Production Schedule':
-                navigate('/admin/production-schedule');
-                break;
-            case 'Downtime':
-                navigate('/admin/downtime');
-                break;
-            case 'Support Functions':
-                navigate('/admin/support-functions');
-                break;
-            case 'Machine List':
-                navigate('/admin/machine-list');
-                break;
-            default:
-                break;
-        }
     };
 
     return (
-        <div className="admin-dashboard-container">
-            <div className="title-block">
-                <button className="back-button" onClick={() => navigate('/')}>
+        <div className="dashboard-container">
+            <div className="header">
+                <button className="back-button" onClick={() => window.history.back()}>
                     Back to Home
                 </button>
-                <h1 className="dashboard-title">Admin Dashboard</h1>
+                <h1 className="admin-title">Admin Dashboard</h1>
             </div>
 
-            <div className="content-wrapper">
+            <div className="dashboard-content">
                 <div className="toolbar">
-                    <button onClick={() => handleNavigation('Time Tables')} className="toolbar-button">Time Tables</button>
-                    <button onClick={() => handleNavigation('Work Days')} className="toolbar-button">Work Days</button>
-                    <button onClick={() => handleNavigation('Add Production Lines')} className="toolbar-button">Add Production Lines</button>
-                    <button onClick={() => handleNavigation('Production Schedule')} className="toolbar-button">Production Schedule</button>
-                    <button onClick={() => handleNavigation('Downtime')} className="toolbar-button">Downtime</button>
-                    <button onClick={() => handleNavigation('Support Functions')} className="toolbar-button">Support Functions</button>
-                    <button onClick={() => handleNavigation('Machine List')} className="toolbar-button">Machine List</button>
+                    <button className="toolbar-button" onClick={() => handleOptionClick('ProductionLines')}>
+                        Add Production Lines
+                    </button>
+                    <button className="toolbar-button" onClick={() => handleOptionClick('TimeTables')}>
+                        Time Tables
+                    </button>
+                    <button className="toolbar-button" onClick={() => handleOptionClick('WorkDays')}>
+                        Work Days
+                    </button>
+                    <button className="toolbar-button" onClick={() => handleOptionClick('SupportFunctions')}>
+                        Support Functions
+                    </button>
+                    <button className="toolbar-button" onClick={() => handleOptionClick('MachineList')}>
+                        Machine List
+                    </button>
+                    <button className="toolbar-button" onClick={() => handleOptionClick('ProductionSchedule')}>
+                        Production Schedule
+                    </button>
+                    <button className="toolbar-button" onClick={() => handleOptionClick('Downtime')}>
+                        Downtime
+                    </button>
+                    <button className="toolbar-button" onClick={() => handleOptionClick('StyleCard')}>
+                        Load Style
+                    </button>
                 </div>
 
-                <div className="main-content">
-                    <p>{selectedOption} content will appear here.</p>
+                <div className="content-area">
+                    {/* Conditionally Render Components Based on Selected Option */}
+                    {!selectedOption && (
+                        <div className="default-message">Select an option from the toolbar to begin</div>
+                    )}
+
+                    {selectedOption === 'ProductionLines' && <ProductionLines />}
+                    {selectedOption === 'TimeTables' && <TimeTables />}
+                    {selectedOption === 'WorkDays' && <WorkDays />}
+                    {selectedOption === 'SupportFunctions' && <SupportFunctions />}
+                    {selectedOption === 'MachineList' && <MachineList />}
+                    {selectedOption === 'ProductionSchedule' && <ProductionSchedule />}
+                    {selectedOption === 'Downtime' && <Downtime />}
+                    {selectedOption === 'StyleCard' && <StyleCard />}  {/* Load StyleCard when selected */}
                 </div>
             </div>
         </div>

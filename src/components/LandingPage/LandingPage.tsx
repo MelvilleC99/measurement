@@ -20,7 +20,7 @@ const LandingPage: React.FC = () => {
                         <button className="landing-button" onClick={() => navigate('/admin')}>
                             Admin
                         </button>
-                        <button className="landing-button" onClick={() => navigate('/production')}>
+                        <button className="landing-button" onClick={() => navigate('/production-board')}>
                             Production
                         </button>
                         <button className="landing-button" onClick={() => navigate('/analytics')}>

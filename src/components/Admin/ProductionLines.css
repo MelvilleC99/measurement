@@ -1,108 +1,85 @@
-/* ProductionLines.css */
-.production-lines-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-height: 100vh;
+.admin-dashboard-content {
+    flex-grow: 1;
     background-color: #f8f9fa;
     padding: 20px;
-    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
 }
 
-.production-lines-card {
-    background-color: #ffffff;
-    border-radius: 10px;
-    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-    width: 90%;
-    max-width: 1000px;
-    text-align: center;
-    padding-bottom: 40px;
+.production-lines-container {
+    width: 100%;
+    max-width: 1200px;
 }
 
-.card-header {
-    background-color: #003366;
+.header-banner {
+    background-color: gray;
     color: white;
     padding: 20px;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
-    position: relative;
-}
-
-.card-header h1 {
-    margin: 0;
-    font-size: 2rem;
+    border-radius: 5px;
+    margin-bottom: 20px;
     text-align: center;
 }
 
-.back-button {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    background-color: #6c757d;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    padding: 8px 16px;
-    cursor: pointer;
+.title {
+    margin: 0;
+    font-size: 1.5rem;
 }
 
-.back-button:hover {
-    background-color: #5a6268;
+.content-section {
+    display: flex;
+    justify-content: space-between;
 }
 
 .add-line-section {
-    display: flex;
-    justify-content: center;
-    margin: 20px 0;
+    flex: 1;
+    margin-right: 20px;
 }
 
-.add-line-section input {
-    padding: 10px;
-    font-size: 1rem;
-    margin-right: 10px;
-    width: 300px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-}
-
-.add-button {
-    padding: 10px 20px;
-    font-size: 1rem;
+.add-line-button {
     background-color: #003366;
     color: white;
     border: none;
+    padding: 10px 20px;
     border-radius: 5px;
     cursor: pointer;
+    transition: background-color 0.3s ease;
+    width: 100%;
 }
 
-.add-button:hover {
+.add-line-button:hover {
     background-color: #002244;
 }
 
-.lines-list ul {
-    list-style-type: none;
-    padding: 0;
+.production-lines-list {
+    flex: 2;
+    background-color: #fff;
+    border-radius: 5px;
+    padding: 20px;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.lines-list li {
-    margin: 10px 0;
+.production-lines-list h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.line-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    background-color: #f1f1f1;
     padding: 10px;
-    background-color: #e9ecef;
+    margin-bottom: 10px;
     border-radius: 5px;
 }
 
-.delete-button {
-    background-color: #dc3545;
+.edit-button {
+    background-color: red;
     color: white;
     border: none;
     padding: 5px 10px;
-    border-radius: 5px;
+    border-radius: 3px;
     cursor: pointer;
-}
-
-.delete-button:hover {
-    background-color: #c82333;
 }

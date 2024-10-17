@@ -1,81 +1,88 @@
-/* Admin Dashboard Layout */
-.admin-dashboard-container {
+/* src/components/Admin/AdminDashboard.css */
+
+/* Full dashboard container */
+.dashboard-container {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
-    background-color: #f8f9fa;
+    height: 100vh;
+    width: 100%;
 }
 
-.title-block {
+/* Header styling */
+.header {
     background-color: #003366;
-    color: white; /* Ensure white text for the dashboard title */
-    padding: 20px;
+    color: white;
     display: flex;
-    justify-content: center;
+    justify-content: center; /* Center the heading */
     align-items: center;
-    position: relative;
+    padding: 20px;
+    position: relative; /* Allows back-button positioning */
 }
 
-.dashboard-title {
-    font-size: 2rem;
-    text-align: center;
-    margin: 0;
-    color: white; /* Make sure this is explicitly white */
-}
-
+/* Back button styled to the left of the heading */
 .back-button {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    background-color: #6c757d;
+    background-color: #808080;
     color: white;
     border: none;
-    border-radius: 5px;
     padding: 10px 20px;
     cursor: pointer;
+    border-radius: 5px;
+    position: absolute;
+    left: 20px; /* Positions it to the left */
 }
 
-.back-button:hover {
-    background-color: #5a6268;
+/* Admin dashboard title centered */
+.admin-title {
+    font-size: 2rem;
+    color: white;
+    text-align: center;
 }
 
-/* Main layout with toolbar and content */
-.content-wrapper {
+/* Main dashboard content */
+.dashboard-content {
     display: flex;
     flex-grow: 1;
 }
 
-/* Toolbar styling */
+/* Toolbar for selecting different options */
 .toolbar {
-    width: 250px;
-    background-color: #d3d3d3; /* Grey color for the toolbar */
-    color: black; /* Black text on the grey toolbar */
+    width: 200px;
+    background-color: #f0f0f0;
     padding: 20px;
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
 }
 
+/* Toolbar buttons */
 .toolbar-button {
-    background-color: transparent;
-    color: black; /* Ensure black text for the buttons */
+    background-color: #003366;
+    color: white;
     border: none;
-    text-align: left;
-    padding: 10px 0;
+    padding: 10px 15px;
+    margin-bottom: 10px;
+    width: 100%;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    border-radius: 5px;
 }
 
 .toolbar-button:hover {
-    background-color: #cccccc; /* Slightly darker grey on hover */
+    background-color: #002244;
 }
 
-.main-content {
+/* Content area where selected options will be displayed */
+.content-area {
     flex-grow: 1;
+    background-color: #ffffff; /* White background for selected content */
     padding: 20px;
-    background-color: #ffffff;
-    border-left: 2px solid #003366;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
+    border-radius: 5px;
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow for content area */
+}
+
+/* Default message for when no option is selected */
+.default-message {
+    color: #555;
+    font-size: 1.2rem;
+    text-align: center;
+    padding-top: 20px;
 }

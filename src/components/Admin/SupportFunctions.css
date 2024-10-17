@@ -1,58 +1,44 @@
-/* SupportFunctions.css */
-.support-functions-container {
-    padding: 20px;
-}
-
-.header-bar {
+/* Styling for the main container and toolbar */
+.roles-functions-container {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: #f0f0f0; /* Light grey background for header */
-    padding: 10px;
-}
-
-.home-button {
-    background-color: #808080; /* Grey background for home button */
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    cursor: pointer;
-    border-radius: 5px;
-}
-
-.title {
-    font-size: 2rem;
-    color: black; /* Black text for title */
-    text-align: center; /* Center the title */
-}
-
-.support-functions-card {
-    background-color: white;
-    border-radius: 8px;
+    height: 100vh;
     padding: 20px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Add shadow for depth */
-    margin-top: 20px;
+    background-color: #f8f9fa;
 }
 
-.green-button {
-    background-color: green;
+.toolbar {
+    width: 200px;
+    padding: 20px;
+    background-color: #f0f0f0;
+    display: flex;
+    flex-direction: column;
+}
+
+.toolbar button {
+    background-color: #003366;
     color: white;
-    border: none;
-    padding: 10px 15px;
+    padding: 10px;
     margin-bottom: 10px;
-    cursor: pointer;
     border-radius: 5px;
+    cursor: pointer;
+    text-align: left;
 }
 
-.red-button {
-    background-color: red;
-    color: white;
-    border: none;
-    padding: 10px 15px;
-    cursor: pointer;
-    border-radius: 5px;
+.add-button, .add-role-button, .view-roles-button {
+    width: 100%;
 }
 
+/* Main content area */
+.main-content {
+    flex-grow: 1;
+    padding: 20px;
+    background-color: #fff;
+    margin-left: 20px;
+    border-radius: 10px;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Support Functions Table */
 .support-functions-table {
     width: 100%;
     border-collapse: collapse;
@@ -60,59 +46,139 @@
 }
 
 .support-functions-table th, .support-functions-table td {
+    padding: 10px;
     border: 1px solid #ddd;
-    padding: 8px;
-    text-align: left;
 }
 
 .support-functions-table th {
-    background-color: #f2f2f2; /* Light grey for table headers */
-    color: black; /* Black text */
+    background-color: #003366;
+    color: white;
 }
 
+.support-functions-table td {
+    background-color: #f9f9f9;
+    text-align: left;
+}
+
+/* Modal Styling */
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5); /* Overlay with transparency */
+    background-color: rgba(0, 0, 0, 0.5); /* Dark overlay background */
     display: flex;
     justify-content: center;
     align-items: center;
 }
 
 .modal-content {
-    background-color: white;
+    background-color: #fff;
     padding: 20px;
-    border-radius: 8px;
-    width: 400px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Shadow for pop-up */
+    border-radius: 10px;
+    width: 500px; /* Adjusted width for neatness */
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+/* Neat Input Field Alignment */
+.input-container {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.input-container label {
+    align-self: center;
+    font-weight: bold;
+}
+
+.input-container input, .input-container select {
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+
+/* Button Adjustments */
 .modal-buttons {
+    display: flex;
+    justify-content: space-between;
+}
+
+.modal-buttons button {
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.save-btn {
+    background-color: green;
+    color: white;
+}
+
+.cancel-btn {
+    background-color: gray;
+    color: white;
+}
+
+.delete-btn {
+    background-color: red;
+    color: white;
+}
+
+/* Confirmation Dialog */
+.confirmation-dialog {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    width: 300px;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.confirmation-buttons {
     display: flex;
     justify-content: space-between;
     margin-top: 20px;
 }
 
-.modal-buttons button {
+.confirmation-btn {
     padding: 10px 20px;
-    border: none;
     border-radius: 5px;
+    cursor: pointer;
+    width: 100px;
 }
 
-.modal-buttons button:first-child {
-    background-color: green; /* Green for Save */
+.confirm-btn {
+    background-color: green;
     color: white;
 }
 
-.modal-buttons button:nth-child(2) {
-    background-color: blue; /* Blue for Cancel */
+.cancel-btn {
+    background-color: gray;
     color: white;
 }
 
-.modal-buttons button:nth-child(3) {
-    background-color: red; /* Red for Delete */
+.close-btn {
+    padding: 10px;
+    background-color: blue;
     color: white;
+    border-radius: 5px;
+    text-align: center;
+    cursor: pointer;
+}
+
+/* Confirmation Dialog Background */
+.confirmation-background {
+    background-color: rgba(0, 0, 0, 0.75); /* Dark background for delete confirmation */
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
 }

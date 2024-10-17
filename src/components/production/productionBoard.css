@@ -1,10 +1,67 @@
-/* src/components/productionBoard.css */
 .production-board-container {
     padding: 20px;
     position: relative;
     font-family: 'IBM Plex Sans', sans-serif;
 }
 
+/* Buttons */
+.button {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    line-height: 1.5;
+    padding: 10px;
+    border-radius: 8px;
+    transition: all 150ms ease;
+    cursor: pointer;
+    border: none;
+    color: white;
+    margin: 5px;
+    min-width: 150px; /* Increased width */
+    height: 50px;
+}
+
+.unit-produced-button {
+    background-color: #28a745;
+}
+
+.unit-produced-button:hover {
+    background-color: #218838;
+}
+
+.downtime-button {
+    background-color: #007bff; /* Blue */
+}
+
+.downtime-button:hover {
+    background-color: #0069d9;
+}
+
+.reject-button {
+    background-color: #dc3545; /* Red */
+}
+
+.reject-button:hover {
+    background-color: #c82333;
+}
+
+.rework-button {
+    background-color: #fd7e14; /* Orange */
+}
+
+.rework-button:hover {
+    background-color: #e8590c;
+}
+
+.end-shift-button {
+    background-color: #6c757d;
+}
+
+.end-shift-button:hover {
+    background-color: #5a6268;
+}
+
+/* Inputs Container */
 .inputs-container {
     display: flex;
     flex-direction: column;
@@ -40,9 +97,10 @@
     background-color: #0066cc;
 }
 
+/* Board Display */
 .board-display {
     text-align: left;
-    max-width: 800px;
+    max-width: 100%;
     margin: 0 auto;
 }
 
@@ -54,46 +112,61 @@
     margin-bottom: 20px;
 }
 
-.info-section p {
-    margin: 5px 0;
-    font-size: 1.1rem;
+.left-section, .center-section, .right-section {
+    display: flex;
+    align-items: center;
 }
 
-.clock-date-section {
-    text-align: center;
+.center-section {
+    flex-grow: 1;
+    justify-content: center;
 }
 
-.clock-display .clock {
-    font-size: 2rem;
+.center-section h2 {
+    margin: 0;
+    font-size: 2rem; /* Increased size */
     font-weight: bold;
 }
 
-.date-display .date {
-    font-size: 1.5rem;
+/* Clock and Date */
+.clock-date-display {
+    display: flex;
+    align-items: center;
 }
 
-/* Style Information */
-.style-info {
-    margin: 20px 0;
+.clock-date-display .clock,
+.clock-date-display .date {
+    font-size: 2rem; /* Increased size */
+    font-weight: bold;
+    margin: 0 10px;
 }
 
-.style-info h3 {
-    margin-bottom: 10px;
+/* Main Content */
+.main-content {
+    display: flex;
 }
 
-.style-info p {
-    margin: 5px 0;
-    font-size: 1.1rem;
+.left-content {
+    width: 66%; /* 2/3 of the page */
+}
+
+.right-content {
+    width: 34%; /* Remaining width */
+    display: flex;
+    flex-direction: column;
+    padding-left: 20px;
 }
 
 /* Time Slot Selection */
 .slot-selection {
     margin: 20px 0;
-    text-align: left;
+    display: flex;
+    align-items: center;
 }
 
 .slot-selection label {
     font-weight: bold;
+    margin-right: 10px;
 }
 
 .slot-selection select {
@@ -107,7 +180,8 @@
 .timetable {
     margin: 0 auto;
     border-collapse: collapse;
-    width: 66%; /* Set table width to 2/3 of the page */
+    width: 100%;
+    height: calc(100vh - 200px); /* Adjust as needed */
 }
 
 .timetable th, .timetable td {
@@ -126,15 +200,55 @@
     margin-left: 5px;
 }
 
-/* Buttons */
-.button-container {
-    display: flex;
-    justify-content: center;
-    margin-top: 30px;
+/* Right Content Boxes */
+.style-details-box, .rejects-reworks-box, .downtime-box, .buttons-box {
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    padding: 10px;
 }
 
-.button-container button {
-    margin: 0 10px;
+.style-details-box {
+    height: 20%;
+}
+
+.rejects-reworks-box {
+    height: 25%; /* Reduced height */
+}
+
+.downtime-box {
+    height: 50%; /* Increased height */
+}
+
+.buttons-box {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    height: 10%;
+}
+
+/* Counters */
+.counters {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 10px;
+}
+
+.counter {
+    text-align: center;
+    padding: 10px;
+    border-radius: 5px;
+    width: 45%;
+}
+
+.reject-counter {
+    background-color: #dc3545; /* Red */
+    color: white;
+}
+
+.rework-counter {
+    background-color: #fd7e14; /* Orange */
+    color: white;
 }
 
 /* Modal Styles */
@@ -202,18 +316,6 @@
 
 .cancel-button:hover {
     background-color: #c82333;
-}
-
-/* End Shift Button */
-.end-shift-button {
-    background-color: #6c757d;
-    position: absolute;
-    top: 20px;
-    right: 20px;
-}
-
-.end-shift-button:hover {
-    background-color: #5a6268;
 }
 
 /* Rework Modal Adjustments */

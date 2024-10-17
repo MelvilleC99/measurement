@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "es6", // Updated from "es5" to "es6" for Firestore v9 compatibility
     "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
+    "allowJs": true, // Set to false if not using JavaScript files
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -12,7 +12,7 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
+    "noEmit": true, // Set to false if you need TypeScript to emit output files
     "jsx": "react-jsx"
   },
   "include": ["src"]
