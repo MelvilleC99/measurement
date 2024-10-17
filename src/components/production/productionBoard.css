@@ -1,0 +1,288 @@
+/* src/components/productionBoard.css */
+.production-board-container {
+    padding: 20px;
+    position: relative;
+    font-family: 'IBM Plex Sans', sans-serif;
+}
+
+.inputs-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.inputs-container label {
+    margin-bottom: 15px;
+    width: 100%;
+    text-align: left;
+}
+
+.inputs-container select {
+    width: 100%;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+.load-button {
+    padding: 10px 20px;
+    border-radius: 8px;
+    background-color: #007fff;
+    color: white;
+    cursor: pointer;
+    border: none;
+    font-weight: bold;
+}
+
+.load-button:hover {
+    background-color: #0066cc;
+}
+
+.board-display {
+    text-align: left;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+/* Heading Section */
+.heading-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.info-section p {
+    margin: 5px 0;
+    font-size: 1.1rem;
+}
+
+.clock-date-section {
+    text-align: center;
+}
+
+.clock-display .clock {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.date-display .date {
+    font-size: 1.5rem;
+}
+
+/* Style Information */
+.style-info {
+    margin: 20px 0;
+}
+
+.style-info h3 {
+    margin-bottom: 10px;
+}
+
+.style-info p {
+    margin: 5px 0;
+    font-size: 1.1rem;
+}
+
+/* Time Slot Selection */
+.slot-selection {
+    margin: 20px 0;
+    text-align: left;
+}
+
+.slot-selection label {
+    font-weight: bold;
+}
+
+.slot-selection select {
+    margin-left: 10px;
+    padding: 5px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+/* Time Table */
+.timetable {
+    margin: 0 auto;
+    border-collapse: collapse;
+    width: 66%; /* Set table width to 2/3 of the page */
+}
+
+.timetable th, .timetable td {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+
+.timetable th {
+    background-color: #f2f2f2;
+    color: black; /* Ensure heading text is black */
+}
+
+.break-indicator {
+    color: red;
+    font-weight: bold;
+    margin-left: 5px;
+}
+
+/* Buttons */
+.button-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.button-container button {
+    margin: 0 10px;
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    width: 400px;
+    text-align: center;
+}
+
+.modal-content h2 {
+    margin-bottom: 20px;
+}
+
+.modal-content label {
+    display: block;
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.modal-content input[type="text"],
+.modal-content input[type="number"] {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+.modal-content button {
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    border: none;
+    color: white;
+    font-weight: bold;
+    margin: 5px;
+}
+
+.confirm-button {
+    background-color: #28a745;
+}
+
+.confirm-button:hover {
+    background-color: #218838;
+}
+
+.cancel-button {
+    background-color: #dc3545;
+}
+
+.cancel-button:hover {
+    background-color: #c82333;
+}
+
+/* End Shift Button */
+.end-shift-button {
+    background-color: #6c757d;
+    position: absolute;
+    top: 20px;
+    right: 20px;
+}
+
+.end-shift-button:hover {
+    background-color: #5a6268;
+}
+
+/* Rework Modal Adjustments */
+.rework-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1001; /* Ensure it's above other modals */
+}
+
+.rework-modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    width: 400px;
+    text-align: center;
+}
+
+.rework-modal-content h2 {
+    margin-bottom: 20px;
+}
+
+.rework-modal-content label {
+    display: block;
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.rework-modal-content textarea {
+    width: 100%;
+    height: 80px;
+    margin-top: 5px;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+.rework-modal-buttons {
+    display: flex;
+    justify-content: space-between;
+}
+
+.rework-modal-buttons button {
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    border: none;
+    color: white;
+    font-weight: bold;
+}
+
+.submit-button {
+    background-color: #28a745;
+}
+
+.submit-button:hover {
+    background-color: #218838;
+}
+
+.cancel-button {
+    background-color: #dc3545;
+}
+
+.cancel-button:hover {
+    background-color: #c82333;
+}
