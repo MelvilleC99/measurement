@@ -3,22 +3,35 @@ import {
     collection,
     getDocs,
     addDoc,
+    updateDoc,
+    deleteDoc,
+    doc,
     Timestamp,
 } from 'firebase/firestore';
-import { db } from '../../firebase'; // Ensure this path is correct
-import Rework from './Rework'; // Ensure this path is correct
-import './productionBoard.css'; // Ensure this path is correct
+import { db } from '../../firebase';
+import ReworkPopup from './ReworkPopup';
+import RejectPopup from './RejectPopup';
+import DowntimePopup from './DowntimePopup';
+import ActiveReworksPopup from './ActiveReworksPopup';
+import RejectsListPopup from './RejectsListPopup';
+import DowntimeActionPopup from './DowntimeActionPopup';
+import './productionBoard.css';
 
-// Define Interfaces based on Your Firestore Schema
+// Interfaces
 interface ProductionLine {
     id: string;
     name: string;
     description?: string;
 }
 
-interface Supervisor {
+interface SupportFunction {
     id: string;
     name: string;
+    surname: string;
+    employeeNumber: string;
+    role: string;
+    hasPassword: boolean;
+    password: string;
 }
 
 interface Style {
@@ -45,22 +58,61 @@ interface TimeTable {
 
 interface Break {
     id: string;
-    duration: number; // Duration in minutes
+    breakType: string;
+    startTime: string;
+    endTime: string;
+    duration: number;
+}
+
+interface Reject {
+    refNumber: string;
+    count: number;
+    reason: string;
+    recordedAsProduced: boolean;
+    qcApprovedBy: string;
+}
+
+interface ReworkItem {
+    refNumber: string;
+    count: number;
+    reason: string;
+    operation: string;
+    startTime: Date;
+    endTime?: Date;
+    status: 'Booked Out' | 'Booked In' | 'Rejected';
+}
+
+interface DowntimeItem {
+    refNumber: string;
+    productionLineId: string;
+    supervisorId: string;
+    mechanicId?: string;
+    startTime: Date;
+    mechanicReceivedTime?: Date;
+    endTime?: Date;
+    category: string;
+    reason: string;
+    status: 'Open' | 'Mechanic Received' | 'Resolved';
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 const ProductionBoard: React.FC = () => {
     // State Variables
     const [productionLines, setProductionLines] = useState<ProductionLine[]>([]);
-    const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
+    const [supervisors, setSupervisors] = useState<SupportFunction[]>([]);
+    const [mechanics, setMechanics] = useState<SupportFunction[]>([]);
+    const [qcs, setQcs] = useState<SupportFunction[]>([]);
     const [styles, setStyles] = useState<Style[]>([]);
     const [timeTables, setTimeTables] = useState<TimeTable[]>([]);
     const [breaks, setBreaks] = useState<Break[]>([]);
+    const [downtimeCategories, setDowntimeCategories] = useState<{ categoryName: string; reasons: string[] }[]>([]);
 
-    // Selection States (Using Names)
+    // Selection States
     const [selectedLine, setSelectedLine] = useState<string>('');
-    const [selectedSupervisor, setSelectedSupervisor] = useState<string>('');
+    const [selectedSupervisor, setSelectedSupervisor] = useState<SupportFunction | null>(null);
     const [selectedStyle, setSelectedStyle] = useState<Style | null>(null);
-    const [manualSlot, setManualSlot] = useState<string>('current'); // Manual booking slot
+    const [manualSlot, setManualSlot] = useState<string>('current');
 
     // Production Board States
     const [assignedTimeTable, setAssignedTimeTable] = useState<TimeTable | null>(null);
@@ -76,28 +128,44 @@ const ProductionBoard: React.FC = () => {
     const [isBoardLoaded, setIsBoardLoaded] = useState(false);
     const [isStyleModalOpen, setIsStyleModalOpen] = useState(false);
     const [isReworkModalOpen, setIsReworkModalOpen] = useState(false);
+    const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+    const [isDowntimeModalOpen, setIsDowntimeModalOpen] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [rejectCount, setRejectCount] = useState(0);
     const [reworkCount, setReworkCount] = useState(0);
+    const [rejects, setRejects] = useState<Reject[]>([]);
+    const [reworks, setReworks] = useState<ReworkItem[]>([]);
+    const [downtimes, setDowntimes] = useState<DowntimeItem[]>([]);
+
+    // New State Variables for Popups
+    const [isActiveReworksPopupOpen, setIsActiveReworksPopupOpen] = useState(false);
+    const [isRejectsListPopupOpen, setIsRejectsListPopupOpen] = useState(false);
+    const [selectedDowntime, setSelectedDowntime] = useState<DowntimeItem | null>(null);
 
     // Fetch data from Firestore
     const fetchData = async () => {
         try {
+            // Fetch production lines
             const linesSnapshot = await getDocs(collection(db, 'productionLines'));
-            const supervisorsSnapshot = await getDocs(collection(db, 'supportFunctions'));
-            const stylesSnapshot = await getDocs(collection(db, 'styles'));
-            const timeTablesSnapshot = await getDocs(collection(db, 'timeTables'));
-            const breaksSnapshot = await getDocs(collection(db, 'breaks'));
-
             setProductionLines(
                 linesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ProductionLine))
             );
-            setSupervisors(
-                supervisorsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Supervisor))
-            );
+
+            // Fetch support functions
+            const supportFunctionsSnapshot = await getDocs(collection(db, 'supportFunctions'));
+            const supportFunctionsData = supportFunctionsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as SupportFunction));
+
+            // Filter supervisors, mechanics, and QCs
+            setSupervisors(supportFunctionsData.filter(sf => sf.role.toLowerCase() === 'supervisor'));
+            setMechanics(supportFunctionsData.filter(sf => sf.role.toLowerCase() === 'mechanic'));
+            setQcs(supportFunctionsData.filter(sf => sf.role.toLowerCase() === 'qc'));
+
+            // Fetch styles
+            const stylesSnapshot = await getDocs(collection(db, 'styles'));
             setStyles(stylesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Style)));
 
-            // Fetch and set the time tables, including slots and breaks
+            // Fetch time tables
+            const timeTablesSnapshot = await getDocs(collection(db, 'timeTables'));
             const fetchedTimeTables: TimeTable[] = timeTablesSnapshot.docs.map((doc) => {
                 const data = doc.data();
                 return {
@@ -111,16 +179,27 @@ const ProductionBoard: React.FC = () => {
                     })),
                 };
             });
-
             setTimeTables(fetchedTimeTables);
 
-            // Fetch and set the breaks
+            // Fetch breaks
+            const breaksSnapshot = await getDocs(collection(db, 'breaks'));
             const fetchedBreaks: Break[] = breaksSnapshot.docs.map((doc) => ({
                 id: doc.id,
+                breakType: doc.data().breakType,
+                startTime: doc.data().startTime,
+                endTime: doc.data().endTime,
                 duration: doc.data().duration,
             }));
-
             setBreaks(fetchedBreaks);
+
+            // Fetch downtime categories and reasons (including rejects and reworks)
+            const downtimeCategoriesSnapshot = await getDocs(collection(db, 'downtimeCategories'));
+            const fetchedDowntimeCategories = downtimeCategoriesSnapshot.docs.map((doc) => ({
+                categoryName: doc.data().name, // Corrected field name
+                reasons: doc.data().reasons,
+            }));
+            setDowntimeCategories(fetchedDowntimeCategories);
+
         } catch (error) {
             console.error('Error fetching data from Firestore:', error);
             alert('Failed to load data. Please try again.');
@@ -159,7 +238,7 @@ const ProductionBoard: React.FC = () => {
             // Create a new production record
             await addDoc(productionRef, {
                 productionLineId: selectedLine,
-                supervisorId: selectedSupervisor,
+                supervisorId: selectedSupervisor.id,
                 styleId: selectedStyle.id,
                 date: Timestamp.fromDate(new Date()),
                 timeSlot: selectedSlot.id,
@@ -289,16 +368,95 @@ const ProductionBoard: React.FC = () => {
         }
     };
 
-    // Function to handle rework submission
-    const handleReworkSubmit = (reason: string) => {
-        if (!reason.trim()) {
-            alert('Please provide a reason for rework.');
-            return;
+    // Function to handle reject submission
+    const handleRejectSubmit = async (rejectData: Omit<Reject, 'refNumber'>) => {
+        // Generate unique 4-digit reference number
+        const refNumber = Math.floor(1000 + Math.random() * 9000).toString();
+
+        const newReject: Reject = {
+            refNumber,
+            ...rejectData,
+        };
+
+        setRejects([...rejects, newReject]);
+        setRejectCount(rejectCount + rejectData.count);
+
+        if (rejectData.recordedAsProduced) {
+            // Adjust outputs
+            const slotIndex = assignedTimeTable?.slots.findIndex(slot => slot.id === manualSlot) || 0;
+            const updatedOutputs = [...styleDetails.outputs];
+            updatedOutputs[slotIndex] -= rejectData.count; // Reduce output by reject count
+            setStyleDetails((prev) => ({ ...prev, outputs: updatedOutputs }));
         }
-        console.log('Rework reason:', reason);
-        setReworkCount(reworkCount + 1);
-        alert(`Rework submitted for reason: ${reason}`);
+
+        // Save to database
+        await addDoc(collection(db, 'rejects'), {
+            ...newReject,
+            productionLineId: selectedLine,
+            supervisorId: selectedSupervisor?.id,
+            timestamp: Timestamp.fromDate(new Date()),
+            createdAt: Timestamp.fromDate(new Date()),
+            updatedAt: Timestamp.fromDate(new Date()),
+        });
+
+        setIsRejectModalOpen(false);
+    };
+
+    // Function to handle rework submission
+    const handleReworkSubmit = async (reworkData: Omit<ReworkItem, 'refNumber' | 'startTime' | 'status' | 'endTime'>) => {
+        // Generate unique 4-digit reference number
+        const refNumber = Math.floor(1000 + Math.random() * 9000).toString();
+
+        const newRework: ReworkItem = {
+            refNumber,
+            startTime: new Date(),
+            status: 'Booked Out',
+            ...reworkData,
+        };
+
+        setReworks([...reworks, newRework]);
+        setReworkCount(reworkCount + reworkData.count);
+
+        // Save to database
+        await addDoc(collection(db, 'reworks'), {
+            ...newRework,
+            productionLineId: selectedLine,
+            supervisorId: selectedSupervisor?.id,
+            timestamp: Timestamp.fromDate(new Date()),
+            createdAt: Timestamp.fromDate(new Date()),
+            updatedAt: Timestamp.fromDate(new Date()),
+        });
+
         setIsReworkModalOpen(false);
+    };
+
+    // Function to handle downtime submission
+    const handleDowntimeSubmit = async (downtimeData: Omit<DowntimeItem, 'refNumber' | 'startTime' | 'status' | 'createdAt' | 'updatedAt' | 'productionLineId' | 'supervisorId'>) => {
+        // Generate unique 4-digit reference number
+        const refNumber = Math.floor(1000 + Math.random() * 9000).toString();
+
+        const newDowntime: DowntimeItem = {
+            refNumber,
+            productionLineId: selectedLine,
+            supervisorId: selectedSupervisor?.id || '',
+            startTime: new Date(),
+            status: 'Open',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            ...downtimeData,
+        };
+
+        setDowntimes([...downtimes, newDowntime]);
+
+        // Save to database
+        await addDoc(collection(db, 'downtimes'), {
+            ...newDowntime,
+            startTime: Timestamp.fromDate(newDowntime.startTime),
+            createdAt: Timestamp.fromDate(newDowntime.createdAt),
+            updatedAt: Timestamp.fromDate(newDowntime.updatedAt),
+        });
+
+        setIsDowntimeModalOpen(false);
     };
 
     // Function to calculate target per slot based on break duration
@@ -336,6 +494,157 @@ const ProductionBoard: React.FC = () => {
         return totalTarget ? ((totalOutput / totalTarget) * 100).toFixed(2) + '%' : 'N/A';
     };
 
+    // Function to handle selecting an active downtime
+    const handleSelectDowntime = (downtime: DowntimeItem) => {
+        setSelectedDowntime(downtime);
+    };
+
+    // Function to handle downtime action from popup
+    const handleDowntimeAction = async (action: 'mechanicReceived' | 'resolved', mechanicId?: string) => {
+        if (!selectedDowntime) return;
+
+        const downtimeDocRef = doc(db, 'downtimes', selectedDowntime.refNumber);
+
+        if (action === 'mechanicReceived' && mechanicId) {
+            const mechanic = mechanics.find(m => m.id === mechanicId);
+            if (!mechanic) {
+                alert('Invalid mechanic selected.');
+                return;
+            }
+
+            const updatedDowntime: DowntimeItem = {
+                ...selectedDowntime,
+                mechanicId,
+                mechanicReceivedTime: new Date(),
+                status: 'Mechanic Received',
+                updatedAt: new Date(),
+            };
+
+            // Update local state
+            setDowntimes(prevDowntimes =>
+                prevDowntimes.map(dt =>
+                    dt.refNumber === selectedDowntime.refNumber ? updatedDowntime : dt
+                )
+            );
+
+            // Update in database
+            await updateDoc(downtimeDocRef, {
+                mechanicId: updatedDowntime.mechanicId,
+                mechanicReceivedTime: Timestamp.fromDate(updatedDowntime.mechanicReceivedTime!),
+                status: updatedDowntime.status,
+                updatedAt: Timestamp.fromDate(updatedDowntime.updatedAt),
+            });
+        } else if (action === 'resolved') {
+            const updatedDowntime: DowntimeItem = {
+                ...selectedDowntime,
+                endTime: new Date(),
+                status: 'Resolved',
+                updatedAt: new Date(),
+            };
+
+            // Update local state
+            setDowntimes(prevDowntimes =>
+                prevDowntimes.map(dt =>
+                    dt.refNumber === selectedDowntime.refNumber ? updatedDowntime : dt
+                )
+            );
+
+            // Update in database
+            await updateDoc(downtimeDocRef, {
+                endTime: Timestamp.fromDate(updatedDowntime.endTime!),
+                status: updatedDowntime.status,
+                updatedAt: Timestamp.fromDate(updatedDowntime.updatedAt),
+            });
+
+            // Calculate response time and repair time
+            const responseTime = updatedDowntime.mechanicReceivedTime
+                ? (updatedDowntime.mechanicReceivedTime.getTime() - updatedDowntime.startTime.getTime()) / 1000
+                : 0;
+            const repairTime = updatedDowntime.endTime && updatedDowntime.mechanicReceivedTime
+                ? (updatedDowntime.endTime.getTime() - updatedDowntime.mechanicReceivedTime.getTime()) / 1000
+                : 0;
+            const totalDowntime = updatedDowntime.endTime
+                ? (updatedDowntime.endTime.getTime() - updatedDowntime.startTime.getTime()) / 1000
+                : 0;
+
+            console.log(`Downtime Resolved. Response Time: ${responseTime}s, Repair Time: ${repairTime}s, Total Downtime: ${totalDowntime}s`);
+        }
+
+        setSelectedDowntime(null);
+    };
+
+    // Function to handle booking reworks back in or converting to reject
+    const handleBookInRework = async (rework: ReworkItem, qcId: string, action: 'bookIn' | 'convertToReject') => {
+        const qc = qcs.find(q => q.id === qcId);
+        if (qc) {
+            if (action === 'bookIn') {
+                // Update rework status
+                const updatedReworks = reworks.map(rw => {
+                    if (rw.refNumber === rework.refNumber) {
+                        return {
+                            ...rw,
+                            endTime: new Date(),
+                            status: 'Booked In' as 'Booked In',
+                        };
+                    }
+                    return rw;
+                });
+                setReworks(updatedReworks);
+                setReworkCount(reworkCount - rework.count);
+
+                // Update in database
+                const reworkDocRef = doc(db, 'reworks', rework.refNumber);
+                await updateDoc(reworkDocRef, {
+                    endTime: Timestamp.fromDate(new Date()),
+                    status: 'Booked In',
+                    updatedAt: Timestamp.fromDate(new Date()),
+                });
+            } else if (action === 'convertToReject') {
+                // Remove rework and add reject
+                setReworks(reworks.filter(rw => rw.refNumber !== rework.refNumber));
+                setReworkCount(reworkCount - rework.count);
+
+                const refNumber = Math.floor(1000 + Math.random() * 9000).toString();
+                const newReject: Reject = {
+                    refNumber,
+                    count: rework.count,
+                    reason: rework.reason,
+                    recordedAsProduced: false,
+                    qcApprovedBy: `${qc.name} ${qc.surname}`,
+                };
+                setRejects([...rejects, newReject]);
+                setRejectCount(rejectCount + rework.count);
+
+                // Save reject to database
+                await addDoc(collection(db, 'rejects'), {
+                    ...newReject,
+                    productionLineId: selectedLine,
+                    supervisorId: selectedSupervisor?.id,
+                    timestamp: Timestamp.fromDate(new Date()),
+                    createdAt: Timestamp.fromDate(new Date()),
+                    updatedAt: Timestamp.fromDate(new Date()),
+                });
+
+                // Delete rework from database
+                const reworkDocRef = doc(db, 'reworks', rework.refNumber);
+                await deleteDoc(reworkDocRef);
+            }
+            setIsActiveReworksPopupOpen(false);
+        } else {
+            alert('Invalid QC selected.');
+        }
+    };
+
+    // Function to display list of rejects
+    const handleShowRejects = () => {
+        setIsRejectsListPopupOpen(true);
+    };
+
+    // Function to display list of reworks
+    const handleShowReworks = () => {
+        setIsActiveReworksPopupOpen(true);
+    };
+
     return (
         <div className="production-board-container">
             {!isBoardLoaded ? (
@@ -361,15 +670,16 @@ const ProductionBoard: React.FC = () => {
                     <label>
                         Supervisor:
                         <select
-                            value={selectedSupervisor}
+                            value={selectedSupervisor?.id || ''}
                             onChange={(e) => {
-                                setSelectedSupervisor(e.target.value);
+                                const supervisor = supervisors.find(sup => sup.id === e.target.value);
+                                setSelectedSupervisor(supervisor || null);
                             }}
                         >
                             <option value="">Select a Supervisor</option>
                             {supervisors.map((sup) => (
-                                <option key={sup.id} value={sup.name}>
-                                    {sup.name}
+                                <option key={sup.id} value={sup.id}>
+                                    {sup.name} {sup.surname}
                                 </option>
                             ))}
                         </select>
@@ -406,7 +716,7 @@ const ProductionBoard: React.FC = () => {
                             </div>
                         </div>
                         <div className="center-section">
-                            <h2>{selectedLine} - Supervisor: {selectedSupervisor} - Style Number: {selectedStyle?.styleNumber}</h2>
+                            <h2>{selectedLine} - Supervisor: {selectedSupervisor?.name} - Style Number: {selectedStyle?.styleNumber}</h2>
                         </div>
                         <div className="right-section">
                             <button className="button end-shift-button" onClick={handleEndShift}>End of Shift</button>
@@ -447,9 +757,9 @@ const ProductionBoard: React.FC = () => {
                                     </thead>
                                     <tbody>
                                     {assignedTimeTable.slots.map((slot, index) => {
-                                        const breakDuration = slot.breakId
-                                            ? breaks.find((b) => b.id === slot.breakId)?.duration || 0
-                                            : 0;
+                                        const breakInfo = slot.breakId
+                                            ? breaks.find((b) => b.id === slot.breakId)
+                                            : null;
 
                                         // Calculate target per slot
                                         const targetPerSlot = calculateTargetPerSlot(slot);
@@ -460,8 +770,8 @@ const ProductionBoard: React.FC = () => {
                                                 <td>Hour {index + 1}</td>
                                                 <td>
                                                     {slot.startTime} - {slot.endTime}
-                                                    {breakDuration > 0 && (
-                                                        <span className="break-indicator"> (Break: {breakDuration} mins)</span>
+                                                    {breakInfo && (
+                                                        <span className="break-indicator"> (Break: {breakInfo.breakType} - {breakInfo.duration} mins)</span>
                                                     )}
                                                 </td>
                                                 <td>{targetPerSlot}</td>
@@ -493,11 +803,11 @@ const ProductionBoard: React.FC = () => {
                             <div className="rejects-reworks-box">
                                 <h3>Rejects and Reworks</h3>
                                 <div className="counters">
-                                    <div className="counter reject-counter">
+                                    <div className="counter reject-counter" onClick={handleShowRejects}>
                                         <p>Total Rejects:</p>
                                         <span>{rejectCount}</span>
                                     </div>
-                                    <div className="counter rework-counter">
+                                    <div className="counter rework-counter" onClick={handleShowReworks}>
                                         <p>Total Reworks:</p>
                                         <span>{reworkCount}</span>
                                     </div>
@@ -507,61 +817,122 @@ const ProductionBoard: React.FC = () => {
                             {/* Box 3: Open Downtime Elements */}
                             <div className="downtime-box">
                                 <h3>Open Downtime Elements</h3>
-                                {/* Placeholder content */}
-                                <p>No downtime reported.</p>
+                                <div className="downtime-list">
+                                    {downtimes.filter(dt => dt.status !== 'Resolved').map(dt => (
+                                        <div
+                                            key={dt.refNumber}
+                                            className="downtime-item"
+                                            onClick={() => handleSelectDowntime(dt)}
+                                        >
+                                            <p><strong>Ref:</strong> {dt.refNumber}</p>
+                                            <p><strong>Category:</strong> {dt.category}</p>
+                                            <p><strong>Reason:</strong> {dt.reason}</p>
+                                            <p><strong>Status:</strong> {dt.status}</p>
+                                            <p><strong>Duration:</strong> {Math.floor((new Date().getTime() - dt.startTime.getTime()) / 1000)} seconds</p>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
 
                             {/* Box 4: Buttons */}
                             <div className="buttons-box">
-                                <button className="button downtime-button">Down Time</button>
-                                <button className="button reject-button">Reject</button>
+                                <button className="button downtime-button" onClick={() => setIsDowntimeModalOpen(true)}>Down Time</button>
+                                <button className="button reject-button" onClick={() => setIsRejectModalOpen(true)}>Reject</button>
                                 <button className="button rework-button" onClick={() => setIsReworkModalOpen(true)}>Rework</button>
                             </div>
                         </div>
                     </div>
 
-                    {/* Rework Modal */}
-                    {isReworkModalOpen && (
-                        <Rework
-                            onClose={() => setIsReworkModalOpen(false)}
-                            onSubmit={handleReworkSubmit}
+                    {/* Modals */}
+                    {isRejectModalOpen && (
+                        <RejectPopup
+                            onClose={() => setIsRejectModalOpen(false)}
+                            onSubmit={handleRejectSubmit}
+                            downtimeCategories={downtimeCategories}
+                            qcs={qcs}
                         />
                     )}
-                </div>
-            )}
 
-            {/* Modal for Confirming Style and Target */}
-            {isStyleModalOpen && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <h2>Confirm Style & Target</h2>
-                        <label>
-                            Style:
-                            <input
-                                type="text"
-                                value={selectedStyle?.styleNumber || ''}
-                                readOnly
-                            />
-                        </label>
-                        <label>
-                            Target per Hour:
-                            <input
-                                type="number"
-                                min="1"
-                                value={styleDetails.target}
-                                onChange={(e) =>
-                                    setStyleDetails((prev) => ({ ...prev, target: Number(e.target.value) }))
-                                }
-                            />
-                        </label>
-                        <button className="confirm-button" onClick={() => handleConfirmStyle(styleDetails.target)}>Confirm</button>
-                        <button className="cancel-button" onClick={() => setIsStyleModalOpen(false)}>Cancel</button>
-                    </div>
+                    {isReworkModalOpen && (
+                        <ReworkPopup
+                            onClose={() => setIsReworkModalOpen(false)}
+                            onSubmit={handleReworkSubmit}
+                            downtimeCategories={downtimeCategories}
+                            operations={[]} // Operations are manual input
+                            qcs={qcs}
+                        />
+                    )}
+
+                    {isDowntimeModalOpen && (
+                        <DowntimePopup
+                            onClose={() => setIsDowntimeModalOpen(false)}
+                            onSubmit={handleDowntimeSubmit}
+                            downtimeCategories={downtimeCategories}
+                        />
+                    )}
+
+                    {/* Active Reworks Popup */}
+                    {isActiveReworksPopupOpen && (
+                        <ActiveReworksPopup
+                            reworks={reworks.filter(rw => rw.status === 'Booked Out')}
+                            qcs={qcs}
+                            onClose={() => setIsActiveReworksPopupOpen(false)}
+                            onBookIn={handleBookInRework}
+                        />
+                    )}
+
+                    {/* Rejects List Popup */}
+                    {isRejectsListPopupOpen && (
+                        <RejectsListPopup
+                            rejects={rejects}
+                            onClose={() => setIsRejectsListPopupOpen(false)}
+                        />
+                    )}
+
+                    {/* Downtime Action Popup */}
+                    {selectedDowntime && (
+                        <DowntimeActionPopup
+                            downtime={selectedDowntime}
+                            mechanics={mechanics}
+                            supervisor={selectedSupervisor}
+                            onClose={() => setSelectedDowntime(null)}
+                            onAction={handleDowntimeAction}
+                        />
+                    )}
+
+                    {/* Modal for Confirming Style and Target */}
+                    {isStyleModalOpen && (
+                        <div className="modal-overlay">
+                            <div className="modal-content">
+                                <h2>Confirm Style & Target</h2>
+                                <label>
+                                    Style:
+                                    <input
+                                        type="text"
+                                        value={selectedStyle?.styleNumber || ''}
+                                        readOnly
+                                    />
+                                </label>
+                                <label>
+                                    Target per Hour:
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={styleDetails.target}
+                                        onChange={(e) =>
+                                            setStyleDetails((prev) => ({ ...prev, target: Number(e.target.value) }))
+                                        }
+                                    />
+                                </label>
+                                <button className="confirm-button" onClick={() => handleConfirmStyle(styleDetails.target)}>Confirm</button>
+                                <button className="cancel-button" onClick={() => setIsStyleModalOpen(false)}>Cancel</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
     );
-
-}; // End of ProductionBoard component
+};
 
 export default ProductionBoard;
