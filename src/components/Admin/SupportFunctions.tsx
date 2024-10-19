@@ -6,8 +6,8 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { InputText } from 'primereact/inputtext'; // For cleaner input fields
-import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'; // For delete confirmation
+import { InputText } from 'primereact/inputtext';
+import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog';
 
 interface SupportFunction {
     id: string;
@@ -16,6 +16,7 @@ interface SupportFunction {
     employeeNumber: string;
     role: string;
     hasPassword: boolean;
+    password: string;
 }
 
 interface Role {
@@ -59,12 +60,33 @@ const SupportFunctions: React.FC = () => {
         if (name && surname && employeeNumber && role) {
             if (selectedFunction) {
                 const functionDoc = doc(db, 'supportFunctions', selectedFunction.id);
-                await updateDoc(functionDoc, { name, surname, employeeNumber, role, hasPassword: !!password });
+                await updateDoc(functionDoc, {
+                    name,
+                    surname,
+                    employeeNumber,
+                    role,
+                    hasPassword: !!selectedFunction.password,
+                    password: selectedFunction.password || '',
+                });
             } else {
-                await addDoc(collection(db, 'supportFunctions'), { name, surname, employeeNumber, role, hasPassword: !!password });
+                await addDoc(collection(db, 'supportFunctions'), {
+                    name,
+                    surname,
+                    employeeNumber,
+                    role,
+                    hasPassword: !!password,
+                    password: password || '',
+                });
             }
             fetchData();
             setIsFunctionModalOpen(false);
+            setSelectedFunction(null);
+            setName('');
+            setSurname('');
+            setEmployeeNumber('');
+            setRole('');
+            setPassword('');
+            setConfirmPassword('');
         } else {
             alert('Please fill all the fields');
         }
@@ -72,7 +94,7 @@ const SupportFunctions: React.FC = () => {
 
     const confirmDelete = (id: string) => {
         confirmDialog({
-            message: 'Are you sure you want to delete this function?',
+            message: 'Are you sure you want to delete this support function?',
             header: 'Confirmation',
             icon: 'pi pi-exclamation-triangle',
             accept: async () => {
@@ -108,9 +130,12 @@ const SupportFunctions: React.FC = () => {
 
         if (selectedFunction) {
             const functionDoc = doc(db, 'supportFunctions', selectedFunction.id);
-            await updateDoc(functionDoc, { hasPassword: !!password });
+            await updateDoc(functionDoc, { password, hasPassword: true });
             fetchData();
             setIsPasswordModalOpen(false);
+            setSelectedFunction(null);
+            setPassword('');
+            setConfirmPassword('');
         }
     };
 
@@ -290,7 +315,11 @@ const SupportFunctions: React.FC = () => {
                                     <td>{r.name}</td>
                                     <td>{r.description}</td>
                                     <td>
-                                        <IconButton onClick={() => openRoleModal()}>
+                                        <IconButton onClick={() => {
+                                            setRoleName(r.name);
+                                            setRoleDescription(r.description);
+                                            setIsRoleModalOpen(true);
+                                        }}>
                                             <EditIcon />
                                         </IconButton>
                                     </td>
@@ -314,7 +343,7 @@ const SupportFunctions: React.FC = () => {
             {isPasswordModalOpen && (
                 <div className="modal-overlay">
                     <div className="modal-content">
-                        <h2>Change Password</h2>
+                        <h2>Set Password for {selectedFunction?.name}</h2>
                         <div className="input-container">
                             <label htmlFor="password">Password:</label>
                             <InputText type="password" id="password" value={password} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)} />

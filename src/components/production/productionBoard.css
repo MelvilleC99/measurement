@@ -33,6 +33,11 @@
     background-color: #007bff; /* Blue */
 }
 
+.downtime-button {
+    background-color: blue;
+    color: white;
+}
+
 .downtime-button:hover {
     background-color: #0069d9;
 }

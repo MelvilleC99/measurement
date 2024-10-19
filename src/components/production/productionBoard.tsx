@@ -65,7 +65,7 @@ interface Break {
 }
 
 interface Reject {
-    refNumber: string;
+    docId: string; // Firestore document ID
     count: number;
     reason: string;
     recordedAsProduced: boolean;
@@ -73,7 +73,7 @@ interface Reject {
 }
 
 interface ReworkItem {
-    refNumber: string;
+    docId: string; // Firestore document ID
     count: number;
     reason: string;
     operation: string;
@@ -83,7 +83,7 @@ interface ReworkItem {
 }
 
 interface DowntimeItem {
-    refNumber: string;
+    docId: string; // Firestore document ID
     productionLineId: string;
     supervisorId: string;
     mechanicId?: string;
@@ -98,7 +98,6 @@ interface DowntimeItem {
 }
 
 const ProductionBoard: React.FC = () => {
-    // State Variables
     const [productionLines, setProductionLines] = useState<ProductionLine[]>([]);
     const [supervisors, setSupervisors] = useState<SupportFunction[]>([]);
     const [mechanics, setMechanics] = useState<SupportFunction[]>([]);
@@ -108,13 +107,10 @@ const ProductionBoard: React.FC = () => {
     const [breaks, setBreaks] = useState<Break[]>([]);
     const [downtimeCategories, setDowntimeCategories] = useState<{ categoryName: string; reasons: string[] }[]>([]);
 
-    // Selection States
     const [selectedLine, setSelectedLine] = useState<string>('');
     const [selectedSupervisor, setSelectedSupervisor] = useState<SupportFunction | null>(null);
     const [selectedStyle, setSelectedStyle] = useState<Style | null>(null);
     const [manualSlot, setManualSlot] = useState<string>('current');
-
-    // Production Board States
     const [assignedTimeTable, setAssignedTimeTable] = useState<TimeTable | null>(null);
     const [styleDetails, setStyleDetails] = useState<{
         target: number;
@@ -125,6 +121,7 @@ const ProductionBoard: React.FC = () => {
         outputs: [],
         balance: 0,
     });
+
     const [isBoardLoaded, setIsBoardLoaded] = useState(false);
     const [isStyleModalOpen, setIsStyleModalOpen] = useState(false);
     const [isReworkModalOpen, setIsReworkModalOpen] = useState(false);
@@ -137,34 +134,26 @@ const ProductionBoard: React.FC = () => {
     const [reworks, setReworks] = useState<ReworkItem[]>([]);
     const [downtimes, setDowntimes] = useState<DowntimeItem[]>([]);
 
-    // New State Variables for Popups
     const [isActiveReworksPopupOpen, setIsActiveReworksPopupOpen] = useState(false);
     const [isRejectsListPopupOpen, setIsRejectsListPopupOpen] = useState(false);
     const [selectedDowntime, setSelectedDowntime] = useState<DowntimeItem | null>(null);
 
-    // Fetch data from Firestore
     const fetchData = async () => {
         try {
-            // Fetch production lines
             const linesSnapshot = await getDocs(collection(db, 'productionLines'));
             setProductionLines(
                 linesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ProductionLine))
             );
 
-            // Fetch support functions
             const supportFunctionsSnapshot = await getDocs(collection(db, 'supportFunctions'));
             const supportFunctionsData = supportFunctionsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as SupportFunction));
-
-            // Filter supervisors, mechanics, and QCs
             setSupervisors(supportFunctionsData.filter(sf => sf.role.toLowerCase() === 'supervisor'));
             setMechanics(supportFunctionsData.filter(sf => sf.role.toLowerCase() === 'mechanic'));
             setQcs(supportFunctionsData.filter(sf => sf.role.toLowerCase() === 'qc'));
 
-            // Fetch styles
             const stylesSnapshot = await getDocs(collection(db, 'styles'));
             setStyles(stylesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Style)));
 
-            // Fetch time tables
             const timeTablesSnapshot = await getDocs(collection(db, 'timeTables'));
             const fetchedTimeTables: TimeTable[] = timeTablesSnapshot.docs.map((doc) => {
                 const data = doc.data();
@@ -181,7 +170,6 @@ const ProductionBoard: React.FC = () => {
             });
             setTimeTables(fetchedTimeTables);
 
-            // Fetch breaks
             const breaksSnapshot = await getDocs(collection(db, 'breaks'));
             const fetchedBreaks: Break[] = breaksSnapshot.docs.map((doc) => ({
                 id: doc.id,
@@ -192,13 +180,56 @@ const ProductionBoard: React.FC = () => {
             }));
             setBreaks(fetchedBreaks);
 
-            // Fetch downtime categories and reasons (including rejects and reworks)
             const downtimeCategoriesSnapshot = await getDocs(collection(db, 'downtimeCategories'));
             const fetchedDowntimeCategories = downtimeCategoriesSnapshot.docs.map((doc) => ({
-                categoryName: doc.data().name, // Corrected field name
+                categoryName: doc.data().name,
                 reasons: doc.data().reasons,
             }));
             setDowntimeCategories(fetchedDowntimeCategories);
+
+            // Fetch existing Reworks
+            const reworksSnapshot = await getDocs(collection(db, 'reworks'));
+            const fetchedReworks: ReworkItem[] = reworksSnapshot.docs.map((doc) => ({
+                docId: doc.id,
+                count: doc.data().count,
+                reason: doc.data().reason,
+                operation: doc.data().operation,
+                startTime: doc.data().startTime.toDate(),
+                endTime: doc.data().endTime ? doc.data().endTime.toDate() : undefined,
+                status: doc.data().status,
+            }));
+            setReworks(fetchedReworks);
+            setReworkCount(fetchedReworks.reduce((acc, rw) => acc + rw.count, 0));
+
+            // Fetch existing Rejects
+            const rejectsSnapshot = await getDocs(collection(db, 'rejects'));
+            const fetchedRejects: Reject[] = rejectsSnapshot.docs.map((doc) => ({
+                docId: doc.id,
+                count: doc.data().count,
+                reason: doc.data().reason,
+                recordedAsProduced: doc.data().recordedAsProduced,
+                qcApprovedBy: doc.data().qcApprovedBy,
+            }));
+            setRejects(fetchedRejects);
+            setRejectCount(fetchedRejects.reduce((acc, rj) => acc + rj.count, 0));
+
+            // Fetch existing Downtimes
+            const downtimesSnapshot = await getDocs(collection(db, 'downtimes'));
+            const fetchedDowntimes: DowntimeItem[] = downtimesSnapshot.docs.map((doc) => ({
+                docId: doc.id,
+                productionLineId: doc.data().productionLineId,
+                supervisorId: doc.data().supervisorId,
+                mechanicId: doc.data().mechanicId,
+                startTime: doc.data().startTime.toDate(),
+                mechanicReceivedTime: doc.data().mechanicReceivedTime ? doc.data().mechanicReceivedTime.toDate() : undefined,
+                endTime: doc.data().endTime ? doc.data().endTime.toDate() : undefined,
+                category: doc.data().category,
+                reason: doc.data().reason,
+                status: doc.data().status,
+                createdAt: doc.data().createdAt.toDate(),
+                updatedAt: doc.data().updatedAt.toDate(),
+            }));
+            setDowntimes(fetchedDowntimes);
 
         } catch (error) {
             console.error('Error fetching data from Firestore:', error);
@@ -210,10 +241,9 @@ const ProductionBoard: React.FC = () => {
         fetchData();
 
         const interval = setInterval(() => setCurrentTime(new Date()), 1000);
-        return () => clearInterval(interval); // Cleanup interval on component unmount
+        return () => clearInterval(interval);
     }, []);
 
-    // Function to log production data to Firestore
     const logProductionRecord = async (unitsProduced: number, slotId: string) => {
         if (!selectedLine || !selectedSupervisor || !selectedStyle) {
             alert('Please select a line, supervisor, and style.');
@@ -232,10 +262,8 @@ const ProductionBoard: React.FC = () => {
         }
 
         try {
-            // Reference to the 'production' collection
             const productionRef = collection(db, 'production');
 
-            // Create a new production record
             await addDoc(productionRef, {
                 productionLineId: selectedLine,
                 supervisorId: selectedSupervisor.id,
@@ -246,42 +274,35 @@ const ProductionBoard: React.FC = () => {
                 breakId: selectedSlot.breakId || null,
             });
 
-            console.log('Production record added successfully.');
-            // Removed alert for success as per user request
         } catch (error) {
             console.error('Error adding production record:', error);
             alert('Failed to record production data. Please try again.');
         }
     };
 
-    // Function to handle loading the production board
     const handleLoadBoard = () => {
         if (!selectedLine || !selectedSupervisor || !selectedStyle) {
             alert('Please select a line, supervisor, and style.');
             return;
         }
 
-        // Assign a specific time table based on the selected line by matching names
-        const selectedTimeTable =
-            timeTables.find((tt) => tt.name === selectedLine) || timeTables[0] || null;
+        const selectedTimeTable = timeTables.find((tt) => tt.name === selectedLine) || timeTables[0] || null;
 
         if (!selectedTimeTable) {
             alert('No Time Table found for the selected line.');
             return;
         }
 
-        // Define the overall target per hour based on user input
         setAssignedTimeTable(selectedTimeTable);
         setStyleDetails({
-            target: 0, // Will be set in the confirm modal
+            target: 0,
             outputs: Array(selectedTimeTable.slots.length).fill(0),
             balance: selectedStyle.unitsInOrder,
         });
         setIsBoardLoaded(true);
-        setIsStyleModalOpen(true); // Open style modal after loading the board
+        setIsStyleModalOpen(true);
     };
 
-    // Function to confirm style and target
     const handleConfirmStyle = (target: number) => {
         if (target <= 0) {
             alert('Target must be a positive number.');
@@ -290,17 +311,16 @@ const ProductionBoard: React.FC = () => {
 
         setStyleDetails((prev) => ({
             ...prev,
-            target: target, // Target per hour
+            target: target,
         }));
 
         setIsStyleModalOpen(false);
     };
 
-    // Function to end the shift
     const handleEndShift = () => {
         const confirmed = window.confirm('Are you sure you want to end the shift?');
         if (confirmed) {
-            setIsBoardLoaded(false); // Reset the board and return to selection screen
+            setIsBoardLoaded(false);
             setAssignedTimeTable(null);
             setStyleDetails({
                 target: 0,
@@ -311,7 +331,6 @@ const ProductionBoard: React.FC = () => {
         }
     };
 
-    // Function to add an output and write to Firestore
     const handleAddOutput = async () => {
         if (!assignedTimeTable) {
             alert('Time Table is not loaded.');
@@ -323,11 +342,8 @@ const ProductionBoard: React.FC = () => {
         if (manualSlot === 'current') {
             const currentHour = currentTime.getHours();
             const currentMinutes = currentTime.getMinutes();
-            const currentTimeFormatted = `${currentHour.toString().padStart(2, '0')}:${currentMinutes
-                .toString()
-                .padStart(2, '0')}`;
+            const currentTimeFormatted = `${currentHour.toString().padStart(2, '0')}:${currentMinutes.toString().padStart(2, '0')}`;
 
-            // Find the current slot based on current time
             const currentSlot = assignedTimeTable.slots.find((slot: TimeSlot) => {
                 return (
                     currentTimeFormatted >= slot.startTime &&
@@ -353,14 +369,12 @@ const ProductionBoard: React.FC = () => {
                 return;
             }
 
-            // Increment output
             const updatedOutputs = [...styleDetails.outputs];
-            updatedOutputs[slotIndex] += 1; // Increment output
-            const newBalance = styleDetails.balance - 1; // Reduce balance
+            updatedOutputs[slotIndex] += 1;
+            const newBalance = styleDetails.balance - 1;
 
             setStyleDetails((prev) => ({ ...prev, outputs: updatedOutputs, balance: newBalance }));
 
-            // Write to Firestore
             await logProductionRecord(1, selectedSlotId);
         } else {
             console.warn('No Slot ID selected.');
@@ -368,98 +382,102 @@ const ProductionBoard: React.FC = () => {
         }
     };
 
-    // Function to handle reject submission
-    const handleRejectSubmit = async (rejectData: Omit<Reject, 'refNumber'>) => {
-        // Generate unique 4-digit reference number
-        const refNumber = Math.floor(1000 + Math.random() * 9000).toString();
+    const handleRejectSubmit = async (rejectData: Omit<Reject, 'docId'>) => {
+        try {
+            const rejectDocRef = await addDoc(collection(db, 'rejects'), {
+                ...rejectData,
+                productionLineId: selectedLine,
+                supervisorId: selectedSupervisor?.id,
+                timestamp: Timestamp.fromDate(new Date()),
+                createdAt: Timestamp.fromDate(new Date()),
+                updatedAt: Timestamp.fromDate(new Date()),
+            });
 
-        const newReject: Reject = {
-            refNumber,
-            ...rejectData,
-        };
+            const newReject: Reject = {
+                docId: rejectDocRef.id,
+                ...rejectData,
+            };
 
-        setRejects([...rejects, newReject]);
-        setRejectCount(rejectCount + rejectData.count);
+            setRejects([...rejects, newReject]);
+            setRejectCount(rejectCount + rejectData.count);
 
-        if (rejectData.recordedAsProduced) {
-            // Adjust outputs
-            const slotIndex = assignedTimeTable?.slots.findIndex(slot => slot.id === manualSlot) || 0;
-            const updatedOutputs = [...styleDetails.outputs];
-            updatedOutputs[slotIndex] -= rejectData.count; // Reduce output by reject count
-            setStyleDetails((prev) => ({ ...prev, outputs: updatedOutputs }));
+            if (rejectData.recordedAsProduced && assignedTimeTable) {
+                const slotIndex = assignedTimeTable.slots.findIndex(slot => slot.id === manualSlot);
+                if (slotIndex !== -1) {
+                    const updatedOutputs = [...styleDetails.outputs];
+                    updatedOutputs[slotIndex] -= rejectData.count;
+                    setStyleDetails((prev) => ({ ...prev, outputs: updatedOutputs }));
+                }
+            }
+
+            setIsRejectModalOpen(false);
+        } catch (error) {
+            console.error('Error adding reject:', error);
+            alert('Failed to add reject. Please try again.');
         }
-
-        // Save to database
-        await addDoc(collection(db, 'rejects'), {
-            ...newReject,
-            productionLineId: selectedLine,
-            supervisorId: selectedSupervisor?.id,
-            timestamp: Timestamp.fromDate(new Date()),
-            createdAt: Timestamp.fromDate(new Date()),
-            updatedAt: Timestamp.fromDate(new Date()),
-        });
-
-        setIsRejectModalOpen(false);
     };
 
-    // Function to handle rework submission
-    const handleReworkSubmit = async (reworkData: Omit<ReworkItem, 'refNumber' | 'startTime' | 'status' | 'endTime'>) => {
-        // Generate unique 4-digit reference number
-        const refNumber = Math.floor(1000 + Math.random() * 9000).toString();
+    const handleReworkSubmit = async (reworkData: Omit<ReworkItem, 'docId' | 'startTime' | 'status' | 'endTime'>) => {
+        try {
+            const reworkDocRef = await addDoc(collection(db, 'reworks'), {
+                ...reworkData,
+                productionLineId: selectedLine,
+                supervisorId: selectedSupervisor?.id,
+                startTime: Timestamp.fromDate(new Date()),
+                status: 'Booked Out',
+                createdAt: Timestamp.fromDate(new Date()),
+                updatedAt: Timestamp.fromDate(new Date()),
+            });
 
-        const newRework: ReworkItem = {
-            refNumber,
-            startTime: new Date(),
-            status: 'Booked Out',
-            ...reworkData,
-        };
+            const newRework: ReworkItem = {
+                docId: reworkDocRef.id,
+                startTime: new Date(),
+                status: 'Booked Out',
+                ...reworkData,
+            };
 
-        setReworks([...reworks, newRework]);
-        setReworkCount(reworkCount + reworkData.count);
+            setReworks([...reworks, newRework]);
+            setReworkCount(reworkCount + reworkData.count);
 
-        // Save to database
-        await addDoc(collection(db, 'reworks'), {
-            ...newRework,
-            productionLineId: selectedLine,
-            supervisorId: selectedSupervisor?.id,
-            timestamp: Timestamp.fromDate(new Date()),
-            createdAt: Timestamp.fromDate(new Date()),
-            updatedAt: Timestamp.fromDate(new Date()),
-        });
-
-        setIsReworkModalOpen(false);
+            setIsReworkModalOpen(false);
+        } catch (error) {
+            console.error('Error adding rework:', error);
+            alert('Failed to add rework. Please try again.');
+        }
     };
 
-    // Function to handle downtime submission
-    const handleDowntimeSubmit = async (downtimeData: Omit<DowntimeItem, 'refNumber' | 'startTime' | 'status' | 'createdAt' | 'updatedAt' | 'productionLineId' | 'supervisorId'>) => {
-        // Generate unique 4-digit reference number
-        const refNumber = Math.floor(1000 + Math.random() * 9000).toString();
+    const handleDowntimeSubmit = async (downtimeData: Omit<DowntimeItem, 'docId' | 'startTime' | 'status' | 'createdAt' | 'updatedAt' | 'productionLineId' | 'supervisorId'>) => {
+        try {
+            const downtimeDocRef = await addDoc(collection(db, 'downtimes'), {
+                ...downtimeData,
+                productionLineId: selectedLine,
+                supervisorId: selectedSupervisor?.id || '',
+                startTime: Timestamp.fromDate(new Date()),
+                status: 'Open',
+                createdAt: Timestamp.fromDate(new Date()),
+                updatedAt: Timestamp.fromDate(new Date()),
+            });
 
-        const newDowntime: DowntimeItem = {
-            refNumber,
-            productionLineId: selectedLine,
-            supervisorId: selectedSupervisor?.id || '',
-            startTime: new Date(),
-            status: 'Open',
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            ...downtimeData,
-        };
+            const newDowntime: DowntimeItem = {
+                docId: downtimeDocRef.id,
+                productionLineId: selectedLine,
+                supervisorId: selectedSupervisor?.id || '',
+                startTime: new Date(),
+                status: 'Open',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                ...downtimeData,
+            };
 
-        setDowntimes([...downtimes, newDowntime]);
+            setDowntimes([...downtimes, newDowntime]);
 
-        // Save to database
-        await addDoc(collection(db, 'downtimes'), {
-            ...newDowntime,
-            startTime: Timestamp.fromDate(newDowntime.startTime),
-            createdAt: Timestamp.fromDate(newDowntime.createdAt),
-            updatedAt: Timestamp.fromDate(newDowntime.updatedAt),
-        });
-
-        setIsDowntimeModalOpen(false);
+            setIsDowntimeModalOpen(false);
+        } catch (error) {
+            console.error('Error adding downtime:', error);
+            alert('Failed to add downtime. Please try again.');
+        }
     };
 
-    // Function to calculate target per slot based on break duration
     const calculateTargetPerSlot = (slot: TimeSlot): number => {
         if (slot.breakId) {
             const breakDuration = breaks.find(b => b.id === slot.breakId)?.duration || 0;
@@ -469,12 +487,10 @@ const ProductionBoard: React.FC = () => {
         }
     };
 
-    // Function to calculate efficiency for a single slot
     const calculateEfficiency = (output: number, target: number): string => {
         return target ? ((output / target) * 100).toFixed(2) + '%' : 'N/A';
     };
 
-    // Function to calculate cumulative efficiency up to a certain slot index
     const calculateCumulativeEfficiency = (upToIndex: number): string => {
         if (!assignedTimeTable) return 'N/A';
 
@@ -494,16 +510,14 @@ const ProductionBoard: React.FC = () => {
         return totalTarget ? ((totalOutput / totalTarget) * 100).toFixed(2) + '%' : 'N/A';
     };
 
-    // Function to handle selecting an active downtime
     const handleSelectDowntime = (downtime: DowntimeItem) => {
         setSelectedDowntime(downtime);
     };
 
-    // Function to handle downtime action from popup
     const handleDowntimeAction = async (action: 'mechanicReceived' | 'resolved', mechanicId?: string) => {
         if (!selectedDowntime) return;
 
-        const downtimeDocRef = doc(db, 'downtimes', selectedDowntime.refNumber);
+        const downtimeDocRef = doc(db, 'downtimes', selectedDowntime.docId);
 
         if (action === 'mechanicReceived' && mechanicId) {
             const mechanic = mechanics.find(m => m.id === mechanicId);
@@ -520,20 +534,23 @@ const ProductionBoard: React.FC = () => {
                 updatedAt: new Date(),
             };
 
-            // Update local state
             setDowntimes(prevDowntimes =>
                 prevDowntimes.map(dt =>
-                    dt.refNumber === selectedDowntime.refNumber ? updatedDowntime : dt
+                    dt.docId === selectedDowntime.docId ? updatedDowntime : dt
                 )
             );
 
-            // Update in database
-            await updateDoc(downtimeDocRef, {
-                mechanicId: updatedDowntime.mechanicId,
-                mechanicReceivedTime: Timestamp.fromDate(updatedDowntime.mechanicReceivedTime!),
-                status: updatedDowntime.status,
-                updatedAt: Timestamp.fromDate(updatedDowntime.updatedAt),
-            });
+            try {
+                await updateDoc(downtimeDocRef, {
+                    mechanicId: updatedDowntime.mechanicId,
+                    mechanicReceivedTime: Timestamp.fromDate(updatedDowntime.mechanicReceivedTime!),
+                    status: updatedDowntime.status,
+                    updatedAt: Timestamp.fromDate(updatedDowntime.updatedAt),
+                });
+            } catch (error) {
+                console.error('Error updating downtime:', error);
+                alert('Failed to update downtime. Please try again.');
+            }
         } else if (action === 'resolved') {
             const updatedDowntime: DowntimeItem = {
                 ...selectedDowntime,
@@ -542,45 +559,33 @@ const ProductionBoard: React.FC = () => {
                 updatedAt: new Date(),
             };
 
-            // Update local state
             setDowntimes(prevDowntimes =>
                 prevDowntimes.map(dt =>
-                    dt.refNumber === selectedDowntime.refNumber ? updatedDowntime : dt
+                    dt.docId === selectedDowntime.docId ? updatedDowntime : dt
                 )
             );
 
-            // Update in database
-            await updateDoc(downtimeDocRef, {
-                endTime: Timestamp.fromDate(updatedDowntime.endTime!),
-                status: updatedDowntime.status,
-                updatedAt: Timestamp.fromDate(updatedDowntime.updatedAt),
-            });
-
-            // Calculate response time and repair time
-            const responseTime = updatedDowntime.mechanicReceivedTime
-                ? (updatedDowntime.mechanicReceivedTime.getTime() - updatedDowntime.startTime.getTime()) / 1000
-                : 0;
-            const repairTime = updatedDowntime.endTime && updatedDowntime.mechanicReceivedTime
-                ? (updatedDowntime.endTime.getTime() - updatedDowntime.mechanicReceivedTime.getTime()) / 1000
-                : 0;
-            const totalDowntime = updatedDowntime.endTime
-                ? (updatedDowntime.endTime.getTime() - updatedDowntime.startTime.getTime()) / 1000
-                : 0;
-
-            console.log(`Downtime Resolved. Response Time: ${responseTime}s, Repair Time: ${repairTime}s, Total Downtime: ${totalDowntime}s`);
+            try {
+                await updateDoc(downtimeDocRef, {
+                    endTime: Timestamp.fromDate(updatedDowntime.endTime!),
+                    status: updatedDowntime.status,
+                    updatedAt: Timestamp.fromDate(updatedDowntime.updatedAt),
+                });
+            } catch (error) {
+                console.error('Error updating downtime:', error);
+                alert('Failed to update downtime. Please try again.');
+            }
         }
 
         setSelectedDowntime(null);
     };
 
-    // Function to handle booking reworks back in or converting to reject
     const handleBookInRework = async (rework: ReworkItem, qcId: string, action: 'bookIn' | 'convertToReject') => {
         const qc = qcs.find(q => q.id === qcId);
         if (qc) {
             if (action === 'bookIn') {
-                // Update rework status
                 const updatedReworks = reworks.map(rw => {
-                    if (rw.refNumber === rework.refNumber) {
+                    if (rw.docId === rework.docId) {
                         return {
                             ...rw,
                             endTime: new Date(),
@@ -592,42 +597,50 @@ const ProductionBoard: React.FC = () => {
                 setReworks(updatedReworks);
                 setReworkCount(reworkCount - rework.count);
 
-                // Update in database
-                const reworkDocRef = doc(db, 'reworks', rework.refNumber);
-                await updateDoc(reworkDocRef, {
-                    endTime: Timestamp.fromDate(new Date()),
-                    status: 'Booked In',
-                    updatedAt: Timestamp.fromDate(new Date()),
-                });
+                const reworkDocRef = doc(db, 'reworks', rework.docId);
+                try {
+                    await updateDoc(reworkDocRef, {
+                        endTime: Timestamp.fromDate(new Date()),
+                        status: 'Booked In',
+                        updatedAt: Timestamp.fromDate(new Date()),
+                    });
+                } catch (error) {
+                    console.error('Error updating rework:', error);
+                    alert('Failed to update rework. Please try again.');
+                }
             } else if (action === 'convertToReject') {
-                // Remove rework and add reject
-                setReworks(reworks.filter(rw => rw.refNumber !== rework.refNumber));
+                setReworks(reworks.filter(rw => rw.docId !== rework.docId));
                 setReworkCount(reworkCount - rework.count);
 
-                const refNumber = Math.floor(1000 + Math.random() * 9000).toString();
-                const newReject: Reject = {
-                    refNumber,
-                    count: rework.count,
-                    reason: rework.reason,
-                    recordedAsProduced: false,
-                    qcApprovedBy: `${qc.name} ${qc.surname}`,
-                };
-                setRejects([...rejects, newReject]);
-                setRejectCount(rejectCount + rework.count);
+                try {
+                    const rejectDocRef = await addDoc(collection(db, 'rejects'), {
+                        count: rework.count,
+                        reason: rework.reason,
+                        recordedAsProduced: false,
+                        qcApprovedBy: `${qc.name} ${qc.surname}`,
+                        productionLineId: selectedLine,
+                        supervisorId: selectedSupervisor?.id,
+                        timestamp: Timestamp.fromDate(new Date()),
+                        createdAt: Timestamp.fromDate(new Date()),
+                        updatedAt: Timestamp.fromDate(new Date()),
+                    });
 
-                // Save reject to database
-                await addDoc(collection(db, 'rejects'), {
-                    ...newReject,
-                    productionLineId: selectedLine,
-                    supervisorId: selectedSupervisor?.id,
-                    timestamp: Timestamp.fromDate(new Date()),
-                    createdAt: Timestamp.fromDate(new Date()),
-                    updatedAt: Timestamp.fromDate(new Date()),
-                });
+                    const newReject: Reject = {
+                        docId: rejectDocRef.id,
+                        count: rework.count,
+                        reason: rework.reason,
+                        recordedAsProduced: false,
+                        qcApprovedBy: `${qc.name} ${qc.surname}`,
+                    };
+                    setRejects([...rejects, newReject]);
+                    setRejectCount(rejectCount + rework.count);
 
-                // Delete rework from database
-                const reworkDocRef = doc(db, 'reworks', rework.refNumber);
-                await deleteDoc(reworkDocRef);
+                    const reworkDocRef = doc(db, 'reworks', rework.docId);
+                    await deleteDoc(reworkDocRef);
+                } catch (error) {
+                    console.error('Error converting rework to reject:', error);
+                    alert('Failed to convert rework to reject. Please try again.');
+                }
             }
             setIsActiveReworksPopupOpen(false);
         } else {
@@ -635,12 +648,10 @@ const ProductionBoard: React.FC = () => {
         }
     };
 
-    // Function to display list of rejects
     const handleShowRejects = () => {
         setIsRejectsListPopupOpen(true);
     };
 
-    // Function to display list of reworks
     const handleShowReworks = () => {
         setIsActiveReworksPopupOpen(true);
     };
@@ -707,7 +718,6 @@ const ProductionBoard: React.FC = () => {
                 </div>
             ) : (
                 <div className="board-display">
-                    {/* Heading Section */}
                     <div className="heading-section">
                         <div className="left-section">
                             <div className="clock-date-display">
@@ -723,10 +733,8 @@ const ProductionBoard: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Main Content */}
                     <div className="main-content">
                         <div className="left-content">
-                            {/* Time Slot Selection */}
                             <div className="slot-selection">
                                 <label>
                                     Select Time Slot:
@@ -742,7 +750,6 @@ const ProductionBoard: React.FC = () => {
                                 <button className="button unit-produced-button" onClick={handleAddOutput}>Unit Produced</button>
                             </div>
 
-                            {/* Time Table */}
                             {assignedTimeTable && (
                                 <table className="timetable">
                                     <thead>
@@ -761,9 +768,7 @@ const ProductionBoard: React.FC = () => {
                                             ? breaks.find((b) => b.id === slot.breakId)
                                             : null;
 
-                                        // Calculate target per slot
                                         const targetPerSlot = calculateTargetPerSlot(slot);
-
                                         const output = styleDetails.outputs[index];
                                         return (
                                             <tr key={slot.id}>
@@ -786,7 +791,6 @@ const ProductionBoard: React.FC = () => {
                             )}
                         </div>
                         <div className="right-content">
-                            {/* Box 1: Style Details */}
                             <div className="style-details-box">
                                 <h3>Style Details</h3>
                                 {selectedStyle && (
@@ -799,7 +803,6 @@ const ProductionBoard: React.FC = () => {
                                 )}
                             </div>
 
-                            {/* Box 2: Rejects and Reworks */}
                             <div className="rejects-reworks-box">
                                 <h3>Rejects and Reworks</h3>
                                 <div className="counters">
@@ -814,17 +817,16 @@ const ProductionBoard: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Box 3: Open Downtime Elements */}
                             <div className="downtime-box">
                                 <h3>Open Downtime Elements</h3>
                                 <div className="downtime-list">
                                     {downtimes.filter(dt => dt.status !== 'Resolved').map(dt => (
                                         <div
-                                            key={dt.refNumber}
+                                            key={dt.docId}
                                             className="downtime-item"
                                             onClick={() => handleSelectDowntime(dt)}
                                         >
-                                            <p><strong>Ref:</strong> {dt.refNumber}</p>
+                                            <p><strong>Ref:</strong> {dt.docId.slice(-4)}</p> {/* Display last 4 digits of docId */}
                                             <p><strong>Category:</strong> {dt.category}</p>
                                             <p><strong>Reason:</strong> {dt.reason}</p>
                                             <p><strong>Status:</strong> {dt.status}</p>
@@ -834,7 +836,6 @@ const ProductionBoard: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Box 4: Buttons */}
                             <div className="buttons-box">
                                 <button className="button downtime-button" onClick={() => setIsDowntimeModalOpen(true)}>Down Time</button>
                                 <button className="button reject-button" onClick={() => setIsRejectModalOpen(true)}>Reject</button>
@@ -843,7 +844,6 @@ const ProductionBoard: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Modals */}
                     {isRejectModalOpen && (
                         <RejectPopup
                             onClose={() => setIsRejectModalOpen(false)}
@@ -858,7 +858,7 @@ const ProductionBoard: React.FC = () => {
                             onClose={() => setIsReworkModalOpen(false)}
                             onSubmit={handleReworkSubmit}
                             downtimeCategories={downtimeCategories}
-                            operations={[]} // Operations are manual input
+                            operations={[]}
                             qcs={qcs}
                         />
                     )}
@@ -871,7 +871,6 @@ const ProductionBoard: React.FC = () => {
                         />
                     )}
 
-                    {/* Active Reworks Popup */}
                     {isActiveReworksPopupOpen && (
                         <ActiveReworksPopup
                             reworks={reworks.filter(rw => rw.status === 'Booked Out')}
@@ -881,7 +880,6 @@ const ProductionBoard: React.FC = () => {
                         />
                     )}
 
-                    {/* Rejects List Popup */}
                     {isRejectsListPopupOpen && (
                         <RejectsListPopup
                             rejects={rejects}
@@ -889,7 +887,6 @@ const ProductionBoard: React.FC = () => {
                         />
                     )}
 
-                    {/* Downtime Action Popup */}
                     {selectedDowntime && (
                         <DowntimeActionPopup
                             downtime={selectedDowntime}
@@ -900,7 +897,6 @@ const ProductionBoard: React.FC = () => {
                         />
                     )}
 
-                    {/* Modal for Confirming Style and Target */}
                     {isStyleModalOpen && (
                         <div className="modal-overlay">
                             <div className="modal-content">

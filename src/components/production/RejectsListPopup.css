@@ -1,0 +1,28 @@
+/* RejectsListPopup.css */
+
+.modal-overlay {
+    /* ... same styles as other modals ... */
+}
+
+.modal-content {
+    /* ... same styles as other modals ... */
+}
+
+.rejects-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.reject-item {
+    border-bottom: 1px solid #ccc;
+    padding: 10px;
+}
+
+.close-button {
+    /* ... your styles ... */
+}
+
+.cancel-button {
+    background-color: blue;
+    color: white;
+}
