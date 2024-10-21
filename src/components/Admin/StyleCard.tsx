@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import Papa, { ParseResult } from 'papaparse'; // For CSV parsing
 import { db } from '../../firebase';
 import './StyleCard.css';
 import Button from '@mui/material/Button';
@@ -11,7 +12,7 @@ import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'; // For 
 
 interface Style {
     id: string;
-    styleName: string;
+    styleDescription: string;
     styleNumber: string;
     productType: string;
     productCategory: string;
@@ -23,7 +24,7 @@ interface Style {
 
 const StyleCard: React.FC = () => {
     const [styles, setStyles] = useState<Style[]>([]);
-    const [styleName, setStyleName] = useState('');
+    const [styleDescription, setStyleDescription] = useState('');
     const [styleNumber, setStyleNumber] = useState('');
     const [productType, setProductType] = useState('');
     const [productCategory, setProductCategory] = useState('');
@@ -51,7 +52,7 @@ const StyleCard: React.FC = () => {
     const openModal = (style?: Style) => {
         if (style) {
             setSelectedStyle(style);
-            setStyleName(style.styleName);
+            setStyleDescription(style.styleDescription);
             setStyleNumber(style.styleNumber);
             setProductType(style.productType);
             setProductCategory(style.productCategory);
@@ -67,7 +68,7 @@ const StyleCard: React.FC = () => {
     // Reset form fields
     const resetForm = () => {
         setSelectedStyle(null);
-        setStyleName('');
+        setStyleDescription('');
         setStyleNumber('');
         setProductType('');
         setProductCategory('');
@@ -78,7 +79,7 @@ const StyleCard: React.FC = () => {
 
     // Save or update style in Firestore
     const handleSaveStyle = async () => {
-        if (!styleName || !styleNumber || !productType || !productCategory || unitsInOrder === '' || cost === '' || !deliveryDate) {
+        if (!styleDescription || !styleNumber || !productType || !productCategory || unitsInOrder === '' || cost === '' || !deliveryDate) {
             alert('Please fill out all the fields');
             return;
         }
@@ -88,7 +89,7 @@ const StyleCard: React.FC = () => {
                 // Update existing style
                 const styleDoc = doc(db, 'styles', selectedStyle.id); // Correct document reference
                 await updateDoc(styleDoc, {
-                    styleName,
+                    styleDescription,
                     styleNumber,
                     productType,
                     productCategory,
@@ -99,7 +100,7 @@ const StyleCard: React.FC = () => {
             } else {
                 // Add new style
                 await addDoc(collection(db, 'styles'), {
-                    styleName,
+                    styleDescription,
                     styleNumber,
                     productType,
                     productCategory,
@@ -133,11 +134,58 @@ const StyleCard: React.FC = () => {
         });
     };
 
+    // CSV Upload
+    const handleCSVUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        Papa.parse(file, {
+            header: true,
+            complete: (result: ParseResult<{ [key: string]: string }>) => {
+                const data = result.data;
+                data.forEach(async (row) => {
+                    await addDoc(collection(db, 'styles'), {
+                        styleDescription: row['Style Description'],
+                        styleNumber: row['Style Number'],
+                        productType: row['Product Type'],
+                        productCategory: row['Product Category'],
+                        unitsInOrder: Number(row['Units In Order']),
+                        cost: Number(row['Cost']),
+                        deliveryDate: row['Delivery Date'],
+                        status: 'open',
+                    });
+                });
+                fetchStyles();
+            },
+            skipEmptyLines: true,
+        });
+    };
+
+    // CSV Download Template
+    const downloadTemplate = () => {
+        const csvContent = 'data:text/csv;charset=utf-8,Style Description,Style Number,Product Type,Product Category,Units In Order,Cost,Delivery Date\n';
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', 'style_template.csv');
+        document.body.appendChild(link);
+        link.click();
+    };
+
     return (
         <div className="style-card-container">
             <ConfirmDialog />
             <div className="toolbar">
                 <button onClick={() => openModal()}>Load Style</button>
+                <button onClick={() => document.getElementById('csvFileInput')?.click()}>Upload CSV</button>
+                <button onClick={downloadTemplate}>Download CSV Template</button>
+                <input
+                    type="file"
+                    id="csvFileInput"
+                    accept=".csv"
+                    style={{ display: 'none' }}
+                    onChange={handleCSVUpload}
+                />
             </div>
 
             <div className="content-area">
@@ -160,8 +208,11 @@ const StyleCard: React.FC = () => {
                     <thead>
                     <tr>
                         <th>Style Number</th>
-                        <th>Style Name</th>
-                        <th>Description</th>
+                        <th>Style Description</th>
+                        <th>Product Type</th>
+                        <th>Product Category</th>
+                        <th>Units In Order</th>
+                        <th>Cost</th>
                         <th>Delivery Date</th>
                         <th>Edit</th>
                         <th>Delete</th>
@@ -171,8 +222,11 @@ const StyleCard: React.FC = () => {
                     {styles.map((style) => (
                         <tr key={style.id}>
                             <td>{style.styleNumber}</td>
-                            <td>{style.styleName}</td>
+                            <td>{style.styleDescription}</td>
+                            <td>{style.productType}</td>
                             <td>{style.productCategory}</td>
+                            <td>{style.unitsInOrder}</td>
+                            <td>{style.cost}</td>
                             <td>{style.deliveryDate}</td>
                             <td>
                                 <IconButton onClick={() => openModal(style)}>
@@ -195,11 +249,11 @@ const StyleCard: React.FC = () => {
                     <div className="modal-content">
                         <h2>{selectedStyle ? 'Edit Style' : 'Add Style'}</h2>
                         <div className="input-container">
-                            <label htmlFor="styleName">Style Name:</label>
+                            <label htmlFor="styleDescription">Style Description:</label>
                             <InputText
-                                id="styleName"
-                                value={styleName}
-                                onChange={(e) => setStyleName(e.target.value)}
+                                id="styleDescription"
+                                value={styleDescription}
+                                onChange={(e) => setStyleDescription(e.target.value)}
                             />
                             <label htmlFor="styleNumber">Style Number:</label>
                             <InputText
@@ -211,6 +265,8 @@ const StyleCard: React.FC = () => {
                             <InputText
                                 id="productType"
                                 value={productType}
+
+
                                 onChange={(e) => setProductType(e.target.value)}
                             />
                             <label htmlFor="productCategory">Product Category:</label>

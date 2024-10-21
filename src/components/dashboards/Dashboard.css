@@ -1,0 +1,77 @@
+/* Container for the entire dashboard page */
+.dashboard-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    font-family: Arial, sans-serif;
+}
+
+/* Banner styling */
+.dashboard-banner {
+    display: flex;
+    align-items: center;
+    background-color: #004466; /* Dark blue */
+    color: white;
+    padding: 10px 20px;
+}
+
+.return-button {
+    background-color: transparent;
+    border: none;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    margin-right: 20px;
+}
+
+.return-button:hover {
+    text-decoration: underline;
+}
+
+.dashboard-heading {
+    font-size: 24px;
+    margin: 0;
+}
+
+/* Sidebar styling */
+.dashboard-sidebar {
+    display: flex;
+    flex-direction: column;
+    background-color: #f0f0f0; /* Light grey */
+    width: 200px;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.sidebar-title {
+    font-size: 20px;
+    margin-bottom: 10px;
+}
+
+.sidebar-menu {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar-item {
+    padding: 10px;
+    margin-bottom: 5px;
+    background-color: #e0e0e0;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+.sidebar-item:hover {
+    background-color: #d0d0d0;
+}
+
+/* Main content styling */
+.dashboard-main {
+    flex: 1;
+    padding: 20px;
+    box-sizing: border-box;
+    background-color: #ffffff; /* White */
+    overflow-y: auto;
+}

@@ -1,108 +1,52 @@
-/* Reset default margins and paddings */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-/* Ensure the html and body take up full height */
-html, body {
-    height: 100%;
-    width: 100%;
-    font-family: Arial, Helvetica, sans-serif;
-}
-
 .landing-container {
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 100vh;
-    background-color: #f8f9fa;
-    padding: 20px;
+    height: 100vh;
+    background-color: #eef2f3;
 }
 
 .landing-card {
-    background-color: #ffffff;
-    border-radius: 10px;
-    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-    width: 90%;
-    max-width: 800px;
+    background-color: white;
+    padding: 40px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     text-align: center;
 }
 
-.card-header {
-    background-color: #003366;
-    color: white;
-    padding: 40px;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
+.card-header .company-name {
+    font-size: 36px;
+    margin-bottom: 10px;
+    color: #004466; /* Matching the Dashboard banner color */
 }
 
-.company-name {
-    font-size: 4rem;
-    font-weight: bold;
-    margin: 0;
+.card-header .tagline {
+    font-size: 16px;
+    color: #666;
 }
 
-.tagline {
-    font-size: 1.2rem;
-    margin-top: 10px;
-    font-style: italic;
-}
-
-.card-content {
-    padding: 40px;
-}
-
-.dashboard-title {
-    font-size: 1.8rem;
-    margin-bottom: 30px;
+.card-content .dashboard-title {
+    font-size: 24px;
+    margin: 20px 0;
 }
 
 .button-group {
     display: flex;
-    gap: 20px;
-    justify-content: center;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 15px;
 }
 
 .landing-button {
-    background-color: #003366;
+    padding: 10px 20px;
+    font-size: 16px;
+    background-color: #004466; /* Dark blue */
     color: white;
     border: none;
-    padding: 15px 30px;
-    font-size: 1rem;
-    border-radius: 20px;
+    border-radius: 4px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
-    min-width: 150px;
+    transition: background-color 0.3s;
 }
 
 .landing-button:hover {
-    background-color: #002244;
-}
-
-@media (max-width: 768px) {
-    .company-name {
-        font-size: 3rem;
-    }
-
-    .tagline {
-        font-size: 1rem;
-    }
-
-    .dashboard-title {
-        font-size: 1.5rem;
-    }
-
-    .landing-button {
-        padding: 12px 20px;
-        font-size: 0.9rem;
-    }
-}
-.company-name {
-    font-size: 4rem;
-    font-weight: bold;
-    margin: 0;
-    color: white; /* Ensure the text color is white */
+    background-color: #003355;
 }

@@ -9,7 +9,8 @@ import ProductionSchedule from './components/Admin/ProductionSchedule';
 import DowntimePage from './components/Admin/DownTime';
 import SupportFunctions from './components/Admin/SupportFunctions';
 import MachineList from './components/Admin/MachineList';
-import ProductionBoard from './components/production/productionBoard'; // Import the ProductionBoard component
+import ProductionBoard from './components/production/productionBoard'; // Ensure correct casing
+import Dashboard from './components/dashboards/Dashboard'; // Import the new Dashboard component
 import './App.css';
 
 const App: React.FC = () => {
@@ -28,6 +29,9 @@ const App: React.FC = () => {
 
                 {/* Add the Production Board route */}
                 <Route path="/production-board" element={<ProductionBoard />} />
+
+                {/* Add the Dashboard route */}
+                <Route path="/analytics" element={<Dashboard />} />
             </Routes>
         </Router>
     );
