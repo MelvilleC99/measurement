@@ -1,5 +1,7 @@
+// src/components/dashboards/Dashboard.tsx
+
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Outlet } from 'react-router-dom';
 import './Dashboard.css';
 
 const Dashboard: React.FC = () => {
@@ -16,28 +18,30 @@ const Dashboard: React.FC = () => {
                 <button className="return-button" onClick={handleReturn}>
                     &larr; Return
                 </button>
-                <h1 className="dashboard-heading">Dashboard</h1>
+                <h1 className="dashboard-heading">Analytics Dashboard</h1>
             </header>
 
-            {/* Sidebar */}
-            <aside className="dashboard-sidebar">
-                <h2 className="sidebar-title">Dashboards</h2>
-                <ul className="sidebar-menu">
-                    <li className="sidebar-item">Maintenance</li>
-                    <li className="sidebar-item">Quality</li>
-                    <li className="sidebar-item">Production</li>
-                    <li className="sidebar-item">Down time</li>
-                    <li className="sidebar-item">Style Change Over</li>
-                    <li className="sidebar-item">Financial</li>
-                    <li className="sidebar-item">HR</li>
-                </ul>
-            </aside>
+            {/* Sidebar and Main Content Area */}
+            <div className="dashboard-sidebar">
+                {/* Sidebar */}
+                <aside>
+                    <h2 className="sidebar-title">Dashboards</h2>
+                    <ul className="sidebar-menu">
+                        <li className="sidebar-item"><Link to="/analytics/maintenance">Maintenance</Link></li>
+                        <li className="sidebar-item"><Link to="/analytics/quality">Quality</Link></li>
+                        <li className="sidebar-item"><Link to="/analytics/production">Production</Link></li>
+                        <li className="sidebar-item"><Link to="/analytics/downtime">Downtime</Link></li>
+                        <li className="sidebar-item"><Link to="/analytics/style-change-over">Style Change Over</Link></li>
+                        <li className="sidebar-item"><Link to="/analytics/financial">Financial</Link></li>
+                        <li className="sidebar-item"><Link to="/analytics/hr">HR</Link></li>
+                    </ul>
+                </aside>
 
-            {/* Main Content Area */}
-            <main className="dashboard-main">
-                {/* Future content can be added here */}
-                <p>Select an option from the sidebar to view the respective dashboard.</p>
-            </main>
+                {/* Main Content Area */}
+                <main className="dashboard-main">
+                    <Outlet />
+                </main>
+            </div>
         </div>
     );
 };

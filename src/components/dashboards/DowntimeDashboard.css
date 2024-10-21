@@ -1,0 +1,151 @@
+/* src/components/dashboards/DowntimeDashboard.css */
+
+.downtime-dashboard-container {
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    height: calc(100vh - 60px); /* Adjust based on banner height */
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.error-message {
+    color: red;
+    margin-bottom: 20px;
+}
+
+.dashboard-content {
+    display: flex;
+    gap: 20px;
+    height: 100%;
+}
+
+.active-downtime-section, .trend-section {
+    flex: 1; /* Each takes up 50% of the container */
+    display: flex;
+    flex-direction: column;
+}
+
+.active-downtime-section h2,
+.trend-section h2 {
+    margin-bottom: 10px;
+}
+
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.filters label {
+    display: flex;
+    flex-direction: column;
+    font-size: 14px;
+}
+
+.filters select {
+    padding: 5px;
+    margin-top: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.downtime-cards-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    overflow-y: auto;
+    flex: 1; /* Allows the container to grow and fill space */
+}
+
+.downtime-card {
+    display: flex;
+    width: calc(50% - 20px); /* Half width minus gap */
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+    background-color: #fafafa;
+    box-sizing: border-box;
+    align-items: center;
+    position: relative;
+    transition: background-color 0.3s ease;
+}
+
+.downtime-time {
+    flex: 0 0 80px; /* Fixed width for time */
+    font-size: 24px;
+    font-weight: bold;
+    color: #333;
+    margin-right: 15px;
+    text-align: center;
+}
+
+.downtime-info {
+    flex: 1; /* Takes up remaining space */
+}
+
+.downtime-info p {
+    margin: 5px 0;
+    font-size: 14px;
+}
+
+/* Alert Styles for Downtimes Open Longer Than 5 Minutes */
+.alert {
+    background-color: #ffe6e6; /* Light red background */
+    border-color: #ff4d4d; /* Red border */
+    animation: flash 1s infinite;
+}
+
+@keyframes flash {
+    0% { background-color: #ffe6e6; }
+    50% { background-color: #ffcccc; }
+    100% { background-color: #ffe6e6; }
+}
+
+.trend-chart {
+    flex: 1; /* Allows the chart to fill the available space */
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .downtime-dashboard-container {
+        padding: 15px;
+    }
+
+    .downtime-card {
+        width: calc(50% - 20px); /* Maintain half width */
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-content {
+        flex-direction: column;
+    }
+
+    .downtime-cards-container {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .downtime-card {
+        width: 100%; /* Full width on smaller screens */
+    }
+
+    .filters {
+        flex-direction: column;
+    }
+
+    .downtime-time {
+        flex: none;
+        width: 100%;
+        text-align: left;
+        margin-bottom: 10px;
+    }
+}

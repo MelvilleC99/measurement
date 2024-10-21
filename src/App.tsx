@@ -1,3 +1,5 @@
+// src/App.tsx
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from './components/LandingPage/LandingPage';
@@ -9,8 +11,9 @@ import ProductionSchedule from './components/Admin/ProductionSchedule';
 import DowntimePage from './components/Admin/DownTime';
 import SupportFunctions from './components/Admin/SupportFunctions';
 import MachineList from './components/Admin/MachineList';
-import ProductionBoard from './components/production/productionBoard'; // Ensure correct casing
-import Dashboard from './components/dashboards/Dashboard'; // Import the new Dashboard component
+import ProductionBoard from './components/production/productionBoard';
+import Dashboard from './components/dashboards/Dashboard';
+import DowntimeDashboard from './components/dashboards/DowntimeDashboard'; // Import the new DowntimeDashboard
 import './App.css';
 
 const App: React.FC = () => {
@@ -31,7 +34,11 @@ const App: React.FC = () => {
                 <Route path="/production-board" element={<ProductionBoard />} />
 
                 {/* Add the Dashboard route */}
-                <Route path="/analytics" element={<Dashboard />} />
+                <Route path="/analytics" element={<Dashboard />}>
+                    {/* Nested Route for Downtime Dashboard */}
+                    <Route path="downtime" element={<DowntimeDashboard />} />
+                    {/* Add other nested routes here if needed */}
+                </Route>
             </Routes>
         </Router>
     );

@@ -1,5 +1,7 @@
 // src/types.ts
 
+import { Timestamp } from 'firebase/firestore';
+
 export interface BasicInfo {
     lineName: string;
     productName: string;
@@ -34,6 +36,7 @@ export interface ProductionTarget {
     workDays: string[];
     timeTables: TimeTable[];
 }
+
 export interface Measurement {
     hour: string;
     target: number;
@@ -52,4 +55,18 @@ export interface DowntimeLog {
     id: number;
     reason: string;
     timeLost: string;
+}
+
+// **Add the Downtime Interface Below**
+export interface Downtime {
+    id: string;
+    category: string;
+    machine: string;
+    createdAt: Timestamp;
+    productionLineId: string;
+    reason: string;
+    startTime: Timestamp;
+    status: 'Open' | 'Resolved';
+    supervisorId: string;
+    updatedAt: Timestamp;
 }
