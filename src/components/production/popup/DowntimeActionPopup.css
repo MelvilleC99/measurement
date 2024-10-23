@@ -1,0 +1,91 @@
+.downtime-action-modal {
+    max-width: 600px;
+}
+
+.downtime-action-content {
+    padding: 20px;
+}
+
+.downtime-info {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.downtime-info h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.downtime-info p {
+    margin: 8px 0;
+}
+
+.mechanic-section,
+.supervisor-section {
+    background-color: #fff;
+    padding: 15px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin-top: 20px;
+}
+
+.mechanic-section h3,
+.supervisor-section h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.error-message {
+    color: #dc3545;
+    margin: 10px 0;
+    padding: 10px;
+    background-color: #f8d7da;
+    border-radius: 4px;
+}
+
+/* Verification form styling */
+.verification-form {
+    margin-top: 15px;
+}
+
+.verification-form label {
+    display: block;
+    margin-bottom: 15px;
+}
+
+.verification-form select,
+.verification-form input {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.action-button {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.action-button.resolve {
+    background-color: #28a745;
+    color: white;
+}
+
+.action-button.resolve:hover {
+    background-color: #218838;
+}

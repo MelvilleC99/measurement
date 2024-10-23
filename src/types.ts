@@ -57,7 +57,6 @@ export interface DowntimeLog {
     timeLost: string;
 }
 
-// **Add the Downtime Interface Below**
 export interface Downtime {
     id: string;
     category: string;
@@ -69,4 +68,72 @@ export interface Downtime {
     status: 'Open' | 'Resolved';
     supervisorId: string;
     updatedAt: Timestamp;
+}
+
+export interface SupportFunction {
+    id: string;
+    name: string;
+    surname: string;
+    employeeNumber: string;
+    role: string;
+    hasPassword: boolean;
+    password: string;
+}
+
+export interface ReworkItem {
+    docId: string;
+    count: number;
+    reason: string;
+    operation: string;
+    startTime: Date;
+    endTime?: Date;
+    status: 'Booked Out' | 'Booked In' | 'Rejected';
+    productionLineId: string;
+    supervisorId: string;
+}
+
+export interface Reject {
+    docId: string;
+    count: number;
+    reason: string;
+    recordedAsProduced: boolean;
+    qcApprovedBy: string;
+    productionLineId: string;
+    supervisorId: string;
+    timestamp: Date;
+}
+
+export interface StyleChangeoverStep {
+    id: 'machineSetup' | 'peopleAllocated' | 'firstOffLine' | 'qcApproved';
+    label: string;
+    required: boolean;
+    completedAt?: Date;
+    completedBy?: string;
+    comment?: string;
+}
+
+export interface StyleChangeoverState {
+    currentStyle: string;
+    nextStyle: string;
+    steps: StyleChangeoverStep[];
+    startTime: Date;
+    status: 'InProgress' | 'Completed';
+}
+
+export interface SpecializedDowntimeState {
+    type: 'machine' | 'style-changeover';
+    category: string;
+    startTime: Date;
+}
+
+export interface DowntimeSubmitData {
+    category: string;
+    reason: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface DowntimeCategory {
+    categoryName: string;
+    reasons: string[];
 }

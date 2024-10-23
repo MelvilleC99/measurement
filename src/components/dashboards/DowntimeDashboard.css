@@ -17,7 +17,7 @@
 
 .dashboard-content {
     display: flex;
-    gap: 20px;
+    gap: 20px; /* Horizontal gap between sections */
     height: 100%;
 }
 
@@ -35,7 +35,7 @@
 .filters {
     display: flex;
     flex-wrap: wrap;
-    gap: 15px;
+    gap: 15px; /* Gap between filter elements */
     margin-bottom: 20px;
 }
 
@@ -52,100 +52,113 @@
     border-radius: 4px;
 }
 
+/* Grid Layout for Downtime Tiles */
 .downtime-cards-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* Reduced min-width for smaller tiles */
+    gap: 15px 15px; /* Consistent horizontal and vertical gaps */
     overflow-y: auto;
     flex: 1; /* Allows the container to grow and fill space */
 }
 
+/* Downtime Tile Styling */
 .downtime-card {
     display: flex;
-    width: calc(50% - 20px); /* Half width minus gap */
+    flex-direction: column;
     border: 1px solid #ddd;
     border-radius: 8px;
-    padding: 15px;
-    box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+    padding: 8px; /* Reduced padding for smaller tiles */
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
     background-color: #fafafa;
     box-sizing: border-box;
-    align-items: center;
-    position: relative;
-    transition: background-color 0.3s ease;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+    height: 130px; /* Reduced height for smaller tiles */
+}
+
+/* Alert Styling for Long-Open Downtimes */
+.downtime-card.alert {
+    background-color: #ffe6e6; /* Light red background */
+    border-color: #ff4d4d; /* Red border */
 }
 
 .downtime-time {
-    flex: 0 0 80px; /* Fixed width for time */
-    font-size: 24px;
+    font-size: 20px; /* Slightly smaller font for smaller tiles */
     font-weight: bold;
     color: #333;
-    margin-right: 15px;
+    margin-bottom: 8px;
     text-align: center;
 }
 
-.downtime-info {
-    flex: 1; /* Takes up remaining space */
-}
-
 .downtime-info p {
-    margin: 5px 0;
-    font-size: 14px;
+    margin: 2px 0;
+    font-size: 12px; /* Smaller font to fit within tile */
+    word-wrap: break-word; /* Ensure text wraps within the tile */
 }
 
-/* Alert Styles for Downtimes Open Longer Than 5 Minutes */
-.alert {
-    background-color: #ffe6e6; /* Light red background */
-    border-color: #ff4d4d; /* Red border */
-    animation: flash 1s infinite;
-}
-
-@keyframes flash {
-    0% { background-color: #ffe6e6; }
-    50% { background-color: #ffcccc; }
-    100% { background-color: #ffe6e6; }
-}
-
+/* Trend Chart Styling */
 .trend-chart {
     flex: 1; /* Allows the chart to fill the available space */
     background-color: #fff;
-    padding: 20px;
+    padding: 15px; /* Reduced padding for smaller tiles */
     border-radius: 8px;
     box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
 }
 
 /* Responsive Design */
-@media (max-width: 1024px) {
-    .downtime-dashboard-container {
-        padding: 15px;
+@media (max-width: 1200px) {
+    .downtime-cards-container {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* Further reduced min-width */
     }
 
     .downtime-card {
-        width: calc(50% - 20px); /* Maintain half width */
+        height: 120px; /* Further reduced height */
+    }
+
+    .downtime-time {
+        font-size: 18px;
+    }
+
+    .downtime-info p {
+        font-size: 11px;
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
+    .downtime-cards-container {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); /* Even smaller tiles */
+    }
+
+    .downtime-card {
+        height: 110px;
+    }
+
+    .downtime-time {
+        font-size: 16px;
+    }
+
+    .downtime-info p {
+        font-size: 10px;
+    }
+}
+
+@media (max-width: 600px) {
     .dashboard-content {
         flex-direction: column;
     }
 
     .downtime-cards-container {
-        flex-direction: row;
-        flex-wrap: wrap;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* Adjusted for better readability */
     }
 
     .downtime-card {
-        width: 100%; /* Full width on smaller screens */
-    }
-
-    .filters {
-        flex-direction: column;
+        height: 120px;
     }
 
     .downtime-time {
-        flex: none;
-        width: 100%;
-        text-align: left;
-        margin-bottom: 10px;
+        font-size: 16px;
+    }
+
+    .downtime-info p {
+        font-size: 10px;
     }
 }

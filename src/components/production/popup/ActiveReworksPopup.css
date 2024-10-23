@@ -1,0 +1,62 @@
+.active-reworks-content {
+    padding: 20px;
+}
+
+.rework-select-label {
+    display: block;
+    margin-bottom: 20px;
+}
+
+.rework-select {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.rework-details {
+    background-color: #f5f5f5;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.book-in-button {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    flex: 1;
+}
+
+.book-in-button:hover {
+    background-color: #218838;
+}
+
+.reject-button {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    flex: 1;
+}
+
+.reject-button:hover {
+    background-color: #c82333;
+}
+
+.error-message {
+    color: #dc3545;
+    margin-bottom: 10px;
+}

@@ -5,7 +5,6 @@ import { db } from '../../firebase';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Downtime } from '../../types';
 import './DowntimeDashboard.css';
-import { format } from 'date-fns';
 import { Bar } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
@@ -229,7 +228,7 @@ const DowntimeDashboard: React.FC = () => {
                                             </div>
                                             <div className="downtime-info">
                                                 <p><strong>Category:</strong> {dt.category}</p>
-                                                <p><strong>Production Line:</strong> {dt.productionLineId}</p>
+                                                <p><strong>Line:</strong> {dt.productionLineId}</p>
                                                 <p><strong>Reason:</strong> {dt.reason}</p>
                                             </div>
                                         </div>

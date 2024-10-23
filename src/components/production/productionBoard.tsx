@@ -9,12 +9,12 @@ import {
     Timestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
-import ReworkPopup from './ReworkPopup';
-import RejectPopup from './RejectPopup';
-import DowntimePopup from './DowntimePopup';
-import ActiveReworksPopup from './ActiveReworksPopup';
-import RejectsListPopup from './RejectsListPopup';
-import DowntimeActionPopup from './DowntimeActionPopup';
+import ReworkPopup from '../production/popup/ReworkPopup';
+import RejectPopup from '../production/popup/RejectPopup';
+import DowntimePopup from '../production/popup/DowntimePopup';
+import ActiveReworksPopup from '../production/popup/ActiveReworksPopup';
+import RejectsListPopup from '../production/popup/RejectsListPopup';
+import DowntimeActionPopup from '../production/popup/DowntimeActionPopup';
 import './productionBoard.css';
 
 // Interfaces

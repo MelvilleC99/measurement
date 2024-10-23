@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './DowntimeActionPopup.css';
 import { doc, updateDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../../firebase'; // Correct import path for your Firebase config
+import { db } from '../../../firebase'; // Correct import path for your Firebase config
 
 interface DowntimeItem {
     docId: string; // Firestore document ID
