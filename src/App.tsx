@@ -1,5 +1,3 @@
-// src/App.tsx
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from './components/LandingPage/LandingPage';
@@ -11,9 +9,10 @@ import ProductionSchedule from './components/Admin/ProductionSchedule';
 import DowntimePage from './components/Admin/DownTime';
 import SupportFunctions from './components/Admin/SupportFunctions';
 import MachineList from './components/Admin/MachineList';
-import ProductionBoard from './components/production/productionBoard';
+import ActiveLineInput from './components/production/ActiveLineInput';
+import ProductionBoardViewer from './components/production/ProductionBoardViewer';
 import Dashboard from './components/dashboards/Dashboard';
-import DowntimeDashboard from './components/dashboards/DowntimeDashboard'; // Import the new DowntimeDashboard
+import DowntimeDashboard from './components/dashboards/DowntimeDashboard';
 import './App.css';
 
 const App: React.FC = () => {
@@ -27,17 +26,16 @@ const App: React.FC = () => {
                 <Route path="/admin/add-lines" element={<ProductionLines />} />
                 <Route path="/admin/production-schedule" element={<ProductionSchedule />} />
                 <Route path="/admin/downtime" element={<DowntimePage />} />
-                <Route path="/admin/support-functions" element={<SupportFunctions />} />
+                <Route path="/admin/support-functions" element={<s />} />
                 <Route path="/admin/machine-list" element={<MachineList />} />
 
-                {/* Add the Production Board route */}
-                <Route path="/production-board" element={<ProductionBoard />} />
+                {/* Updated Production routes */}
+                <Route path="/active-line" element={<ActiveLineInput />} />
+                <Route path="/production-board" element={<ProductionBoardViewer />} />
 
-                {/* Add the Dashboard route */}
+                {/* Dashboard routes */}
                 <Route path="/analytics" element={<Dashboard />}>
-                    {/* Nested Route for Downtime Dashboard */}
                     <Route path="downtime" element={<DowntimeDashboard />} />
-                    {/* Add other nested routes here if needed */}
                 </Route>
             </Routes>
         </Router>

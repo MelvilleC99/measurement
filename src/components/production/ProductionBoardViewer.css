@@ -1,0 +1,269 @@
+.production-board-container {
+    padding: 20px;
+    position: relative;
+    font-family: 'IBM Plex Sans', sans-serif;
+}
+
+/* Loading and Error States */
+.loading-container,
+.error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 80vh;
+}
+
+.error-container button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    background-color: #004466;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* Active Lines Selection */
+.active-lines-selection {
+    padding: 20px;
+}
+
+.active-lines-selection h1 {
+    text-align: center;
+    color: #004466;
+    margin-bottom: 40px;
+}
+
+.lines-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 20px;
+}
+
+.line-card {
+    background-color: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.line-card:hover {
+    transform: translateY(-5px);
+}
+
+.line-card h2 {
+    color: #004466;
+    margin-bottom: 15px;
+}
+
+.line-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.line-details p {
+    margin: 0;
+    color: #666;
+}
+
+/* Board Header */
+.board-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.header-left .time-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.current-time {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #004466;
+}
+
+.current-date {
+    font-size: 1.2rem;
+    color: #666;
+}
+
+.header-center {
+    text-align: center;
+}
+
+.header-center h1 {
+    margin: 0;
+    color: #004466;
+}
+
+.supervisor-info {
+    margin: 5px 0 0 0;
+    color: #666;
+}
+
+.change-line-button {
+    padding: 10px 20px;
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.change-line-button:hover {
+    background-color: #5a6268;
+}
+
+/* Board Content */
+.board-content {
+    display: flex;
+    gap: 20px;
+}
+
+.left-panel {
+    flex: 2;
+}
+
+.right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Production Table */
+.production-table {
+    background-color: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.production-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.production-table th,
+.production-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.production-table th {
+    background-color: #f8f9fa;
+    color: #004466;
+    font-weight: 600;
+}
+
+/* Panel Styles */
+.panel {
+    background-color: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.panel h3 {
+    color: #004466;
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.info-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.info-content p {
+    margin: 0;
+    color: #666;
+}
+
+.info-content strong {
+    color: #004466;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+}
+
+.stat-item label {
+    display: block;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.stat-item span {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #004466;
+}
+
+.downtimes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.downtime-item {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 15px;
+}
+
+.downtime-item p {
+    margin: 5px 0;
+    color: #666;
+}
+
+.downtime-item strong {
+    color: #004466;
+}
+
+@media (max-width: 1200px) {
+    .board-content {
+        flex-direction: column;
+    }
+
+    .right-panel {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .panel {
+        flex: 1;
+        min-width: 300px;
+    }
+}
+
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .right-panel {
+        flex-direction: column;
+    }
+}

@@ -16,6 +16,8 @@ interface Machine {
     make: string;
     model: string;
     assetNumber: string;
+    purchaseDate?: string;
+    purchasePrice?: string;
 }
 
 const MachineList: React.FC = () => {
@@ -24,6 +26,8 @@ const MachineList: React.FC = () => {
     const [make, setMake] = useState('');
     const [model, setModel] = useState('');
     const [assetNumber, setAssetNumber] = useState('');
+    const [purchaseDate, setPurchaseDate] = useState('');  // New optional field
+    const [purchasePrice, setPurchasePrice] = useState(''); // New optional field
     const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -48,6 +52,8 @@ const MachineList: React.FC = () => {
             setMake(machine.make);
             setModel(machine.model);
             setAssetNumber(machine.assetNumber);
+            setPurchaseDate(machine.purchaseDate || ''); // Optional field
+            setPurchasePrice(machine.purchasePrice || ''); // Optional field
         } else {
             resetForm();
         }
@@ -60,30 +66,31 @@ const MachineList: React.FC = () => {
         setMake('');
         setModel('');
         setAssetNumber('');
+        setPurchaseDate(''); // Reset optional field
+        setPurchasePrice(''); // Reset optional field
     };
 
     const handleSaveMachine = async () => {
         if (!type || !make || !model || !assetNumber) {
-            alert('Please fill out all fields');
+            alert('Please fill out all required fields');
             return;
         }
+
+        const machineData = {
+            type,
+            make,
+            model,
+            assetNumber,
+            ...(purchaseDate && { purchaseDate }), // Include only if filled
+            ...(purchasePrice && { purchasePrice }), // Include only if filled
+        };
 
         try {
             if (selectedMachine) {
                 const machineDoc = doc(db, 'machines', selectedMachine.id);
-                await updateDoc(machineDoc, {
-                    type,
-                    make,
-                    model,
-                    assetNumber,
-                });
+                await updateDoc(machineDoc, machineData);
             } else {
-                await addDoc(collection(db, 'machines'), {
-                    type,
-                    make,
-                    model,
-                    assetNumber,
-                });
+                await addDoc(collection(db, 'machines'), machineData);
             }
 
             resetForm();
@@ -121,6 +128,8 @@ const MachineList: React.FC = () => {
                         make: row['Make'],
                         model: row['Model'],
                         assetNumber: row['Asset Number'],
+                        purchaseDate: row['Purchase Date'], // Optional in CSV too
+                        purchasePrice: row['Purchase Price'], // Optional in CSV too
                     });
                 });
                 fetchMachines();
@@ -130,7 +139,7 @@ const MachineList: React.FC = () => {
     };
 
     const downloadTemplate = () => {
-        const csvContent = 'data:text/csv;charset=utf-8,Type,Make,Model,Asset Number\n';
+        const csvContent = 'data:text/csv;charset=utf-8,Type,Make,Model,Asset Number,Purchase Date,Purchase Price\n';
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement('a');
         link.setAttribute('href', encodedUri);
@@ -172,6 +181,8 @@ const MachineList: React.FC = () => {
                             <th>Make</th>
                             <th>Model</th>
                             <th>Asset Number</th>
+                            <th>Purchase Date</th> {/* Optional field */}
+                            <th>Purchase Price</th> {/* Optional field */}
                             <th>Edit</th>
                             <th>Delete</th>
                         </tr>
@@ -187,6 +198,8 @@ const MachineList: React.FC = () => {
                                     <td>{machine.make}</td>
                                     <td>{machine.model}</td>
                                     <td>{machine.assetNumber}</td>
+                                    <td>{machine.purchaseDate || 'N/A'}</td> {/* Optional field */}
+                                    <td>{machine.purchasePrice || 'N/A'}</td> {/* Optional field */}
                                     <td>
                                         <IconButton onClick={() => openModal(machine)}>
                                             <EditIcon />
@@ -232,6 +245,21 @@ const MachineList: React.FC = () => {
                                 id="assetNumber"
                                 value={assetNumber}
                                 onChange={(e) => setAssetNumber(e.target.value)}
+                            />
+                            {/* Optional fields for purchase info */}
+                            <label htmlFor="purchaseDate">Purchase Date:</label>
+                            <InputText
+                                id="purchaseDate"
+                                value={purchaseDate}
+                                onChange={(e) => setPurchaseDate(e.target.value)}
+                                placeholder="Optional"
+                            />
+                            <label htmlFor="purchasePrice">Purchase Price:</label>
+                            <InputText
+                                id="purchasePrice"
+                                value={purchasePrice}
+                                onChange={(e) => setPurchasePrice(e.target.value)}
+                                placeholder="Optional"
                             />
                         </div>
                         <div className="modal-buttons">
