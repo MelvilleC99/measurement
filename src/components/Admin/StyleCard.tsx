@@ -163,7 +163,7 @@ const StyleCard: React.FC = () => {
 
     // CSV Download Template
     const downloadTemplate = () => {
-        const csvContent = 'data:text/csv;charset=utf-8,Style Description,Style Number,Product Type,Product Category,Units In Order,Cost,Delivery Date\n';
+        const csvContent = 'data:text/csv;charset=utf-8,Style Description,Style Number,Product Type,Product Categories,Units In Order,Cost,Delivery Date\n';
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement('a');
         link.setAttribute('href', encodedUri);

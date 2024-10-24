@@ -1,22 +1,28 @@
 /* src/components/Admin/DownTime.css */
 
+/* Full container for the downtime component */
 .downtime-container {
     display: flex;
     flex-direction: column;
     padding: 20px;
     height: 100vh;
+    background-color: #f5f5f5; /* Light gray background for the entire page */
 }
 
+/* Card styling to encapsulate the downtime content */
 .downtime-card {
     background-color: white;
     border-radius: 8px;
     padding: 20px;
     box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
+/* Header styling with back button and title */
 .card-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
     background-color: #f0f0f0;
     padding: 10px;
@@ -25,147 +31,298 @@
     position: relative;
 }
 
+/* Title styling */
 .title {
     font-size: 1.8rem;
     text-align: center;
     flex-grow: 1;
-    color: black;  /* Change the title to black */
+    color: black; /* Change the title to black */
 }
 
+/* Back button styled similarly to AdminDashboard's toolbar-button */
 .back-button {
-    background-color: #808080;
-    color: white;
+    background-color: #808080; /* Gray background */
+    color: white; /* White text */
     border: none;
-    padding: 8px 16px;
+    padding: 10px 15px; /* Increased padding for better clickability */
     cursor: pointer;
     border-radius: 5px;
     position: absolute;
-    left: 10px;
+    left: 20px; /* Positioned to the left within the header */
+    top: 50%;
+    transform: translateY(-50%); /* Vertically center the button */
+    font-size: 1rem; /* Consistent font size */
 }
 
+/* Main content area with categories and reasons sections */
 .downtime-content {
     display: flex;
-    justify-content: space-between;
-    padding: 20px;
-    border: 1px solid #ddd;  /* Framing box for categories and reasons */
+    flex: 1;
+    gap: 20px; /* Space between categories and reasons */
 }
 
-.categories-section, .reasons-section {
-    width: 45%;
-    padding: 15px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    background-color: #f9f9f9;
+/* Categories section styling */
+.categories-section {
+    width: 25%; /* Adjusted width for better balance */
+    display: flex;
+    flex-direction: column;
 }
 
-.categories-section h2, .reasons-section h2 {
+/* Categories header */
+.categories-section h2 {
     font-size: 1.5rem;
-    margin-bottom: 15px;
-    text-align: center;
+    margin-bottom: 10px;
+    color: #333;
 }
 
-ul {
-    list-style: none;
+/* Categories list styling matching AdminDashboard's toolbar */
+.categories-list {
+    list-style: none; /* Remove default list styling */
     padding: 0;
     margin: 0;
+    display: flex;
+    flex-direction: column; /* Stack categories vertically */
+    gap: 10px; /* Space between category items */
 }
 
-.category-item, .reason-item {
+/* Category item styled to match toolbar buttons */
+.category-item {
+    background-color: #003366; /* Dark blue background matching .toolbar-button */
+    color: white; /* White text */
+    padding: 10px 15px; /* Consistent padding */
+    border-radius: 5px; /* Rounded corners */
+    cursor: pointer;
+    font-size: 1rem; /* Consistent font size */
+    transition: background-color 0.3s, transform 0.3s;
+    width: 100%; /* Full width to match toolbar buttons */
+    height: 50px; /* Uniform height matching input fields and reason items */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box; /* Include padding in width and height */
+}
+
+/* Hover effect for category items */
+.category-item:hover {
+    background-color: #002244; /* Darker blue on hover */
+    transform: translateY(-2px); /* Subtle lift on hover */
+}
+
+/* Selected category styling */
+.category-item.selected {
+    background-color: #004b99; /* Slightly lighter blue for selected state */
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+}
+
+/* Reasons section styling */
+.reasons-section {
+    width: 75%; /* Adjusted width to complement categories-section */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Reasons header */
+.reasons-section h2 {
+    font-size: 1.5rem;
+    margin-bottom: 15px;
+    text-align: left;
+    color: #333;
+}
+
+/* Add reason section with input and button aligned horizontally */
+.add-reason {
+    display: flex;
+    margin-bottom: 15px;
+    align-items: center; /* Vertically center the input and button */
+}
+
+/* Input field styling matching category-item height */
+.add-reason input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 5px 0 0 5px; /* Rounded corners on the left */
+    font-size: 1rem;
+    height: 50px; /* Match the height of category boxes */
+    box-sizing: border-box;
+}
+
+/* Add reason button styled to match toolbar buttons */
+.add-reason button {
+    background-color: #28a745; /* Green background */
+    color: white; /* White text */
+    border: none;
+    padding: 10px 15px; /* Consistent padding */
+    cursor: pointer;
+    border-radius: 0 5px 5px 0; /* Rounded corners on the right */
+    font-size: 1rem; /* Consistent font size */
+    transition: background-color 0.3s;
+    height: 50px; /* Match the height of category boxes */
+    width: 120px; /* Fixed width for consistency */
+    box-sizing: border-box;
+}
+
+/* Hover effect for add reason button */
+.add-reason button:hover {
+    background-color: #218838; /* Darker green on hover */
+}
+
+/* Reasons list styling matching AdminDashboard's item list */
+.reasons-list {
+    list-style: none; /* Remove default list styling */
+    padding: 0;
+    margin: 0;
+    flex: 1;
+    overflow-y: auto; /* Scroll if too many reasons */
+}
+
+/* Reason item styled to match category-item size */
+.reason-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background-color: #1f7aec;
-    color: white;
-    padding: 10px;
+    background-color: #f0f0f0; /* Light gray background similar to .toolbar */
+    color: #333;
+    padding: 10px 15px; /* Consistent padding */
     margin-bottom: 10px;
-    border-radius: 5px;
-    width: 100%;
-    font-size: 1rem;
+    border-radius: 5px; /* Rounded corners */
+    font-size: 1rem; /* Consistent font size */
+    transition: background-color 0.3s;
+    height: 50px; /* Uniform height matching category boxes */
+    box-sizing: border-box;
 }
 
-.category-name, .reason-name {
-    flex-grow: 1;
+/* Hover effect for reason items */
+.reason-item:hover {
+    background-color: #e0e0e0; /* Slightly darker gray on hover */
 }
 
-.edit-btn {
-    background-color: #ff4c4c;
-    color: white;
+/* Reason name styling */
+.reason-name {
+    flex: 1;
+    margin-right: 10px; /* Space between reason text and actions */
+    display: flex;
+    align-items: center; /* Vertically center the text */
+}
+
+/* Reason actions container */
+.reason-actions {
+    display: flex;
+    gap: 10px; /* Space between Edit and Delete buttons */
+}
+
+/* Edit and Delete buttons styled similarly to toolbar buttons */
+.reason-actions button {
+    background-color: #ffc107; /* Yellow background */
+    color: #333; /* Dark text */
     border: none;
-    padding: 6px 12px;
-    margin-left: 10px;
+    padding: 8px 12px; /* Consistent padding */
+    border-radius: 4px; /* Rounded corners */
     cursor: pointer;
-    border-radius: 5px;
+    transition: background-color 0.3s;
+    height: 35px; /* Smaller height for action buttons */
+    min-width: 80px; /* Uniform width */
+    box-sizing: border-box;
+    font-size: 0.9rem; /* Slightly smaller font size */
 }
 
-.add-category-btn, .add-reason-btn {
-    background-color: #1f7aec;
-    color: white;
-    border: none;
-    padding: 10px 15px;
-    cursor: pointer;
-    border-radius: 5px;
-    width: 100%;
-    margin-top: 10px;
+/* Hover effect for Edit/Delete buttons */
+.reason-actions button:hover {
+    background-color: #e0a800; /* Darker yellow on hover */
 }
 
-/* Adjust the size of the category and reason boxes */
-.category-item, .reason-item {
-    width: 100%;
-    height: 40px;  /* Reduce the height to make the boxes smaller */
-}
-
-.input-field {
-    margin-bottom: 10px;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    width: calc(100% - 20px);
-}
-
+/* Modal overlay styling */
 .modal {
     position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-    padding: 20px;
-    width: 400px;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0,0,0,0.5); /* Semi-transparent background */
+    display: flex;
+    justify-content: center;
+    align-items: center;
     z-index: 1000;
 }
 
+/* Modal content styling */
 .modal-content {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    width: 400px;
+    box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
     text-align: center;
 }
 
+/* Modal header */
+.modal-content h2 {
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 1.5rem;
+}
+
+/* Modal input field */
+.modal-content input {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1rem;
+    height: 40px; /* Consistent height for input */
+    box-sizing: border-box;
+}
+
+/* Modal actions container */
+.modal-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px; /* Space between Save and Cancel buttons */
+}
+
+/* Save button styled similarly to toolbar buttons */
 .save-btn {
-    background-color: #4CAF50;
-    color: white;
-    padding: 10px 20px;
+    background-color: #4CAF50; /* Green background */
+    color: white; /* White text */
+    padding: 8px 16px;
     border: none;
-    margin-right: 10px;
+    border-radius: 5px;
     cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s;
+    height: 40px; /* Uniform height */
+    min-width: 100px; /* Uniform width */
+    box-sizing: border-box;
 }
 
-.delete-btn {
-    background-color: #ff4c4c;
-    color: white;
-    padding: 10px 20px;
-    border: none;
-    margin-right: 10px;
-    cursor: pointer;
+/* Hover effect for Save button */
+.save-btn:hover {
+    background-color: #45a049; /* Darker green on hover */
 }
 
+/* Cancel button styled similarly to toolbar buttons */
 .cancel-btn {
-    background-color: #008CBA;
-    color: white;
-    padding: 10px 20px;
+    background-color: #008CBA; /* Blue background */
+    color: white; /* White text */
+    padding: 8px 16px;
     border: none;
+    border-radius: 5px;
     cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s;
+    height: 40px; /* Uniform height */
+    min-width: 100px; /* Uniform width */
+    box-sizing: border-box;
 }
 
-button {
+/* Hover effect for Cancel button */
+.cancel-btn:hover {
+    background-color: #007bb5; /* Darker blue on hover */
+}
+
+/* Generic button cursor and font size */
+.button {
     cursor: pointer;
     font-size: 14px;
 }

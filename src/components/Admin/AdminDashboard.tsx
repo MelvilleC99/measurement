@@ -7,7 +7,8 @@ import SupportFunctions from './SupportFunctions';
 import MachineList from './MachineList';
 import ProductionSchedule from './ProductionSchedule';
 import Downtime from './DownTime';
-import StyleCard from './StyleCard'; // Import the StyleCard component
+import StyleCard from './StyleCard';
+import ProductHierarchyList from './ProductHierarchyList'; // Import the new component
 
 const AdminDashboard: React.FC = () => {
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -51,6 +52,10 @@ const AdminDashboard: React.FC = () => {
                     <button className="toolbar-button" onClick={() => handleOptionClick('StyleCard')}>
                         Load Style
                     </button>
+                    {/* Add the new Product Hierarchy button */}
+                    <button className="toolbar-button" onClick={() => handleOptionClick('ProductHierarchy')}>
+                        Product Hierarchy
+                    </button>
                 </div>
 
                 <div className="content-area">
@@ -66,7 +71,9 @@ const AdminDashboard: React.FC = () => {
                     {selectedOption === 'MachineList' && <MachineList />}
                     {selectedOption === 'ProductionSchedule' && <ProductionSchedule />}
                     {selectedOption === 'Downtime' && <Downtime />}
-                    {selectedOption === 'StyleCard' && <StyleCard />}  {/* Load StyleCard when selected */}
+                    {selectedOption === 'StyleCard' && <StyleCard />}
+                    {/* Render the new ProductHierarchyList component */}
+                    {selectedOption === 'ProductHierarchy' && <ProductHierarchyList />}
                 </div>
             </div>
         </div>

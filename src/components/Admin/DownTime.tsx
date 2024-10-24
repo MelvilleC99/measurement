@@ -1,5 +1,14 @@
+// src/components/Admin/DownTime.tsx
+
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, deleteDoc, updateDoc, doc } from 'firebase/firestore';
+import {
+    collection,
+    getDocs,
+    updateDoc,
+    doc,
+    arrayUnion,
+    arrayRemove
+} from 'firebase/firestore';
 import { db } from '../../firebase';
 import './DownTime.css';
 
@@ -12,207 +21,266 @@ interface Category {
 const DownTime: React.FC = () => {
     const [categories, setCategories] = useState<Category[]>([]);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-    const [newCategoryName, setNewCategoryName] = useState('');
     const [newReason, setNewReason] = useState('');
-    const [updatedCategoryName, setUpdatedCategoryName] = useState('');
-    const [selectedReason, setSelectedReason] = useState<string | null>(null);
-    const [showCategoryModal, setShowCategoryModal] = useState(false);
+    const [updatedReason, setUpdatedReason] = useState('');
+    const [reasonToEdit, setReasonToEdit] = useState<string | null>(null);
     const [showReasonModal, setShowReasonModal] = useState(false);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
 
+    // Fetch categories from Firestore
     const fetchCategories = async () => {
-        const categorySnapshot = await getDocs(collection(db, 'downtimeCategories'));
-        const categoryList = categorySnapshot.docs.map(doc => ({
-            id: doc.id,
-            name: doc.data().name,
-            reasons: doc.data().reasons || []
-        }));
-        setCategories(categoryList);
+        setIsLoading(true);
+        try {
+            const categoriesRef = collection(db, 'downtimeCategories');
+            const snapshot = await getDocs(categoriesRef);
+            const categoryList: Category[] = snapshot.docs.map(doc => ({
+                id: doc.id,
+                name: doc.data().name,
+                reasons: doc.data().reasons || []
+            }));
+            setCategories(categoryList);
+
+            // Optionally, set the first category as selected
+            if (categoryList.length > 0 && !selectedCategoryId) {
+                setSelectedCategoryId(categoryList[0].id);
+            }
+        } catch (error) {
+            console.error("Error fetching categories: ", error);
+            alert("Failed to fetch categories.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     useEffect(() => {
         fetchCategories();
     }, []);
 
-    const handleAddCategory = async () => {
-        if (!newCategoryName) {
-            alert('Please provide a category name.');
-            return;
-        }
-
-        await addDoc(collection(db, 'downtimeCategories'), {
-            name: newCategoryName,
-            reasons: []
-        });
-        setNewCategoryName('');
-        fetchCategories();
-    };
-
-    const handleDeleteCategory = async (categoryId: string) => {
-        await deleteDoc(doc(db, 'downtimeCategories', categoryId));
-        fetchCategories();
-    };
-
-    const handleEditCategory = async (categoryId: string) => {
-        const updatedCategories = categories.map(cat =>
-            cat.id === categoryId ? { ...cat, name: updatedCategoryName } : cat
-        );
-        const selectedCat = updatedCategories.find(cat => cat.id === categoryId);
-        if (selectedCat) {
-            await updateDoc(doc(db, 'downtimeCategories', categoryId), {
-                name: selectedCat.name,
-                reasons: selectedCat.reasons
-            });
-        }
-        setUpdatedCategoryName('');
-        setShowCategoryModal(false);
-        fetchCategories();
-    };
-
-    const handleAddReason = async (categoryId: string) => {
-        if (!newReason) {
+    // Handle adding a new reason
+    const handleAddReason = async () => {
+        if (!newReason.trim()) {
             alert('Please provide a reason.');
             return;
         }
 
-        const updatedCategories = categories.map(cat =>
-            cat.id === categoryId
-                ? { ...cat, reasons: [...cat.reasons, newReason] }
-                : cat
-        );
-        const selectedCat = updatedCategories.find(cat => cat.id === categoryId);
-
-        if (selectedCat) {
-            await updateDoc(doc(db, 'downtimeCategories', categoryId), {
-                name: selectedCat.name,
-                reasons: selectedCat.reasons
-            });
+        if (!selectedCategoryId) {
+            alert('Please select a category first.');
+            return;
         }
-        setNewReason('');
-        fetchCategories();
+
+        try {
+            const categoryRef = doc(db, 'downtimeCategories', selectedCategoryId);
+            await updateDoc(categoryRef, {
+                reasons: arrayUnion(newReason.trim())
+            });
+            console.log(`Added reason "${newReason}" to category ID: ${selectedCategoryId}`);
+            setNewReason('');
+
+            // Update local state
+            setCategories(prevCategories =>
+                prevCategories.map(cat =>
+                    cat.id === selectedCategoryId
+                        ? { ...cat, reasons: [...cat.reasons, newReason.trim()] }
+                        : cat
+                )
+            );
+        } catch (error) {
+            console.error('Error adding reason: ', error);
+            alert('Failed to add reason.');
+        }
     };
 
-    const handleDeleteReason = async (categoryId: string, reason: string) => {
-        const updatedCategories = categories.map(cat =>
-            cat.id === categoryId
-                ? { ...cat, reasons: cat.reasons.filter(r => r !== reason) }
-                : cat
-        );
-        const selectedCat = updatedCategories.find(cat => cat.id === categoryId);
+    // Handle deleting a reason
+    const handleDeleteReason = async (reason: string) => {
+        if (!selectedCategoryId) return;
 
-        if (selectedCat) {
-            await updateDoc(doc(db, 'downtimeCategories', categoryId), {
-                name: selectedCat.name,
-                reasons: selectedCat.reasons
+        if (!window.confirm(`Are you sure you want to delete the reason "${reason}"?`)) return;
+
+        try {
+            const categoryRef = doc(db, 'downtimeCategories', selectedCategoryId);
+            await updateDoc(categoryRef, {
+                reasons: arrayRemove(reason)
             });
+            console.log(`Deleted reason "${reason}" from category ID: ${selectedCategoryId}`);
+
+            // Update local state
+            setCategories(prevCategories =>
+                prevCategories.map(cat =>
+                    cat.id === selectedCategoryId
+                        ? { ...cat, reasons: cat.reasons.filter(r => r !== reason) }
+                        : cat
+                )
+            );
+        } catch (error) {
+            console.error('Error deleting reason: ', error);
+            alert('Failed to delete reason.');
         }
-        fetchCategories();
     };
 
+    // Open modal to edit a reason
+    const openEditModal = (reason: string) => {
+        setReasonToEdit(reason);
+        setUpdatedReason(reason);
+        setShowReasonModal(true);
+    };
+
+    // Handle saving the edited reason
+    const handleSaveEditedReason = async () => {
+        if (!updatedReason.trim() || !reasonToEdit || !selectedCategoryId) {
+            alert('Please provide a valid reason.');
+            return;
+        }
+
+        try {
+            const categoryRef = doc(db, 'downtimeCategories', selectedCategoryId);
+            const category = categories.find(cat => cat.id === selectedCategoryId);
+            if (!category) {
+                alert('Selected category does not exist.');
+                return;
+            }
+
+            // Prevent duplicate reasons (case-insensitive)
+            if (
+                category.reasons.some(r => r.trim().toLowerCase() === updatedReason.trim().toLowerCase()) &&
+                updatedReason.trim().toLowerCase() !== reasonToEdit.trim().toLowerCase()
+            ) {
+                alert('This reason already exists.');
+                return;
+            }
+
+            // Remove the old reason and add the updated reason
+            await updateDoc(categoryRef, {
+                reasons: arrayRemove(reasonToEdit)
+            });
+            await updateDoc(categoryRef, {
+                reasons: arrayUnion(updatedReason.trim())
+            });
+
+            console.log(`Updated reason from "${reasonToEdit}" to "${updatedReason}" in category ID: ${selectedCategoryId}`);
+            setShowReasonModal(false);
+            setReasonToEdit(null);
+            setUpdatedReason('');
+
+            // Update local state
+            setCategories(prevCategories =>
+                prevCategories.map(cat =>
+                    cat.id === selectedCategoryId
+                        ? {
+                            ...cat,
+                            reasons: cat.reasons.map(r =>
+                                r === reasonToEdit ? updatedReason.trim() : r
+                            )
+                        }
+                        : cat
+                )
+            );
+        } catch (error) {
+            console.error('Error updating reason: ', error);
+            alert('Failed to update reason.');
+        }
+    };
+
+    // Find the selected category based on selectedCategoryId
     const selectedCategory = categories.find(cat => cat.id === selectedCategoryId);
 
     return (
         <div className="downtime-container">
             <div className="downtime-card">
                 <div className="card-header">
-                    <button className="back-button" onClick={() => window.history.back()}>Back to Admin</button>
+                    <button className="back-button" onClick={() => window.history.back()}>
+                        Back to Admin
+                    </button>
                     <h1 className="title">Downtime Admin</h1>
                 </div>
                 <div className="downtime-content">
+                    {/* Categories Section */}
                     <div className="categories-section">
                         <h2>Categories</h2>
-                        <ul>
-                            {categories.map(category => (
-                                <li key={category.id} className="category-item">
-                                    <div
-                                        className="category-name"
+                        {isLoading ? (
+                            <p>Loading categories...</p>
+                        ) : (
+                            <ul className="categories-list">
+                                {categories.map(category => (
+                                    <li
+                                        key={category.id}
+                                        className={`category-item ${selectedCategoryId === category.id ? 'selected' : ''}`}
                                         onClick={() => setSelectedCategoryId(category.id)}
                                     >
                                         {category.name}
-                                    </div>
-                                    <button
-                                        className="edit-btn"
-                                        onClick={() => { setShowCategoryModal(true); setUpdatedCategoryName(category.name); setSelectedCategoryId(category.id); }}
-                                    >
-                                        Edit
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
-                        <input
-                            type="text"
-                            placeholder="New Category"
-                            value={newCategoryName}
-                            onChange={(e) => setNewCategoryName(e.target.value)}
-                        />
-                        <button className="add-category-btn" onClick={handleAddCategory}>Add Category</button>
-                    </div>
-                    <div className="reasons-section">
-                        <h2>Reasons</h2>
-                        {selectedCategoryId ? (
-                            <>
-                                {selectedCategory?.reasons.map((reason, index) => (
-                                    <div key={index} className="reason-item">
-                                        <div className="reason-name">{reason}</div>
-                                        <button
-                                            className="edit-btn"
-                                            onClick={() => { setShowReasonModal(true); setSelectedReason(reason); }}
-                                        >
-                                            Edit
-                                        </button>
-                                    </div>
+                                    </li>
                                 ))}
-                                <input
-                                    type="text"
-                                    placeholder="New Reason"
-                                    value={newReason}
-                                    onChange={(e) => setNewReason(e.target.value)}
-                                />
-                                <button className="add-reason-btn" onClick={() => handleAddReason(selectedCategoryId!)}>Add Reason</button>
+                            </ul>
+                        )}
+                    </div>
+                    {/* Reasons Section */}
+                    <div className="reasons-section">
+                        <h2>Reasons for "{selectedCategory?.name || 'Select a Category'}"</h2>
+                        {selectedCategory ? (
+                            <>
+                                <div className="add-reason">
+                                    <input
+                                        type="text"
+                                        placeholder="New Reason"
+                                        value={newReason}
+                                        onChange={e => setNewReason(e.target.value)}
+                                        className="reason-input"
+                                    />
+                                    <button onClick={handleAddReason} className="add-button">
+                                        Add Reason
+                                    </button>
+                                </div>
+                                <ul className="reasons-list">
+                                    {selectedCategory.reasons.map((reason, index) => (
+                                        <li key={index} className="reason-item">
+                                            <span className="reason-name">{reason}</span>
+                                            <div className="reason-actions">
+                                                <button onClick={() => openEditModal(reason)} className="edit-button">
+                                                    Edit
+                                                </button>
+                                                <button onClick={() => handleDeleteReason(reason)} className="delete-button">
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
                             </>
                         ) : (
-                            <p>Please select a category to view reasons</p>
+                            <p>Please select a category to view and manage reasons.</p>
                         )}
                     </div>
                 </div>
 
-                {/* Category Modal */}
-                {showCategoryModal && (
-                    <div className="modal">
-                        <div className="modal-content">
-                            <h2>Edit Category</h2>
-                            <input
-                                type="text"
-                                placeholder="Rename Category"
-                                value={updatedCategoryName}
-                                onChange={(e) => setUpdatedCategoryName(e.target.value)}
-                            />
-                            <button className="save-btn" onClick={() => handleEditCategory(selectedCategoryId!)}>Save</button>
-                            <button className="delete-btn" onClick={() => handleDeleteCategory(selectedCategoryId!)}>Delete</button>
-                            <button className="cancel-btn" onClick={() => setShowCategoryModal(false)}>Cancel</button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Reason Modal */}
-                {showReasonModal && (
+                {/* Reason Edit Modal */}
+                {showReasonModal && reasonToEdit && (
                     <div className="modal">
                         <div className="modal-content">
                             <h2>Edit Reason</h2>
                             <input
                                 type="text"
-                                placeholder="Rename Reason"
-                                value={selectedReason || ''}
-                                onChange={(e) => setSelectedReason(e.target.value)}
+                                value={updatedReason}
+                                onChange={e => setUpdatedReason(e.target.value)}
+                                placeholder="Reason Name"
+                                className="reason-input"
                             />
-                            <button className="save-btn" onClick={() => setShowReasonModal(false)}>Save</button>
-                            <button className="delete-btn" onClick={() => handleDeleteReason(selectedCategoryId!, selectedReason!)}>Delete</button>
-                            <button className="cancel-btn" onClick={() => setShowReasonModal(false)}>Cancel</button>
+                            <div className="modal-actions">
+                                <button className="save-btn" onClick={handleSaveEditedReason}>
+                                    Save
+                                </button>
+                                <button
+                                    className="cancel-btn"
+                                    onClick={() => setShowReasonModal(false)}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
             </div>
         </div>
     );
+
 };
 
 export default DownTime;

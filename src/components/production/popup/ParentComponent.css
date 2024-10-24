@@ -1,0 +1,13 @@
+/* src/components/production/popup/ParentComponent.css */
+.parent-component {
+    padding: 1rem;
+}
+
+.parent-component button {
+    padding: 0.5rem 1rem;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}

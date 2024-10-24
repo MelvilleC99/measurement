@@ -1,32 +1,13 @@
+// src/components/production/popup/DowntimeActionPopup.tsx
 import React, { useState } from 'react';
 import './DowntimeActionPopup.css';
-import { doc, updateDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../../../firebase'; // Correct import path for your Firebase config
-
-interface DowntimeItem {
-    docId: string; // Firestore document ID
-    productionLineId: string;
-    supervisorId: string;
-    mechanicId?: string;
-    startTime: Date;
-    mechanicReceivedTime?: Date;
-    endTime?: Date;
-    category: string;
-    reason: string;
-    status: 'Open' | 'Mechanic Received' | 'Resolved';
-    createdAt: Date;
-    updatedAt: Date;
-}
-
-interface SupportFunction {
-    id: string;
-    name: string;
-    surname: string;
-    password: string;
-}
+import PasswordConfirmation from './PasswordConfirmation';
+import CommentsInput from './CommentsInput';
+import { DowntimeCard } from '../../../interfaces/DowntimeCard';
+import { SupportFunction } from '../../../interfaces/SupportFunction';
 
 interface DowntimeActionPopupProps {
-    downtime: DowntimeItem;
+    downtime: DowntimeCard;
     mechanics: SupportFunction[];
     supervisor: SupportFunction | null;
     onClose: () => void;
@@ -59,7 +40,11 @@ const DowntimeActionPopup: React.FC<DowntimeActionPopupProps> = ({
 
         // Perform the action
         setErrorMessage(''); // Clear error message on success
-        await onAction('mechanicReceived', selectedMechanicId);
+        try {
+            await onAction('mechanicReceived', selectedMechanicId);
+        } catch (error) {
+            setErrorMessage('An error occurred while confirming mechanic receipt.');
+        }
     };
 
     const handleResolved = async () => {
@@ -68,14 +53,18 @@ const DowntimeActionPopup: React.FC<DowntimeActionPopupProps> = ({
             return;
         }
 
-        if (supervisorPassword !== supervisor?.password) {
+        if (!supervisor || supervisorPassword !== supervisor.password) {
             setErrorMessage('Invalid supervisor password.');
             return;
         }
 
         // Perform the action
         setErrorMessage(''); // Clear error message on success
-        await onAction('resolved');
+        try {
+            await onAction('resolved');
+        } catch (error) {
+            setErrorMessage('An error occurred while marking as resolved.');
+        }
     };
 
     return (
@@ -87,7 +76,7 @@ const DowntimeActionPopup: React.FC<DowntimeActionPopupProps> = ({
                 <p><strong>Category:</strong> {downtime.category}</p>
                 <p><strong>Reason:</strong> {downtime.reason}</p>
                 <p><strong>Status:</strong> {downtime.status}</p>
-                <p><strong>Duration:</strong> {Math.floor((new Date().getTime() - downtime.startTime.getTime()) / 1000)} seconds</p>
+                <p><strong>Duration:</strong> {Math.floor((new Date().getTime() - new Date(downtime.startTime).getTime()) / 1000)} seconds</p>
 
                 {downtime.status === 'Open' && downtime.category.toLowerCase() === 'maintenance' && (
                     <>

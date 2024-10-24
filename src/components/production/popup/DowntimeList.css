@@ -1,0 +1,34 @@
+/* src/components/production/popup/DowntimeList.css */
+.downtime-list {
+    padding: 1rem;
+}
+
+.downtime-list h1 {
+    margin-bottom: 1rem;
+}
+
+.downtime-list ul {
+    list-style: none;
+    padding: 0;
+}
+
+.downtime-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #ccc;
+}
+
+.downtime-list span {
+    flex-grow: 1;
+}
+
+.downtime-list button {
+    padding: 0.25rem 0.5rem;
+    background-color: #008CBA;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
