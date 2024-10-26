@@ -1,0 +1,113 @@
+/* src/common/production/downtime/hr/Absent.css */
+
+.absent-container {
+    padding: 20px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.absent-container h2 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.absent-form {
+    display: flex;
+    flex-direction: column;
+}
+
+.absent-form label {
+    margin-bottom: 15px;
+}
+
+.absent-form input,
+.absent-form textarea,
+.absent-form select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.submit-button {
+    width: 200px;
+    padding: 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.submit-button:hover {
+    background-color: #45a049;
+}
+
+.error-message {
+    color: red;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #fff;
+    padding: 2rem;
+    border-radius: 8px;
+    width: 400px;
+    max-width: 90%;
+    position: relative;
+}
+
+.modal-content h3 {
+    margin-bottom: 1rem;
+}
+
+.modal-content p {
+    margin: 0.5rem 0;
+}
+
+.modal-content input {
+    width: 100%;
+    padding: 10px;
+    margin-top: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1.5rem;
+}
+
+.modal-buttons .submit-button {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.modal-buttons .cancel-button {
+    background-color: #f44336;
+    color: white;
+}
+
+.modal-buttons .submit-button:hover {
+    background-color: #45a049;
+}
+
+.modal-buttons .cancel-button:hover {
+    background-color: #da190b;
+}

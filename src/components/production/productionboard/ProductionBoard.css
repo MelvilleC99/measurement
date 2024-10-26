@@ -1,0 +1,110 @@
+.board-container {
+    display: flex;
+    height: calc(100vh - 2rem);
+    background-color: #f5f5f5;
+    padding: 1rem;
+    gap: 1rem;
+    position: relative;
+}
+
+.main-section {
+    flex: 2;
+    min-width: 0;
+    display: flex;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.main-section > div {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.monitoring-section {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.section-counters {
+    height: 25%;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    overflow: auto;
+}
+
+.section-downtimes {
+    height: 50%;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.section-inputs {
+    height: 25%;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    overflow: auto;
+}
+
+.end-shift-button {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    padding: 0.75rem 1.5rem;
+    background-color: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    z-index: 10;
+    height: auto;
+    width: auto;
+}
+
+.end-shift-button:hover {
+    background-color: #b91c1c;
+}
+
+.error-message {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    background: #fee2e2;
+    border: 1px solid #ef4444;
+    padding: 1rem;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    z-index: 50;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.error-message button {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    padding: 0.5rem;
+}
+
+/* Additional support for nested components */
+.main-section > * {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}

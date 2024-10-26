@@ -9,7 +9,7 @@ import ProductionSchedule from './components/Admin/ProductionSchedule';
 import DowntimePage from './components/Admin/DownTime';
 import SupportFunctions from './components/Admin/SupportFunctions';
 import MachineList from './components/Admin/MachineList';
-import ActiveLineInput from './components/production/ActiveLineInput';
+import ProductionBoard from './components/production/productionboard/ProductionBoard';
 import ProductionBoardViewer from './components/production/ProductionBoardViewer';
 import Dashboard from './components/dashboards/Dashboard';
 import DowntimeDashboard from './components/dashboards/DowntimeDashboard';
@@ -26,11 +26,11 @@ const App: React.FC = () => {
                 <Route path="/admin/add-lines" element={<ProductionLines />} />
                 <Route path="/admin/production-schedule" element={<ProductionSchedule />} />
                 <Route path="/admin/downtime" element={<DowntimePage />} />
-                <Route path="/admin/support-functions" element={<s />} />
+                <Route path="/admin/support-functions" element={<SupportFunctions />} />
                 <Route path="/admin/machine-list" element={<MachineList />} />
 
                 {/* Updated Production routes */}
-                <Route path="/active-line" element={<ActiveLineInput />} />
+                <Route path="/active-line" element={<ProductionBoard />} />
                 <Route path="/production-board" element={<ProductionBoardViewer />} />
 
                 {/* Dashboard routes */}

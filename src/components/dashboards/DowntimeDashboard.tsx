@@ -5,6 +5,8 @@ import { db } from '../../firebase';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Downtime } from '../../types';
 import './DowntimeDashboard.css';
+
+/* Temporarily commenting out Chart.js related code
 import { Bar } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
@@ -16,7 +18,6 @@ import {
     Legend,
 } from 'chart.js';
 
-// Register Chart.js components
 ChartJS.register(
     CategoryScale,
     LinearScale,
@@ -25,11 +26,12 @@ ChartJS.register(
     Tooltip,
     Legend
 );
+*/
 
 const DowntimeDashboard: React.FC = () => {
     const [downtimes, setDowntimes] = useState<Downtime[]>([]);
     const [filter, setFilter] = useState({
-        timePeriod: '7', // days
+        timePeriod: '7',
         category: 'All',
         line: 'All',
         reason: 'All',
@@ -42,48 +44,12 @@ const DowntimeDashboard: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Update current time every minute for running clock
     useEffect(() => {
         const timer = setInterval(() => {
             setCurrentTime(new Date());
-        }, 60000); // 60,000 ms = 1 minute
+        }, 60000);
 
         return () => clearInterval(timer);
-    }, []);
-
-    useEffect(() => {
-        // Query to fetch open downtimes
-        const q = query(collection(db, 'downtimes'), where('status', '==', 'Open'));
-        const unsubscribe = onSnapshot(
-            q,
-            (querySnapshot) => {
-                const openDowntimes: Downtime[] = [];
-                const lineSet: Set<string> = new Set();
-                const categorySet: Set<string> = new Set();
-                const reasonSet: Set<string> = new Set();
-
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data() as Omit<Downtime, 'id'>;
-                    openDowntimes.push({ id: doc.id, ...data });
-                    lineSet.add(data.productionLineId);
-                    categorySet.add(data.category);
-                    reasonSet.add(data.reason);
-                });
-
-                setDowntimes(openDowntimes);
-                setLines(Array.from(lineSet));
-                setCategories(Array.from(categorySet));
-                setReasons(Array.from(reasonSet));
-                setLoading(false);
-            },
-            (err) => {
-                console.error("Error fetching downtimes: ", err);
-                setError("Failed to load downtimes.");
-                setLoading(false);
-            }
-        );
-
-        return () => unsubscribe();
     }, []);
 
     // Handle filter changes
@@ -92,64 +58,7 @@ const DowntimeDashboard: React.FC = () => {
         setFilter((prev) => ({ ...prev, [name]: value }));
     };
 
-    // Apply filters to downtimes
-    const filteredDowntimes = downtimes
-        .filter((dt) => {
-            const { timePeriod, category, line, reason } = filter;
-            const now = new Date();
-            let startDate: Date | null = null;
-
-            if (timePeriod !== 'all') {
-                startDate = new Date();
-                startDate.setDate(now.getDate() - parseInt(timePeriod));
-            }
-
-            const dtStartTime = dt.startTime.toDate();
-
-            const matchesTime = timePeriod === 'all' || (startDate && dtStartTime >= startDate);
-            const matchesLine = line === 'All' || dt.productionLineId === line;
-            const matchesCategory = category === 'All' || dt.category === category;
-            const matchesReason = reason === 'All' || dt.reason === reason;
-
-            return matchesTime && matchesLine && matchesCategory && matchesReason;
-        })
-        // Sort from longest to shortest open
-        .sort((a, b) => a.startTime.toDate().getTime() - b.startTime.toDate().getTime());
-
-    // Prepare data for trend chart
-    const trendData = {
-        labels: Array.from(new Set(downtimes.map(dt => dt.reason))),
-        datasets: [
-            {
-                label: 'Time Lost (minutes)',
-                data: Array.from(new Set(downtimes.map(dt => dt.reason))).map(reason => {
-                    const total = downtimes
-                        .filter(dt => dt.reason === reason)
-                        .reduce((acc, dt) => {
-                            const duration = (currentTime.getTime() - dt.startTime.toDate().getTime()) / (1000 * 60);
-                            return acc + duration;
-                        }, 0);
-                    return Math.round(total);
-                }),
-                backgroundColor: 'rgba(75, 192, 192, 0.6)',
-            },
-        ],
-    };
-
-    const trendOptions = {
-        responsive: true,
-        plugins: {
-            legend: {
-                position: 'top' as const,
-            },
-            title: {
-                display: true,
-                text: 'Downtime Trend',
-            },
-        },
-    };
-
-    // Function to format duration in hh:mm
+    // Format duration function
     const formatDuration = (startTime: Date): string => {
         const diffMs = currentTime.getTime() - startTime.getTime();
         const diffTotalMinutes = Math.floor(diffMs / (1000 * 60));
@@ -164,7 +73,6 @@ const DowntimeDashboard: React.FC = () => {
         <div className="downtime-dashboard-container">
             {error && <p className="error-message">{error}</p>}
             <div className="dashboard-content">
-                {/* Active Downtime Section */}
                 <div className="active-downtime-section">
                     <h2>Current Open Downtimes</h2>
                     <div className="filters">
@@ -205,17 +113,17 @@ const DowntimeDashboard: React.FC = () => {
                             </select>
                         </label>
                     </div>
+
                     {loading ? (
                         <p>Loading downtimes...</p>
                     ) : (
+                        <p>Downtime data will be displayed here</p>
+                        /* Commenting out the problematic section
                         <div className="downtime-cards-container">
                             {filteredDowntimes.length > 0 ? (
                                 filteredDowntimes.map((dt) => {
-                                    // Calculate duration in minutes
                                     const durationMs = currentTime.getTime() - dt.startTime.toDate().getTime();
                                     const durationMinutes = Math.floor(durationMs / (1000 * 60));
-
-                                    // Determine if duration exceeds 5 minutes
                                     const isLong = durationMinutes > 5;
 
                                     return (
@@ -238,20 +146,21 @@ const DowntimeDashboard: React.FC = () => {
                                 <p>No open downtimes found.</p>
                             )}
                         </div>
+                        */
                     )}
                 </div>
 
-                {/* Trend Section */}
+                {/* Commenting out the Trend Section
                 <div className="trend-section">
                     <h2>Downtime Trends</h2>
                     <div className="trend-chart">
                         <Bar data={trendData} options={trendOptions} />
                     </div>
                 </div>
+                */}
             </div>
         </div>
     );
-
 };
 
 export default DowntimeDashboard;
