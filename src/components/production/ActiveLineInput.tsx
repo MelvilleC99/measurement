@@ -1,107 +1,59 @@
-// ActiveLineInput.tsx
-
 import React, { useState, useEffect } from 'react';
 import {
     collection,
     getDocs,
     addDoc,
     updateDoc,
-    deleteDoc,
     doc,
     Timestamp,
+    query,
+    where
 } from 'firebase/firestore';
 import { db } from '../../firebase';
-import ReworkPopup from '../production/popup/ReworkPopup';
-import RejectPopup from '../production/popup/RejectPopup';
-import DowntimePopup from '../production/popup/DowntimePopup';
-import ActiveReworksPopup from '../production/popup/ActiveReworksPopup';
-import RejectsListPopup from '../production/popup/RejectsListPopup';
-import DowntimeActionPopup from '../production/popup/DowntimeActionPopup';
+import Rework from './downtime/rework/Rework';
+import Reject from './downtime/reject/Reject';
+import Machine from './downtime/machine/Machine';
+import StyleChange from './downtime/stylechange/StyleChangeover';
+import {
+    ProductionLine,
+    Style,
+    SupportFunction,
+    TimeTable,
+    Break,
+    Downtime,
+    ReworkItem,
+    RejectRecord,
+    ReworkFormData,
+    RejectFormData,
+    MachineFormData,
+    StyleChangeoverFormData,
+    convertDateToTimestamp
+} from '../../types';
 import './ActiveLineInput.css';
 
-// Interfaces
-interface ProductionLine {
+interface CurrentSlot {
     id: string;
-    name: string;
-    description?: string;
-}
-
-interface SupportFunction {
-    id: string;
-    name: string;
-    surname: string;
-    employeeNumber: string;
-    role: string;
-    hasPassword: boolean;
-    password: string;
-}
-
-interface Style {
-    id: string;
-    styleNumber: string;
-    styleName: string;
-    description: string;
-    unitsInOrder: number;
-    deliveryDate: string;
-}
-
-interface TimeSlot {
-    id: string;
-    startTime: string; // "HH:MM" format
-    endTime: string; // "HH:MM" format
-    breakId: string | null;
-}
-
-interface TimeTable {
-    id: string;
-    name: string;
-    lineId?: string;
-    slots: TimeSlot[];
-}
-
-interface Break {
-    id: string;
-    breakType: string;
     startTime: string;
     endTime: string;
-    duration: number;
+    breakId: string | null;
+    isActive: boolean;
 }
 
-interface Reject {
-    docId: string; // Firestore document ID
-    count: number;
-    reason: string;
-    recordedAsProduced: boolean;
-    qcApprovedBy: string;
+interface DowntimeCategory {
+    id: string;
+    name: string;
+    reasons: string[];
 }
 
-interface ReworkItem {
-    docId: string; // Firestore document ID
-    count: number;
-    reason: string;
-    operation: string;
-    startTime: Date;
-    endTime?: Date;
-    status: 'Booked Out' | 'Booked In' | 'Rejected';
-}
+const downtimeTypes = {
+    MACHINE: 'Machine Breakdown',
+    STYLE_CHANGE: 'Style Changeover',
+    OTHER: 'Other'
+} as const;
 
-interface DowntimeItem {
-    docId: string; // Firestore document ID
-    productionLineId: string;
-    supervisorId: string;
-    mechanicId?: string;
-    startTime: Date;
-    mechanicReceivedTime?: Date;
-    endTime?: Date;
-    category: string;
-    reason: string;
-    status: 'Open' | 'Mechanic Received' | 'Resolved';
-    createdAt: Date;
-    updatedAt: Date;
-}
-
+type DowntimeType = typeof downtimeTypes[keyof typeof downtimeTypes];
 const ActiveLineInput: React.FC = () => {
-    // State variables
+    // Data states
     const [productionLines, setProductionLines] = useState<ProductionLine[]>([]);
     const [supervisors, setSupervisors] = useState<SupportFunction[]>([]);
     const [mechanics, setMechanics] = useState<SupportFunction[]>([]);
@@ -109,19 +61,18 @@ const ActiveLineInput: React.FC = () => {
     const [styles, setStyles] = useState<Style[]>([]);
     const [timeTables, setTimeTables] = useState<TimeTable[]>([]);
     const [breaks, setBreaks] = useState<Break[]>([]);
-    const [downtimeCategories, setDowntimeCategories] = useState<
-        { categoryName: string; reasons: string[] }[]
-    >([]);
+    const [downtimeCategories, setDowntimeCategories] = useState<DowntimeCategory[]>([]);
 
+    // Selection states
     const [selectedLine, setSelectedLine] = useState<string>('');
     const [selectedLineId, setSelectedLineId] = useState<string>('');
-    const [selectedSupervisor, setSelectedSupervisor] =
-        useState<SupportFunction | null>(null);
+    const [selectedSupervisor, setSelectedSupervisor] = useState<SupportFunction | null>(null);
     const [selectedStyle, setSelectedStyle] = useState<Style | null>(null);
     const [manualSlot, setManualSlot] = useState<string>('current');
-    const [assignedTimeTable, setAssignedTimeTable] = useState<TimeTable | null>(
-        null
-    );
+    const [currentTimeSlot, setCurrentTimeSlot] = useState<CurrentSlot | null>(null);
+    const [assignedTimeTable, setAssignedTimeTable] = useState<TimeTable | null>(null);
+
+    // Production tracking states
     const [styleDetails, setStyleDetails] = useState<{
         target: number;
         outputs: number[];
@@ -132,188 +83,434 @@ const ActiveLineInput: React.FC = () => {
         balance: 0,
     });
 
+    // Modal states
     const [isBoardLoaded, setIsBoardLoaded] = useState(false);
     const [isStyleModalOpen, setIsStyleModalOpen] = useState(false);
     const [isReworkModalOpen, setIsReworkModalOpen] = useState(false);
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-    const [isDowntimeModalOpen, setIsDowntimeModalOpen] = useState(false);
+    const [isMachineDowntimeModalOpen, setIsMachineDowntimeModalOpen] = useState(false);
+    const [isStyleChangeModalOpen, setIsStyleChangeModalOpen] = useState(false);
+    const [selectedDowntimeType, setSelectedDowntimeType] = useState<DowntimeType | null>(null);
+
+    // Tracking states
     const [currentTime, setCurrentTime] = useState(new Date());
     const [rejectCount, setRejectCount] = useState(0);
     const [reworkCount, setReworkCount] = useState(0);
-    const [rejects, setRejects] = useState<Reject[]>([]);
+    const [rejects, setRejects] = useState<RejectRecord[]>([]);
     const [reworks, setReworks] = useState<ReworkItem[]>([]);
-    const [downtimes, setDowntimes] = useState<DowntimeItem[]>([]);
+    const [downtimes, setDowntimes] = useState<Downtime[]>([]);
+    const [error, setError] = useState<string>('');
 
-    const [isActiveReworksPopupOpen, setIsActiveReworksPopupOpen] =
-        useState(false);
-    const [isRejectsListPopupOpen, setIsRejectsListPopupOpen] = useState(false);
-    const [selectedDowntime, setSelectedDowntime] =
-        useState<DowntimeItem | null>(null);
-
+    // Session state
     const [sessionId, setSessionId] = useState<string | null>(null);
 
-    // Fetch data from Firestore
-    const fetchData = async () => {
-        try {
-            const linesSnapshot = await getDocs(collection(db, 'productionLines'));
-            const linesData = linesSnapshot.docs.map(
-                (doc) => ({ id: doc.id, ...doc.data() } as ProductionLine)
-            );
-            setProductionLines(linesData);
-
-            const supportFunctionsSnapshot = await getDocs(
-                collection(db, 'supportFunctions')
-            );
-            const supportFunctionsData = supportFunctionsSnapshot.docs.map(
-                (doc) => ({ id: doc.id, ...doc.data() } as SupportFunction)
-            );
-            setSupervisors(
-                supportFunctionsData.filter(
-                    (sf) => sf.role.toLowerCase() === 'supervisor'
-                )
-            );
-            setMechanics(
-                supportFunctionsData.filter((sf) => sf.role.toLowerCase() === 'mechanic')
-            );
-            setQcs(
-                supportFunctionsData.filter((sf) => sf.role.toLowerCase() === 'qc')
-            );
-
-            const stylesSnapshot = await getDocs(collection(db, 'styles'));
-            setStyles(
-                stylesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Style))
-            );
-
-            const timeTablesSnapshot = await getDocs(collection(db, 'timeTables'));
-            const fetchedTimeTables: TimeTable[] = timeTablesSnapshot.docs.map(
-                (doc) => {
-                    const data = doc.data();
-                    return {
-                        id: doc.id,
-                        name: data.name,
-                        lineId: data.lineId || '',
-                        slots: (data.slots || []).map((slot: any) => ({
-                            id: slot.id,
-                            startTime: slot.startTime,
-                            endTime: slot.endTime,
-                            breakId: slot.breakId || null,
-                        })),
-                    };
-                }
-            );
-            setTimeTables(fetchedTimeTables);
-
-            const breaksSnapshot = await getDocs(collection(db, 'breaks'));
-            const fetchedBreaks: Break[] = breaksSnapshot.docs.map((doc) => ({
-                id: doc.id,
-                breakType: doc.data().breakType,
-                startTime: doc.data().startTime,
-                endTime: doc.data().endTime,
-                duration: doc.data().duration,
-            }));
-            setBreaks(fetchedBreaks);
-
-            const downtimeCategoriesSnapshot = await getDocs(
-                collection(db, 'downtimeCategories')
-            );
-            const fetchedDowntimeCategories = downtimeCategoriesSnapshot.docs.map(
-                (doc) => ({
-                    categoryName: doc.data().name,
-                    reasons: doc.data().reasons,
-                })
-            );
-            setDowntimeCategories(fetchedDowntimeCategories);
-        } catch (error) {
-            console.error('Error fetching data from Firestore:', error);
-            alert('Failed to load data. Please try again.');
-        }
-    };
-
     useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const [
+                    linesSnapshot,
+                    supportSnapshot,
+                    stylesSnapshot,
+                    timeTablesSnapshot,
+                    breaksSnapshot,
+                    downtimeCatSnapshot
+                ] = await Promise.all([
+                    getDocs(collection(db, 'productionLines')),
+                    getDocs(collection(db, 'supportFunctions')),
+                    getDocs(collection(db, 'styles')),
+                    getDocs(collection(db, 'timeTables')),
+                    getDocs(collection(db, 'breaks')),
+                    getDocs(collection(db, 'downtimeCategories'))
+                ]);
+
+                setProductionLines(linesSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                } as ProductionLine)));
+
+                const supportData = supportSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                } as SupportFunction));
+
+                setSupervisors(supportData.filter(sf => sf.role === 'Supervisor'));
+                setMechanics(supportData.filter(sf => sf.role === 'Mechanic'));
+                setQcs(supportData.filter(sf => sf.role === 'QC'));
+
+                setStyles(stylesSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                } as Style)));
+
+                setTimeTables(timeTablesSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    name: doc.data().name,
+                    lineId: doc.data().lineId || '',
+                    slots: (doc.data().slots || []).map((slot: any) => ({
+                        id: slot.id,
+                        startTime: slot.startTime,
+                        endTime: slot.endTime,
+                        breakId: slot.breakId || null,
+                    })),
+                } as TimeTable)));
+
+                setBreaks(breaksSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                } as Break)));
+
+                setDowntimeCategories(downtimeCatSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                } as DowntimeCategory)));
+
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                setError('Failed to load data. Please try again.');
+            }
+        };
+
         fetchData();
 
-        const interval = setInterval(() => setCurrentTime(new Date()), 1000);
+        // Update current time and time slot
+        const interval = setInterval(() => {
+            const now = new Date();
+            setCurrentTime(now);
+            if (assignedTimeTable && manualSlot === 'current') {
+                updateCurrentTimeSlot(now);
+            }
+        }, 1000);
+
         return () => clearInterval(interval);
-    }, []);
+    }, [assignedTimeTable, manualSlot]);
 
-    // Log production record to Firestore
-    const logProductionRecord = async (unitsProduced: number, slotId: string) => {
-        if (!sessionId) {
-            alert('Session ID is not set. Please try again.');
-            return;
-        }
+    const updateCurrentTimeSlot = (now: Date) => {
+        if (!assignedTimeTable) return;
 
-        if (!selectedLine || !selectedSupervisor || !selectedStyle) {
-            alert('Please select a line, supervisor, and style.');
-            return;
-        }
+        const currentTimeStr = now.toLocaleTimeString('en-GB', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
 
-        if (!assignedTimeTable) {
-            alert('Time Table is not loaded.');
-            return;
-        }
-
-        const selectedSlot = assignedTimeTable.slots.find(
-            (slot: TimeSlot) => slot.id === slotId
+        const activeSlot = assignedTimeTable.slots.find(slot =>
+            currentTimeStr >= slot.startTime && currentTimeStr < slot.endTime
         );
-        if (!selectedSlot) {
-            alert('Selected time slot not found.');
+
+        if (activeSlot) {
+            setCurrentTimeSlot({
+                ...activeSlot,
+                isActive: true
+            });
+        }
+    };
+    // Production tracking functions
+    const handleAddOutput = async () => {
+        if (!assignedTimeTable || !sessionId) {
+            setError('Production tracking not properly initialized.');
             return;
         }
 
         try {
-            const productionRef = collection(db, 'production');
+            let selectedSlotId: string;
+            let slotToUse: TimeTable['slots'][0];
 
-            await addDoc(productionRef, {
-                sessionId: sessionId, // Include the sessionId
+            // Determine which slot to use for recording output
+            if (manualSlot === 'current') {
+                if (!currentTimeSlot) {
+                    throw new Error('No active time slot for current time.');
+                }
+                selectedSlotId = currentTimeSlot.id;
+                slotToUse = currentTimeSlot;
+            } else {
+                const selectedSlot = assignedTimeTable.slots.find(slot => slot.id === manualSlot);
+                if (!selectedSlot) {
+                    throw new Error('Invalid slot selection.');
+                }
+                selectedSlotId = manualSlot;
+                slotToUse = selectedSlot;
+            }
+
+            // Record production in Firestore
+            await addDoc(collection(db, 'production'), {
+                sessionId,
                 productionLineId: selectedLineId,
-                supervisorId: selectedSupervisor.id,
-                styleId: selectedStyle.id,
-                date: Timestamp.fromDate(new Date()),
-                timeSlot: selectedSlot.id,
-                unitsProduced: unitsProduced,
-                breakId: selectedSlot.breakId || null,
+                supervisorId: selectedSupervisor?.id,
+                styleId: selectedStyle?.id,
+                timeSlot: selectedSlotId,
+                unitsProduced: 1,
+                timestamp: Timestamp.fromDate(new Date()),
+                createdAt: Timestamp.fromDate(new Date()),
             });
+
+            // Update local state
+            const slotIndex = assignedTimeTable.slots.findIndex(
+                (slot) => slot.id === selectedSlotId
+            );
+
+            if (slotIndex !== -1) {
+                const updatedOutputs = [...styleDetails.outputs];
+                updatedOutputs[slotIndex] += 1;
+                const newBalance = styleDetails.balance - 1;
+
+                setStyleDetails(prev => ({
+                    ...prev,
+                    outputs: updatedOutputs,
+                    balance: newBalance,
+                }));
+            }
         } catch (error) {
-            console.error('Error adding production record:', error);
-            alert('Failed to record production data. Please try again.');
+            console.error('Error recording production:', error);
+            setError(error instanceof Error ? error.message : 'Failed to record production.');
         }
     };
 
-    // Handle loading the production board
+    // Efficiency calculations
+    const calculateTargetPerSlot = (slot: TimeTable['slots'][0]): number => {
+        if (!slot.breakId) {
+            return styleDetails.target;
+        }
+
+        const breakInfo = breaks.find(b => b.id === slot.breakId);
+        if (!breakInfo) {
+            return styleDetails.target;
+        }
+
+        const effectiveMinutes = 60 - breakInfo.duration;
+        return Math.ceil((styleDetails.target / 60) * effectiveMinutes);
+    };
+
+    const calculateEfficiency = (output: number, target: number): string => {
+        if (!target) return 'N/A';
+        return `${((output / target) * 100).toFixed(2)}%`;
+    };
+
+    const calculateCumulativeEfficiency = (upToIndex: number): string => {
+        if (!assignedTimeTable) return 'N/A';
+
+        let totalOutput = 0;
+        let totalTarget = 0;
+
+        for (let i = 0; i <= upToIndex; i++) {
+            const slot = assignedTimeTable.slots[i];
+            if (!slot) continue;
+
+            totalOutput += styleDetails.outputs[i];
+            totalTarget += calculateTargetPerSlot(slot);
+        }
+
+        if (!totalTarget) return 'N/A';
+        return `${((totalOutput / totalTarget) * 100).toFixed(2)}%`;
+    };
+
+    // Rework handling
+    const handleReworkSubmit = async (formData: ReworkFormData): Promise<void> => {
+        try {
+            if (!selectedLineId || !selectedSupervisor) {
+                throw new Error('Line and supervisor must be selected');
+            }
+
+            const newRework: ReworkItem = {
+                docId: '',  // Will be set after document creation
+                count: formData.count,
+                reason: formData.reason,
+                operation: formData.operation,
+                startTime: Timestamp.now(),
+                status: 'Booked Out' as const,
+                productionLineId: selectedLineId,
+                supervisorId: selectedSupervisor.id,
+                qcId: formData.qcId,
+                comments: formData.comments,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            };
+
+            const docRef = await addDoc(collection(db, 'reworks'), {
+                ...newRework,
+                docId: undefined // Remove docId for Firestore
+            });
+
+            const reworkWithId: ReworkItem = {
+                ...newRework,
+                docId: docRef.id
+            };
+
+            setReworks(prev => [...prev, reworkWithId]);
+            setReworkCount(prev => prev + formData.count);
+            setIsReworkModalOpen(false);
+        } catch (error) {
+            console.error('Error submitting rework:', error);
+            setError(error instanceof Error ? error.message : 'Failed to submit rework.');
+        }
+    };
+
+    // Reject handling
+    const handleRejectSubmit = async (formData: RejectFormData): Promise<void> => {
+        try {
+            if (!selectedLineId || !selectedSupervisor) {
+                throw new Error('Line and supervisor must be selected');
+            }
+
+            const newReject: RejectRecord = {
+                docId: '',  // Will be set after document creation
+                count: formData.count,
+                reason: formData.reason,
+                operation: formData.operation,
+                recordedAsProduced: formData.recordedAsProduced,
+                qcApprovedBy: '',
+                productionLineId: selectedLineId,
+                supervisorId: selectedSupervisor.id,
+                comments: formData.comments,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            };
+
+            const docRef = await addDoc(collection(db, 'rejects'), {
+                ...newReject,
+                docId: undefined // Remove docId for Firestore
+            });
+
+            const rejectWithId: RejectRecord = {
+                ...newReject,
+                docId: docRef.id
+            };
+
+            setRejects(prev => [...prev, rejectWithId]);
+            setRejectCount(prev => prev + formData.count);
+
+            // Adjust production count if needed
+            if (formData.recordedAsProduced) {
+                const slotId = manualSlot === 'current' ? currentTimeSlot?.id : manualSlot;
+                if (slotId) {
+                    const slotIndex = assignedTimeTable?.slots.findIndex(
+                        slot => slot.id === slotId
+                    );
+
+                    if (slotIndex !== undefined && slotIndex !== -1) {
+                        const updatedOutputs = [...styleDetails.outputs];
+                        updatedOutputs[slotIndex] -= formData.count;
+                        setStyleDetails(prev => ({ ...prev, outputs: updatedOutputs }));
+                    }
+                }
+            }
+
+            setIsRejectModalOpen(false);
+        } catch (error) {
+            console.error('Error submitting reject:', error);
+            setError(error instanceof Error ? error.message : 'Failed to submit reject.');
+        }
+    };
+    // Downtime handling
+    const handleDowntimeSelection = (type: DowntimeType) => {
+        setSelectedDowntimeType(type);
+        switch (type) {
+            case downtimeTypes.MACHINE:
+                setIsMachineDowntimeModalOpen(true);
+                break;
+            case downtimeTypes.STYLE_CHANGE:
+                setIsStyleChangeModalOpen(true);
+                break;
+            case downtimeTypes.OTHER:
+                setError('Please select a specific downtime category.');
+                break;
+            default:
+                setError('Invalid downtime type selected.');
+        }
+    };
+
+    const handleMachineDowntimeSubmit = async (machineData: MachineFormData): Promise<void> => {
+        try {
+            if (!sessionId || !selectedLineId || !selectedSupervisor) {
+                throw new Error('Session or required data not initialized.');
+            }
+
+            const downtimeDoc = {
+                ...machineData,
+                type: downtimeTypes.MACHINE,
+                productionLineId: selectedLineId,
+                supervisorId: selectedSupervisor.id,
+                startTime: Timestamp.now(),
+                status: 'Open' as const,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            };
+
+            await addDoc(collection(db, 'downtimes'), downtimeDoc);
+            await refreshDowntimes();
+            setIsMachineDowntimeModalOpen(false);
+            setSelectedDowntimeType(null);
+
+        } catch (error) {
+            console.error('Error submitting machine downtime:', error);
+            setError(error instanceof Error ? error.message : 'Failed to submit machine downtime.');
+        }
+    };
+
+    const handleStyleChangeSubmit = async (styleChangeData: StyleChangeoverFormData): Promise<void> => {
+        try {
+            if (!sessionId || !selectedLineId || !selectedSupervisor) {
+                throw new Error('Session or required data not initialized.');
+            }
+
+            const downtimeDoc = {
+                ...styleChangeData,
+                type: downtimeTypes.STYLE_CHANGE,
+                productionLineId: selectedLineId,
+                supervisorId: selectedSupervisor.id,
+                startTime: Timestamp.now(),
+                status: 'Open' as const,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            };
+
+            await addDoc(collection(db, 'downtimes'), downtimeDoc);
+            await refreshDowntimes();
+            setIsStyleChangeModalOpen(false);
+            setSelectedDowntimeType(null);
+
+        } catch (error) {
+            console.error('Error submitting style change:', error);
+            setError(error instanceof Error ? error.message : 'Failed to submit style change.');
+        }
+    };
+
+    const refreshDowntimes = async () => {
+        try {
+            const downtimesSnapshot = await getDocs(
+                query(
+                    collection(db, 'downtimes'),
+                    where('productionLineId', '==', selectedLineId),
+                    where('status', '!=', 'Closed')
+                )
+            );
+
+            setDowntimes(downtimesSnapshot.docs.map(doc => ({
+                docId: doc.id,
+                ...doc.data()
+            } as Downtime)));
+        } catch (error) {
+            console.error('Error refreshing downtimes:', error);
+            setError('Failed to refresh downtimes list.');
+        }
+    };
+
+    // Board initialization
     const handleLoadBoard = async () => {
         if (!selectedLine || !selectedSupervisor || !selectedStyle) {
-            alert('Please select a line, supervisor, and style.');
+            setError('Please select a line, supervisor, and style.');
             return;
         }
 
-        if (timeTables.length === 0) {
-            alert('No Time Tables are available. Please check your database.');
-            return;
-        }
-
-        // Attempt to find a time table associated with the selected line
-        const selectedTimeTable =
-            timeTables.find((tt) => tt.lineId === selectedLineId) ||
-            timeTables.find((tt) => tt.name === selectedLine) ||
-            timeTables[0]; // Default to the first time table if no match is found
-
-        if (!selectedTimeTable) {
-            alert('No Time Table found for the selected line.');
-            return;
-        }
-
-        setAssignedTimeTable(selectedTimeTable);
-        setStyleDetails({
-            target: 0,
-            outputs: Array(selectedTimeTable.slots.length).fill(0),
-            balance: selectedStyle.unitsInOrder,
-        });
-        setIsBoardLoaded(true);
-        setIsStyleModalOpen(true);
-
-        // Create an active session in Firestore
         try {
+            const selectedTimeTable = timeTables.find(tt => tt.lineId === selectedLineId) ||
+                timeTables.find(tt => tt.name === selectedLine) ||
+                timeTables[0];
+
+            if (!selectedTimeTable) {
+                throw new Error('No Time Table found for the selected line.');
+            }
+
+            // Create active session
             const sessionData = {
                 productionLineId: selectedLineId,
                 supervisorId: selectedSupervisor.id,
@@ -325,47 +522,69 @@ const ActiveLineInput: React.FC = () => {
             };
 
             const sessionRef = await addDoc(collection(db, 'activeSessions'), sessionData);
-
             setSessionId(sessionRef.id);
-            console.log('Session created with ID:', sessionRef.id);
+
+            // Initialize board state
+            setAssignedTimeTable(selectedTimeTable);
+            setStyleDetails({
+                target: 0,
+                outputs: Array(selectedTimeTable.slots.length).fill(0),
+                balance: selectedStyle.unitsInOrder,
+            });
+
+            if (manualSlot === 'current') {
+                updateCurrentTimeSlot(new Date());
+            }
+
+            setIsBoardLoaded(true);
+            setIsStyleModalOpen(true);
+            await refreshDowntimes();
+
         } catch (error) {
-            console.error('Error creating active session:', error);
-            alert('Failed to create active session. Please try again.');
+            console.error('Error initializing board:', error);
+            setError(error instanceof Error ? error.message : 'Failed to initialize board.');
         }
     };
 
-    // Handle confirming the style and setting the target
+    // Handle style confirmation
     const handleConfirmStyle = (target: number) => {
         if (target <= 0) {
-            alert('Target must be a positive number.');
+            setError('Target must be a positive number.');
             return;
         }
 
-        setStyleDetails((prev) => ({
+        setStyleDetails(prev => ({
             ...prev,
             target: target,
         }));
-
         setIsStyleModalOpen(false);
     };
 
-    // Handle ending the shift
+    // Handle end of shift
     const handleEndShift = async () => {
-        const confirmed = window.confirm('Are you sure you want to end the shift?');
-        if (confirmed) {
-            // Update the active session to set isActive to false
+        if (!window.confirm('Are you sure you want to end the shift?')) {
+            return;
+        }
+
+        try {
             if (sessionId) {
-                try {
-                    const sessionDocRef = doc(db, 'activeSessions', sessionId);
-                    await updateDoc(sessionDocRef, {
-                        isActive: false,
+                await updateDoc(doc(db, 'activeSessions', sessionId), {
+                    isActive: false,
+                    endTime: Timestamp.fromDate(new Date()),
+                    updatedAt: Timestamp.fromDate(new Date()),
+                });
+
+                const openDowntimes = downtimes.filter(dt => dt.status === 'Open');
+                for (const downtime of openDowntimes) {
+                    await updateDoc(doc(db, 'downtimes', downtime.docId), {
+                        status: 'Closed',
+                        endTime: Timestamp.fromDate(new Date()),
                         updatedAt: Timestamp.fromDate(new Date()),
                     });
-                } catch (error) {
-                    console.error('Error ending active session:', error);
                 }
             }
 
+            // Reset states
             setIsBoardLoaded(false);
             setAssignedTimeTable(null);
             setStyleDetails({
@@ -375,424 +594,27 @@ const ActiveLineInput: React.FC = () => {
             });
             setManualSlot('current');
             setSessionId(null);
-        }
-    };
+            setDowntimes([]);
+            setCurrentTimeSlot(null);
+            setSelectedDowntimeType(null);
 
-    // Handle adding a unit produced
-    const handleAddOutput = async () => {
-        if (!assignedTimeTable) {
-            alert('Time Table is not loaded.');
-            return;
-        }
-
-        if (!sessionId) {
-            alert('Session ID is not set. Please try again.');
-            return;
-        }
-
-        let selectedSlotId: string | null = null;
-
-        if (manualSlot === 'current') {
-            const currentHour = currentTime.getHours();
-            const currentMinutes = currentTime.getMinutes();
-            const currentTimeFormatted = `${currentHour
-                .toString()
-                .padStart(2, '0')}:${currentMinutes.toString().padStart(2, '0')}`;
-
-            const currentSlot = assignedTimeTable.slots.find((slot: TimeSlot) => {
-                return (
-                    currentTimeFormatted >= slot.startTime &&
-                    currentTimeFormatted < slot.endTime
-                );
-            });
-
-            if (!currentSlot) {
-                alert('No active slot found for the current time.');
-                return;
-            }
-
-            selectedSlotId = currentSlot.id;
-        } else {
-            selectedSlotId = manualSlot;
-        }
-
-        if (selectedSlotId) {
-            const slotIndex = assignedTimeTable.slots.findIndex(
-                (slot: TimeSlot) => slot.id === selectedSlotId
-            );
-            if (slotIndex === -1) {
-                console.warn('Invalid Slot ID:', selectedSlotId);
-                alert('Invalid slot selected.');
-                return;
-            }
-
-            const updatedOutputs = [...styleDetails.outputs];
-            updatedOutputs[slotIndex] += 1;
-            const newBalance = styleDetails.balance - 1;
-
-            setStyleDetails((prev) => ({
-                ...prev,
-                outputs: updatedOutputs,
-                balance: newBalance,
-            }));
-
-            await logProductionRecord(1, selectedSlotId);
-        } else {
-            console.warn('No Slot ID selected.');
-            alert('No slot selected.');
-        }
-    };
-
-    // Handle submitting a reject
-    const handleRejectSubmit = async (rejectData: Omit<Reject, 'docId'>) => {
-        if (!sessionId) {
-            alert('Session ID is not set. Please try again.');
-            return;
-        }
-
-        try {
-            const rejectDocRef = await addDoc(collection(db, 'rejects'), {
-                ...rejectData,
-                sessionId: sessionId, // Include sessionId
-                productionLineId: selectedLineId,
-                supervisorId: selectedSupervisor?.id,
-                timestamp: Timestamp.fromDate(new Date()),
-                createdAt: Timestamp.fromDate(new Date()),
-                updatedAt: Timestamp.fromDate(new Date()),
-            });
-
-            const newReject: Reject = {
-                docId: rejectDocRef.id,
-                ...rejectData,
-            };
-
-            setRejects([...rejects, newReject]);
-            setRejectCount(rejectCount + rejectData.count);
-
-            if (rejectData.recordedAsProduced && assignedTimeTable) {
-                const slotIndex = assignedTimeTable.slots.findIndex(
-                    (slot) => slot.id === manualSlot
-                );
-                if (slotIndex !== -1) {
-                    const updatedOutputs = [...styleDetails.outputs];
-                    updatedOutputs[slotIndex] -= rejectData.count;
-                    setStyleDetails((prev) => ({ ...prev, outputs: updatedOutputs }));
-                }
-            }
-
-            setIsRejectModalOpen(false);
         } catch (error) {
-            console.error('Error adding reject:', error);
-            alert('Failed to add reject. Please try again.');
+            console.error('Error ending shift:', error);
+            setError('Failed to end shift properly.');
         }
     };
-
-    // Handle submitting a rework
-    const handleReworkSubmit = async (
-        reworkData: Omit<ReworkItem, 'docId' | 'startTime' | 'status' | 'endTime'>
-    ) => {
-        if (!sessionId) {
-            alert('Session ID is not set. Please try again.');
-            return;
-        }
-
-        try {
-            const reworkDocRef = await addDoc(collection(db, 'reworks'), {
-                ...reworkData,
-                sessionId: sessionId, // Include sessionId
-                productionLineId: selectedLineId,
-                supervisorId: selectedSupervisor?.id,
-                startTime: Timestamp.fromDate(new Date()),
-                status: 'Booked Out',
-                createdAt: Timestamp.fromDate(new Date()),
-                updatedAt: Timestamp.fromDate(new Date()),
-            });
-
-            const newRework: ReworkItem = {
-                docId: reworkDocRef.id,
-                startTime: new Date(),
-                status: 'Booked Out',
-                ...reworkData,
-            };
-
-            setReworks([...reworks, newRework]);
-            setReworkCount(reworkCount + reworkData.count);
-
-            setIsReworkModalOpen(false);
-        } catch (error) {
-            console.error('Error adding rework:', error);
-            alert('Failed to add rework. Please try again.');
-        }
-    };
-
-    // Handle submitting a downtime
-    const handleDowntimeSubmit = async (
-        downtimeData: Omit<
-            DowntimeItem,
-            | 'docId'
-            | 'startTime'
-            | 'status'
-            | 'createdAt'
-            | 'updatedAt'
-            | 'productionLineId'
-            | 'supervisorId'
-        >
-    ) => {
-        if (!sessionId) {
-            alert('Session ID is not set. Please try again.');
-            return;
-        }
-
-        try {
-            const downtimeDocRef = await addDoc(collection(db, 'downtimes'), {
-                ...downtimeData,
-                sessionId: sessionId, // Include sessionId
-                productionLineId: selectedLineId,
-                supervisorId: selectedSupervisor?.id || '',
-                startTime: Timestamp.fromDate(new Date()),
-                status: 'Open',
-                createdAt: Timestamp.fromDate(new Date()),
-                updatedAt: Timestamp.fromDate(new Date()),
-            });
-
-            const newDowntime: DowntimeItem = {
-                docId: downtimeDocRef.id,
-                productionLineId: selectedLineId,
-                supervisorId: selectedSupervisor?.id || '',
-                startTime: new Date(),
-                status: 'Open',
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                ...downtimeData,
-            };
-
-            setDowntimes([...downtimes, newDowntime]);
-
-            setIsDowntimeModalOpen(false);
-        } catch (error) {
-            console.error('Error adding downtime:', error);
-            alert('Failed to add downtime. Please try again.');
-        }
-    };
-
-    // Calculate target per time slot
-    const calculateTargetPerSlot = (slot: TimeSlot): number => {
-        if (slot.breakId) {
-            const breakDuration =
-                breaks.find((b) => b.id === slot.breakId)?.duration || 0;
-            return Math.ceil((styleDetails.target / 60) * (60 - breakDuration));
-        } else {
-            return styleDetails.target;
-        }
-    };
-
-    // Calculate efficiency
-    const calculateEfficiency = (output: number, target: number): string => {
-        return target ? ((output / target) * 100).toFixed(2) + '%' : 'N/A';
-    };
-
-    // Calculate cumulative efficiency
-    const calculateCumulativeEfficiency = (upToIndex: number): string => {
-        if (!assignedTimeTable) return 'N/A';
-
-        let totalOutput = 0;
-        let totalTarget = 0;
-
-        for (let i = 0; i <= upToIndex; i++) {
-            const slot = assignedTimeTable.slots[i];
-            if (!slot) continue;
-
-            const targetPerSlot = calculateTargetPerSlot(slot);
-
-            totalOutput += styleDetails.outputs[i];
-            totalTarget += targetPerSlot;
-        }
-
-        return totalTarget
-            ? ((totalOutput / totalTarget) * 100).toFixed(2) + '%'
-            : 'N/A';
-    };
-
-    // Handle selecting a downtime
-    const handleSelectDowntime = (downtime: DowntimeItem) => {
-        setSelectedDowntime(downtime);
-    };
-
-    // Handle downtime actions (mechanic received, resolved)
-    const handleDowntimeAction = async (
-        action: 'mechanicReceived' | 'resolved',
-        mechanicId?: string
-    ) => {
-        if (!selectedDowntime) return;
-
-        const downtimeDocRef = doc(db, 'downtimes', selectedDowntime.docId);
-
-        if (action === 'mechanicReceived' && mechanicId) {
-            const mechanic = mechanics.find((m) => m.id === mechanicId);
-            if (!mechanic) {
-                alert('Invalid mechanic selected.');
-                return;
-            }
-
-            const updatedDowntime: DowntimeItem = {
-                ...selectedDowntime,
-                mechanicId,
-                mechanicReceivedTime: new Date(),
-                status: 'Mechanic Received',
-                updatedAt: new Date(),
-            };
-
-            setDowntimes((prevDowntimes) =>
-                prevDowntimes.map((dt) =>
-                    dt.docId === selectedDowntime.docId ? updatedDowntime : dt
-                )
-            );
-
-            try {
-                await updateDoc(downtimeDocRef, {
-                    mechanicId: updatedDowntime.mechanicId,
-                    mechanicReceivedTime: Timestamp.fromDate(
-                        updatedDowntime.mechanicReceivedTime!
-                    ),
-                    status: updatedDowntime.status,
-                    updatedAt: Timestamp.fromDate(updatedDowntime.updatedAt),
-                });
-            } catch (error) {
-                console.error('Error updating downtime:', error);
-                alert('Failed to update downtime. Please try again.');
-            }
-        } else if (action === 'resolved') {
-            const updatedDowntime: DowntimeItem = {
-                ...selectedDowntime,
-                endTime: new Date(),
-                status: 'Resolved',
-                updatedAt: new Date(),
-            };
-
-            setDowntimes((prevDowntimes) =>
-                prevDowntimes.map((dt) =>
-                    dt.docId === selectedDowntime.docId ? updatedDowntime : dt
-                )
-            );
-
-            try {
-                await updateDoc(downtimeDocRef, {
-                    endTime: Timestamp.fromDate(updatedDowntime.endTime!),
-                    status: updatedDowntime.status,
-                    updatedAt: Timestamp.fromDate(updatedDowntime.updatedAt),
-                });
-            } catch (error) {
-                console.error('Error updating downtime:', error);
-                alert('Failed to update downtime. Please try again.');
-            }
-        }
-
-        setSelectedDowntime(null);
-    };
-
-    // Handle booking in reworks
-    const handleBookInRework = async (
-        rework: ReworkItem,
-        qcId: string,
-        action: 'bookIn' | 'convertToReject'
-    ) => {
-        if (!sessionId) {
-            alert('Session ID is not set. Please try again.');
-            return;
-        }
-
-        const qc = qcs.find((q) => q.id === qcId);
-        if (qc) {
-            if (action === 'bookIn') {
-                const updatedReworks = reworks.map((rw) => {
-                    if (rw.docId === rework.docId) {
-                        return {
-                            ...rw,
-                            endTime: new Date(),
-                            status: 'Booked In' as 'Booked In',
-                        };
-                    }
-                    return rw;
-                });
-                setReworks(updatedReworks);
-                setReworkCount(reworkCount - rework.count);
-
-                const reworkDocRef = doc(db, 'reworks', rework.docId);
-                try {
-                    await updateDoc(reworkDocRef, {
-                        endTime: Timestamp.fromDate(new Date()),
-                        status: 'Booked In',
-                        updatedAt: Timestamp.fromDate(new Date()),
-                    });
-                } catch (error) {
-                    console.error('Error updating rework:', error);
-                    alert('Failed to update rework. Please try again.');
-                }
-            } else if (action === 'convertToReject') {
-                setReworks(reworks.filter((rw) => rw.docId !== rework.docId));
-                setReworkCount(reworkCount - rework.count);
-
-                try {
-                    const rejectDocRef = await addDoc(collection(db, 'rejects'), {
-                        count: rework.count,
-                        reason: rework.reason,
-                        recordedAsProduced: false,
-                        qcApprovedBy: `${qc.name} ${qc.surname}`,
-                        sessionId: sessionId, // Include sessionId
-                        productionLineId: selectedLineId,
-                        supervisorId: selectedSupervisor?.id,
-                        timestamp: Timestamp.fromDate(new Date()),
-                        createdAt: Timestamp.fromDate(new Date()),
-                        updatedAt: Timestamp.fromDate(new Date()),
-                    });
-
-                    const newReject: Reject = {
-                        docId: rejectDocRef.id,
-                        count: rework.count,
-                        reason: rework.reason,
-                        recordedAsProduced: false,
-                        qcApprovedBy: `${qc.name} ${qc.surname}`,
-                    };
-                    setRejects([...rejects, newReject]);
-                    setRejectCount(rejectCount + rework.count);
-
-                    const reworkDocRef = doc(db, 'reworks', rework.docId);
-                    await deleteDoc(reworkDocRef);
-                } catch (error) {
-                    console.error('Error converting rework to reject:', error);
-                    alert('Failed to convert rework to reject. Please try again.');
-                }
-            }
-            setIsActiveReworksPopupOpen(false);
-        } else {
-            alert('Invalid QC selected.');
-        }
-    };
-
-    // Handle showing rejects
-    const handleShowRejects = () => {
-        setIsRejectsListPopupOpen(true);
-    };
-
-    // Handle showing reworks
-    const handleShowReworks = () => {
-        setIsActiveReworksPopupOpen(true);
-    };
-
-    // Render component
     return (
-        <div className="production-board-container">
+        <div className="active-line-container">
             {!isBoardLoaded ? (
-                <div className="inputs-container">
-                    <h1>Production Board</h1>
+                // Initial Setup View
+                <div className="form-group">
+                    <h1>Production Board Setup</h1>
                     <label>
                         Select Line:
                         <select
                             value={selectedLine}
                             onChange={(e) => {
-                                const line = productionLines.find(
-                                    (line) => line.name === e.target.value
-                                );
+                                const line = productionLines.find(l => l.name === e.target.value);
                                 setSelectedLine(e.target.value);
                                 setSelectedLineId(line?.id || '');
                             }}
@@ -811,9 +633,7 @@ const ActiveLineInput: React.FC = () => {
                         <select
                             value={selectedSupervisor?.id || ''}
                             onChange={(e) => {
-                                const supervisor = supervisors.find(
-                                    (sup) => sup.id === e.target.value
-                                );
+                                const supervisor = supervisors.find(s => s.id === e.target.value);
                                 setSelectedSupervisor(supervisor || null);
                             }}
                         >
@@ -831,10 +651,8 @@ const ActiveLineInput: React.FC = () => {
                         <select
                             value={selectedStyle?.styleNumber || ''}
                             onChange={(e) => {
-                                const selected = styles.find(
-                                    (style) => style.styleNumber === e.target.value
-                                );
-                                setSelectedStyle(selected || null);
+                                const style = styles.find(s => s.styleNumber === e.target.value);
+                                setSelectedStyle(style || null);
                             }}
                         >
                             <option value="">Select a Style</option>
@@ -851,32 +669,28 @@ const ActiveLineInput: React.FC = () => {
                     </button>
                 </div>
             ) : (
-                <div className="board-display">
-                    <div className="heading-section">
-                        <div className="left-section">
-                            <div className="clock-date-display">
-                                <span className="clock">{currentTime.toLocaleTimeString()}</span>
-                                <span className="date">{currentTime.toLocaleDateString()}</span>
-                            </div>
+                // Active Production Board View
+                <div className="input-display">
+                    {/* Header Section */}
+                    <div className="board-header">
+                        <div className="clock-display">
+                            <span className="time">{currentTime.toLocaleTimeString()}</span>
+                            <span className="date">{currentTime.toLocaleDateString()}</span>
                         </div>
-                        <div className="center-section">
-                            <h2>
-                                {selectedLine} - Supervisor: {selectedSupervisor?.name} - Style
-                                Number: {selectedStyle?.styleNumber}
-                            </h2>
+                        <div className="board-info">
+                            <h2>{selectedLine} - {selectedSupervisor?.name}</h2>
+                            <h3>Style: {selectedStyle?.styleNumber}</h3>
                         </div>
-                        <div className="right-section">
-                            <button
-                                className="button end-shift-button"
-                                onClick={handleEndShift}
-                            >
-                                End of Shift
-                            </button>
-                        </div>
+                        <button className="end-shift-button" onClick={handleEndShift}>
+                            End Shift
+                        </button>
                     </div>
 
-                    <div className="main-content">
-                        <div className="left-content">
+                    {/* Main Content Grid */}
+                    <div className="board-content">
+                        {/* Left Section - Production Tracking */}
+                        <div className="left-section">
+                            {/* Time Slot Selection */}
                             <div className="slot-selection">
                                 <label>
                                     Select Time Slot:
@@ -884,7 +698,7 @@ const ActiveLineInput: React.FC = () => {
                                         value={manualSlot}
                                         onChange={(e) => setManualSlot(e.target.value)}
                                     >
-                                        <option value="current">Current (Real-time)</option>
+                                        <option value="current">Current Time (Real-time)</option>
                                         {assignedTimeTable?.slots.map((slot, index) => (
                                             <option key={slot.id} value={slot.id}>
                                                 Hour {index + 1} ({slot.startTime} - {slot.endTime})
@@ -892,15 +706,12 @@ const ActiveLineInput: React.FC = () => {
                                         ))}
                                     </select>
                                 </label>
-                                <button
-                                    className="button unit-produced-button"
-                                    onClick={handleAddOutput}
-                                    disabled={!sessionId}
-                                >
+                                <button className="output-button" onClick={handleAddOutput}>
                                     Unit Produced
                                 </button>
                             </div>
 
+                            {/* Time Table */}
                             {assignedTimeTable && (
                                 <table className="timetable">
                                     <thead>
@@ -910,35 +721,32 @@ const ActiveLineInput: React.FC = () => {
                                         <th>Target</th>
                                         <th>Output</th>
                                         <th>Efficiency</th>
-                                        <th>Cumulative Efficiency</th>
+                                        <th>Cumulative</th>
                                     </tr>
                                     </thead>
                                     <tbody>
                                     {assignedTimeTable.slots.map((slot, index) => {
-                                        const breakInfo = slot.breakId
-                                            ? breaks.find((b) => b.id === slot.breakId)
-                                            : null;
-
-                                        const targetPerSlot = calculateTargetPerSlot(slot);
+                                        const target = calculateTargetPerSlot(slot);
                                         const output = styleDetails.outputs[index];
+                                        const breakInfo = breaks.find(b => b.id === slot.breakId);
+                                        const isCurrentSlot = manualSlot === 'current' ?
+                                            currentTimeSlot?.id === slot.id :
+                                            manualSlot === slot.id;
+
                                         return (
-                                            <tr key={slot.id}>
+                                            <tr key={slot.id} className={isCurrentSlot ? 'current-slot' : ''}>
                                                 <td>Hour {index + 1}</td>
                                                 <td>
                                                     {slot.startTime} - {slot.endTime}
                                                     {breakInfo && (
                                                         <span className="break-indicator">
-                                {' '}
-                                                            (Break: {breakInfo.breakType} -{' '}
-                                                            {breakInfo.duration} mins)
-                              </span>
+                                                                ({breakInfo.breakType} - {breakInfo.duration}min)
+                                                            </span>
                                                     )}
                                                 </td>
-                                                <td>{targetPerSlot}</td>
+                                                <td>{target}</td>
                                                 <td>{output}</td>
-                                                <td>
-                                                    {calculateEfficiency(output, targetPerSlot)}
-                                                </td>
+                                                <td>{calculateEfficiency(output, target)}</td>
                                                 <td>{calculateCumulativeEfficiency(index)}</td>
                                             </tr>
                                         );
@@ -947,89 +755,31 @@ const ActiveLineInput: React.FC = () => {
                                 </table>
                             )}
                         </div>
-                        <div className="right-content">
-                            <div className="style-details-box">
-                                <h3>Style Details</h3>
-                                {selectedStyle && (
-                                    <>
-                                        <p>
-                                            <strong>Description:</strong> {selectedStyle.description}
-                                        </p>
-                                        <p>
-                                            <strong>Delivery Date:</strong> {selectedStyle.deliveryDate}
-                                        </p>
-                                        <p>
-                                            <strong>Units in Order:</strong> {selectedStyle.unitsInOrder}
-                                        </p>
-                                        <p>
-                                            <strong>Remaining Balance:</strong> {styleDetails.balance}
-                                        </p>
-                                    </>
-                                )}
+
+                        {/* Right Section - Monitoring */}
+                        <div className="right-section">
+                            {/* Style Details */}
+                            <div className="style-details">
+                                <h3>Style Information</h3>
+                                <p>Description: {selectedStyle?.description}</p>
+                                <p>Units in Order: {selectedStyle?.unitsInOrder}</p>
+                                <p>Balance: {styleDetails.balance}</p>
                             </div>
 
-                            <div className="rejects-reworks-box">
-                                <h3>Rejects and Reworks</h3>
-                                <div className="counters">
-                                    <div
-                                        className="counter reject-counter"
-                                        onClick={handleShowRejects}
-                                    >
-                                        <p>Total Rejects:</p>
-                                        <span>{rejectCount}</span>
-                                    </div>
-                                    <div
-                                        className="counter rework-counter"
-                                        onClick={handleShowReworks}
-                                    >
-                                        <p>Total Reworks:</p>
-                                        <span>{reworkCount}</span>
-                                    </div>
+                            {/* Rejects and Reworks Counters */}
+                            <div className="counters">
+                                <div className="counter reject-counter">
+                                    <label>Rejects</label>
+                                    <span>{rejectCount}</span>
+                                </div>
+                                <div className="counter rework-counter">
+                                    <label>Reworks</label>
+                                    <span>{reworkCount}</span>
                                 </div>
                             </div>
 
-                            <div className="downtime-box">
-                                <h3>Open Downtime Elements</h3>
-                                <div className="downtime-list">
-                                    {downtimes
-                                        .filter((dt) => dt.status !== 'Resolved')
-                                        .map((dt) => (
-                                            <div
-                                                key={dt.docId}
-                                                className="downtime-item"
-                                                onClick={() => handleSelectDowntime(dt)}
-                                            >
-                                                <p>
-                                                    <strong>Ref:</strong> {dt.docId.slice(-4)}
-                                                </p>
-                                                <p>
-                                                    <strong>Category:</strong> {dt.category}
-                                                </p>
-                                                <p>
-                                                    <strong>Reason:</strong> {dt.reason}
-                                                </p>
-                                                <p>
-                                                    <strong>Status:</strong> {dt.status}
-                                                </p>
-                                                <p>
-                                                    <strong>Duration:</strong>{' '}
-                                                    {Math.floor(
-                                                        (new Date().getTime() - dt.startTime.getTime()) / 1000
-                                                    )}{' '}
-                                                    seconds
-                                                </p>
-                                            </div>
-                                        ))}
-                                </div>
-                            </div>
-
+                            {/* Action Buttons */}
                             <div className="buttons-box">
-                                <button
-                                    className="button downtime-button"
-                                    onClick={() => setIsDowntimeModalOpen(true)}
-                                >
-                                    Down Time
-                                </button>
                                 <button
                                     className="button reject-button"
                                     onClick={() => setIsRejectModalOpen(true)}
@@ -1042,104 +792,109 @@ const ActiveLineInput: React.FC = () => {
                                 >
                                     Rework
                                 </button>
+                                <button
+                                    className="button downtime-button"
+                                    onClick={() => handleDowntimeSelection(downtimeTypes.MACHINE)}
+                                >
+                                    Machine
+                                </button>
+                                <button
+                                    className="button downtime-button"
+                                    onClick={() => handleDowntimeSelection(downtimeTypes.STYLE_CHANGE)}
+                                >
+                                    Style Change
+                                </button>
                             </div>
                         </div>
                     </div>
+                </div>
+            )}
 
-                    {isRejectModalOpen && (
-                        <RejectPopup
-                            onClose={() => setIsRejectModalOpen(false)}
-                            onSubmit={handleRejectSubmit}
-                            downtimeCategories={downtimeCategories}
-                            qcs={qcs}
-                        />
-                    )}
+            {/* Modals */}
+            {isReworkModalOpen && (
+                <Rework
+                    onClose={() => setIsReworkModalOpen(false)}
+                    onSubmit={handleReworkSubmit}
+                    productionLineId={selectedLineId}
+                    supervisorId={selectedSupervisor?.id || ''}
+                    qcs={qcs}
+                />
+            )}
 
-                    {isReworkModalOpen && (
-                        <ReworkPopup
-                            onClose={() => setIsReworkModalOpen(false)}
-                            onSubmit={handleReworkSubmit}
-                            downtimeCategories={downtimeCategories}
-                            operations={[]}
-                            qcs={qcs}
-                        />
-                    )}
+            {isRejectModalOpen && (
+                <Reject
+                    onClose={() => setIsRejectModalOpen(false)}
+                    onSubmit={handleRejectSubmit}
+                    productionLineId={selectedLineId}
+                    supervisorId={selectedSupervisor?.id || ''}
+                    qcs={qcs}
+                />
+            )}
 
-                    {isDowntimeModalOpen && (
-                        <DowntimePopup
-                            onClose={() => setIsDowntimeModalOpen(false)}
-                            onSubmit={handleDowntimeSubmit}
-                            downtimeCategories={downtimeCategories}
-                        />
-                    )}
+            {isMachineDowntimeModalOpen && (
+                <Machine
+                    onClose={() => {
+                        setIsMachineDowntimeModalOpen(false);
+                        setSelectedDowntimeType(null);
+                    }}
+                    onSubmit={handleMachineDowntimeSubmit}
+                    productionLineId={selectedLineId}
+                    supervisorId={selectedSupervisor?.id || ''}
+                    mechanics={mechanics}
+                />
+            )}
 
-                    {isActiveReworksPopupOpen && (
-                        <ActiveReworksPopup
-                            reworks={reworks.filter((rw) => rw.status === 'Booked Out')}
-                            qcs={qcs}
-                            onClose={() => setIsActiveReworksPopupOpen(false)}
-                            onBookIn={handleBookInRework}
-                        />
-                    )}
+            {isStyleChangeModalOpen && (
+                <StyleChange
+                    onClose={() => {
+                        setIsStyleChangeModalOpen(false);
+                        setSelectedDowntimeType(null);
+                    }}
+                    onSubmit={handleStyleChangeSubmit}
+                    productionLineId={selectedLineId}
+                    supervisorId={selectedSupervisor?.id || ''}
+                />
+            )}
 
-                    {isRejectsListPopupOpen && (
-                        <RejectsListPopup
-                            rejects={rejects}
-                            onClose={() => setIsRejectsListPopupOpen(false)}
-                        />
-                    )}
-
-                    {selectedDowntime && (
-                        <DowntimeActionPopup
-                            downtime={selectedDowntime}
-                            mechanics={mechanics}
-                            supervisor={selectedSupervisor}
-                            onClose={() => setSelectedDowntime(null)}
-                            onAction={handleDowntimeAction}
-                        />
-                    )}
-
-                    {isStyleModalOpen && (
-                        <div className="modal-overlay">
-                            <div className="modal-content">
-                                <h2>Confirm Style & Target</h2>
-                                <label>
-                                    Style:
-                                    <input
-                                        type="text"
-                                        value={selectedStyle?.styleNumber || ''}
-                                        readOnly
-                                    />
-                                </label>
-                                <label>
-                                    Target per Hour:
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={styleDetails.target}
-                                        onChange={(e) =>
-                                            setStyleDetails((prev) => ({
-                                                ...prev,
-                                                target: Number(e.target.value),
-                                            }))
-                                        }
-                                    />
-                                </label>
-                                <button
-                                    className="confirm-button"
-                                    onClick={() => handleConfirmStyle(styleDetails.target)}
-                                >
-                                    Confirm
-                                </button>
-                                <button
-                                    className="cancel-button"
-                                    onClick={() => setIsStyleModalOpen(false)}
-                                >
-                                    Cancel
-                                </button>
-                            </div>
+            {isStyleModalOpen && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h2>Set Production Target</h2>
+                        <label>
+                            Target Units per Hour:
+                            <input
+                                type="number"
+                                min="1"
+                                value={styleDetails.target}
+                                onChange={(e) => setStyleDetails(prev => ({
+                                    ...prev,
+                                    target: parseInt(e.target.value) || 0
+                                }))}
+                            />
+                        </label>
+                        <div className="modal-buttons">
+                            <button
+                                className="confirm-button"
+                                onClick={() => handleConfirmStyle(styleDetails.target)}
+                            >
+                                Confirm
+                            </button>
+                            <button
+                                className="cancel-button"
+                                onClick={() => setIsStyleModalOpen(false)}
+                            >
+                                Cancel
+                            </button>
                         </div>
-                    )}
+                    </div>
+                </div>
+            )}
+
+            {/* Error Display */}
+            {error && (
+                <div className="error-message">
+                    {error}
+                    <button onClick={() => setError('')}>✕</button>
                 </div>
             )}
         </div>
