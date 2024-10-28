@@ -1,10 +1,7 @@
-// src/common/production/downtime/hr/Absent.tsx
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import './Absent.css';
-import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
-import { db } from '../../../../firebase';
-import { AbsentFormData, SupportFunction } from '../../../../types';
+import { AbsentFormData } from '../types'; // Corrected path
+import { SupportFunction } from '../../../../types';
 
 interface AbsentProps {
     onClose: () => void;
@@ -116,7 +113,6 @@ const Absent: React.FC<AbsentProps> = ({ onClose, onSubmit, productionLineId, su
                     </div>
                 </form>
 
-                {/* Confirm Modal */}
                 {isConfirmModalOpen && (
                     <div className="modal-overlay">
                         <div className="modal-content">

@@ -1,15 +1,10 @@
-// src/components/production/downtime/hr/HRFlow.tsx
-
 import React, { useState, useEffect } from 'react';
 import Absent from './Absent';
 import Late from './Late';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../../../firebase';
-import {
-    AbsentFormData,
-    LateFormData,
-    SupportFunction
-} from '../../../../types';
+import { AbsentFormData, LateFormData } from '../types';
+import { SupportFunction } from '../../../../types';
 import './HRFlow.css';
 
 interface HRFlowProps {
@@ -22,7 +17,6 @@ const HRFlow: React.FC<HRFlowProps> = ({ productionLineId }) => {
     const [supervisors, setSupervisors] = useState<SupportFunction[]>([]);
     const [selectedSupervisor, setSelectedSupervisor] = useState<SupportFunction | null>(null);
 
-    // Fetch supervisors
     useEffect(() => {
         const fetchSupervisors = async () => {
             try {
@@ -43,26 +37,18 @@ const HRFlow: React.FC<HRFlowProps> = ({ productionLineId }) => {
         fetchSupervisors();
     }, []);
 
-    // Handlers for Absent and Late submissions
     const handleAbsentSubmit = async (data: AbsentFormData): Promise<void> => {
         try {
             if (!selectedSupervisor) {
                 throw new Error('Supervisor must be selected');
             }
-
-            // Add the required fields to the data
             const enrichedData: AbsentFormData = {
                 ...data,
                 productionLineId,
                 supervisorId: selectedSupervisor.id
             };
-
-            // Implement the logic to handle absent data
-            // For example: await addDoc(collection(db, 'absents'), enrichedData);
             console.log('Absent Data:', enrichedData);
             alert('Absent data submitted successfully.');
-
-            // Reset the form or switch tabs if needed
             setActiveTab('late');
         } catch (err) {
             console.error('Error handling absent submission:', err);
@@ -75,20 +61,13 @@ const HRFlow: React.FC<HRFlowProps> = ({ productionLineId }) => {
             if (!selectedSupervisor) {
                 throw new Error('Supervisor must be selected');
             }
-
-            // Add the required fields to the data
             const enrichedData: LateFormData = {
                 ...data,
                 productionLineId,
                 supervisorId: selectedSupervisor.id
             };
-
-            // Implement the logic to handle late arrival data
-            // For example: await addDoc(collection(db, 'lates'), enrichedData);
             console.log('Late Arrival Data:', enrichedData);
             alert('Late arrival data submitted successfully.');
-
-            // Reset the form or switch tabs if needed
             setActiveTab('absent');
         } catch (err) {
             console.error('Error handling late submission:', err);
@@ -100,7 +79,6 @@ const HRFlow: React.FC<HRFlowProps> = ({ productionLineId }) => {
         <div className="hr-flow-container">
             <h1>HR Flow</h1>
 
-            {/* Supervisor Selection */}
             <div className="supervisor-selection">
                 <select
                     value={selectedSupervisor?.id || ''}
@@ -119,7 +97,6 @@ const HRFlow: React.FC<HRFlowProps> = ({ productionLineId }) => {
                 </select>
             </div>
 
-            {/* Tabs */}
             <div className="tabs">
                 <button
                     className={`tab-button ${activeTab === 'absent' ? 'active' : ''}`}
@@ -135,7 +112,6 @@ const HRFlow: React.FC<HRFlowProps> = ({ productionLineId }) => {
                 </button>
             </div>
 
-            {/* Content */}
             <div className="tab-content">
                 {activeTab === 'late' ? (
                     <Late
@@ -154,7 +130,6 @@ const HRFlow: React.FC<HRFlowProps> = ({ productionLineId }) => {
                 )}
             </div>
 
-            {/* Error Display */}
             {error && (
                 <div className="error-container">
                     <p className="error-message">{error}</p>

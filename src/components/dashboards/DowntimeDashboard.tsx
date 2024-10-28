@@ -1,9 +1,7 @@
-// src/components/dashboards/DowntimeDashboard.tsx
-
 import React, { useEffect, useState } from 'react';
 import { db } from '../../firebase';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
-import { Downtime } from '../../types';
+import { Downtime } from '../production/downtime/types';
 import './DowntimeDashboard.css';
 
 /* Temporarily commenting out Chart.js related code

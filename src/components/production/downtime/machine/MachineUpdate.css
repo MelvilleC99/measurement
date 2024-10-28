@@ -1,0 +1,88 @@
+/* src/components/production/downtime/machine/MachineUpdate.css */
+
+.machine-update-container {
+    padding: 20px;
+}
+
+h2 {
+    text-align: center;
+}
+
+.error-message {
+    color: #dc3545;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.downtime-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+}
+
+.downtime-card {
+    background-color: #f8f9fa;
+    padding: 15px;
+    width: 250px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 1px solid #ced4da;
+}
+
+.downtime-card:hover {
+    background-color: #e9ecef;
+}
+
+.downtime-details {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.downtime-details h3 {
+    text-align: center;
+}
+
+.downtime-details p {
+    margin-bottom: 10px;
+}
+
+.downtime-details label {
+    display: block;
+    margin-bottom: 15px;
+}
+
+.downtime-details textarea,
+.downtime-details input[type="password"] {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+}
+
+.action-buttons {
+    display: flex;
+    justify-content: space-between;
+}
+
+.acknowledge-button,
+.resolve-button,
+.cancel-button {
+    padding: 10px 20px;
+    border: none;
+    cursor: pointer;
+}
+
+.acknowledge-button {
+    background-color: #17a2b8;
+    color: #fff;
+}
+
+.resolve-button {
+    background-color: #28a745;
+    color: #fff;
+}
+
+.cancel-button {
+    background-color: #dc3545;
+    color: #fff;
+}

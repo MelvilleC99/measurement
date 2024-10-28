@@ -1,33 +1,29 @@
+// src/components/production/productionboard/components/ProductionTracking.tsx
+
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, query, where, Timestamp } from 'firebase/firestore';
+import {
+    collection,
+    getDocs,
+    addDoc,
+    query,
+    where,
+    Timestamp
+} from 'firebase/firestore';
 import { db } from '../../../../firebase';
 import {
     ProductionLine,
     Style,
     SupportFunction,
     TimeTable,
-    Break
+    Break,
+    SessionData
 } from '../../../../types';
 import './ProductionTracking.css';
 
 interface ProductionTrackingProps {
-    sessionData: {
-        id: string;
-        lineId: string;
-        supervisorId: string;
-        styleId: string;
-        startTime: Timestamp;
-    } | null;
+    sessionData: SessionData | null;
     onUnitProduced: (slotId: string) => Promise<void>;
     setSessionData: React.Dispatch<React.SetStateAction<SessionData | null>>;
-}
-
-interface SessionData {
-    id: string;
-    lineId: string;
-    supervisorId: string;
-    styleId: string;
-    startTime: Timestamp;
 }
 
 interface CurrentSlot {
@@ -128,7 +124,7 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
         fetchInitialData();
     }, []);
 
-    // Time table loading effect
+// Time table loading effect
     useEffect(() => {
         if (selectedLineId) {
             const selectedTimeTable = timeTables.find(tt => tt.lineId === selectedLineId) ||
@@ -157,6 +153,7 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
 
         return () => clearInterval(interval);
     }, [assignedTimeTable, manualSlot]);
+
     const updateCurrentTimeSlot = (now: Date) => {
         if (!assignedTimeTable) return;
 
@@ -226,16 +223,17 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
             });
 
             setSessionData({
-                id: sessionRef.id,
+                sessionId: sessionRef.id,
                 lineId: selectedLineId,
                 supervisorId: selectedSupervisor?.id || '',
                 styleId: selectedStyle?.id || '',
-                startTime: Timestamp.now()
+                startTime: Timestamp.now(),
+                isActive: true
             });
 
             setStyleDetails(prev => ({
                 ...prev,
-                target: target
+                target
             }));
 
             setIsStyleModalOpen(false);
@@ -255,7 +253,6 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
             let selectedSlotId: string;
             let slotToUse: TimeTable['slots'][0];
 
-            // Determine which slot to use for recording output
             if (manualSlot === 'current') {
                 if (!currentTimeSlot) {
                     throw new Error('No active time slot for current time.');
@@ -273,7 +270,6 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
 
             await onUnitProduced(selectedSlotId);
 
-            // Update local state
             const slotIndex = assignedTimeTable.slots.findIndex(
                 slot => slot.id === selectedSlotId
             );
@@ -333,7 +329,6 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
     return (
         <div className="production-tracking">
             {!sessionData ? (
-                // Board Setup View
                 <div className="form-group">
                     <h1>Production Board Setup</h1>
 
@@ -397,7 +392,6 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                     </button>
                 </div>
             ) : (
-                // Active Production Board View
                 <div className="input-display">
                     <div className="board-header">
                         <div className="clock-display">
@@ -484,7 +478,6 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                 </div>
             )}
 
-            {/* Style Target Modal */}
             {isStyleModalOpen && (
                 <div className="modal-overlay">
                     <div className="modal-content">
@@ -522,7 +515,7 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
             {error && (
                 <div className="error-message">
                     {error}
-                    <button onClick={() => setError('')}>✕</button>
+                    <button onClick={() => setError('')} className="error-dismiss-button">✕</button>
                 </div>
             )}
         </div>

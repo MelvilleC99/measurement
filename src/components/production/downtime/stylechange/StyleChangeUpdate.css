@@ -1,0 +1,92 @@
+/* src/components/production/downtime/stylechange/StyleChangeUpdate.css */
+
+.style-change-update-container {
+    padding: 20px;
+}
+
+h2 {
+    text-align: center;
+}
+
+.error-message {
+    color: #dc3545;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.changeover-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+}
+
+.changeover-card {
+    background-color: #f1f3f5;
+    padding: 15px;
+    width: 280px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 1px solid #adb5bd;
+}
+
+.changeover-card:hover {
+    background-color: #e9ecef;
+}
+
+.changeover-details {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.changeover-details h3 {
+    text-align: center;
+}
+
+.changeover-details p {
+    margin-bottom: 10px;
+}
+
+.progress-steps {
+    margin-top: 20px;
+}
+
+.progress-step {
+    margin-bottom: 15px;
+}
+
+.progress-step p {
+    margin-bottom: 5px;
+}
+
+.complete-step-button {
+    padding: 8px 16px;
+    border: none;
+    cursor: pointer;
+    background-color: #28a745;
+    color: #fff;
+}
+
+.complete-step-button:hover {
+    background-color: #218838;
+}
+
+.cancel-button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    border: none;
+    cursor: pointer;
+    background-color: #dc3545;
+    color: #fff;
+}
+
+label {
+    display: block;
+    margin-top: 15px;
+}
+
+input[type="password"] {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+}

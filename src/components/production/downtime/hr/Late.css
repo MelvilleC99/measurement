@@ -1,113 +1,120 @@
 /* src/common/production/downtime/hr/Late.css */
 
-.late-container {
-    padding: 20px;
-    max-width: 600px;
-    margin: 0 auto;
-}
-
-.late-container h2 {
-    text-align: center;
-    margin-bottom: 20px;
-}
-
-.late-form {
-    display: flex;
-    flex-direction: column;
-}
-
-.late-form label {
-    margin-bottom: 15px;
-}
-
-.late-form input,
-.late-form textarea,
-.late-form select {
-    width: 100%;
-    padding: 10px;
-    margin-top: 5px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-}
-
-.submit-button {
-    width: 200px;
-    padding: 10px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.submit-button:hover {
-    background-color: #45a049;
-}
-
-.error-message {
-    color: red;
-    margin-bottom: 15px;
-    text-align: center;
-}
-
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0, 0, 0, 0.5);
     display: flex;
-    align-items: center;
     justify-content: center;
+    align-items: center;
     z-index: 1000;
 }
 
 .modal-content {
     background: #fff;
-    padding: 2rem;
     border-radius: 8px;
-    width: 400px;
-    max-width: 90%;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    padding: 1.5rem;
     position: relative;
 }
 
-.modal-content h3 {
+.modal-content h2 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.5em;
+    text-align: center;
+}
+
+.late-form label,
+.confirmation-section label {
+    display: block;
     margin-bottom: 1rem;
 }
 
-.modal-content p {
-    margin: 0.5rem 0;
-}
-
-.modal-content input {
+.late-form label select,
+.late-form label input,
+.late-form label textarea,
+.confirmation-section label input {
     width: 100%;
-    padding: 10px;
-    margin-top: 0.5rem;
+    padding: 0.5rem;
+    margin-top: 0.25rem;
     border: 1px solid #ccc;
     border-radius: 4px;
+    box-sizing: border-box;
 }
 
-.modal-buttons {
+.late-form label textarea {
+    resize: vertical;
+    height: 80px;
+}
+
+.form-buttons {
     display: flex;
-    justify-content: space-between;
-    margin-top: 1.5rem;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1rem;
 }
 
-.modal-buttons .submit-button {
-    background-color: #4CAF50;
+.submit-button,
+.cancel-button {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.submit-button {
+    background-color: #28a745;
     color: white;
 }
 
-.modal-buttons .cancel-button {
-    background-color: #f44336;
+.submit-button:hover {
+    background-color: #218838;
+}
+
+.cancel-button {
+    background-color: #dc3545;
     color: white;
 }
 
-.modal-buttons .submit-button:hover {
-    background-color: #45a049;
+.cancel-button:hover {
+    background-color: #c82333;
 }
 
-.modal-buttons .cancel-button:hover {
-    background-color: #da190b;
+.error-message {
+    color: #dc3545;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    padding: 0.75rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.confirmation-section h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.2em;
+    text-align: center;
+}
+
+.confirmation-section label {
+    display: block;
+    margin-bottom: 1rem;
+}
+
+.confirmation-section label input {
+    width: 100%;
+    padding: 0.5rem;
+    margin-top: 0.25rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
 }

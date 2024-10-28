@@ -1,7 +1,19 @@
+// src/components/production/productionboard/components/RecordEvents.tsx
+
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, Timestamp } from 'firebase/firestore';
+import {
+    collection,
+    addDoc,
+    getDocs,
+    query,
+    where,
+    Timestamp,
+    updateDoc,
+    doc
+} from 'firebase/firestore';
 import { db } from '../../../../firebase';
 import Rework from '../../downtime/rework/Rework';
+import ReworkUpdate from '../../downtime/rework/ReworkUpdate';
 import Reject from '../../downtime/reject/Reject';
 import Late from '../../downtime/hr/Late';
 import Absent from '../../downtime/hr/Absent';
@@ -10,8 +22,10 @@ import {
     RejectFormData,
     LateFormData,
     AbsentFormData,
-    SupportFunction
-} from '../../../../types';
+    ReworkItem
+
+} from '../../downtime/types';
+import { SupportFunction } from '../../../../types'
 import './RecordEvents.css';
 
 interface RecordEventsProps {
@@ -29,16 +43,18 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                                                    }) => {
     const [activeSection, setActiveSection] = useState<'hr' | 'downtime' | null>(null);
     const [isReworkModalOpen, setIsReworkModalOpen] = useState(false);
+    const [isReworkUpdateModalOpen, setIsReworkUpdateModalOpen] = useState(false);
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
     const [isLateModalOpen, setIsLateModalOpen] = useState(false);
     const [isAbsentModalOpen, setIsAbsentModalOpen] = useState(false);
     const [qcs, setQcs] = useState<SupportFunction[]>([]);
+    const [error, setError] = useState<string>('');
 
     // Fetch QCs on component mount
     useEffect(() => {
         const fetchQCs = async () => {
             try {
-                const qcsSnapshot = await getDocs(collection(db, 'supportFunctions'));
+                const qcsSnapshot = await getDocs(query(collection(db, 'supportFunctions'), where('role', '==', 'QC')));
                 const qcsList = qcsSnapshot.docs
                     .map(doc => ({
                         id: doc.id,
@@ -48,6 +64,7 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                 setQcs(qcsList);
             } catch (error) {
                 console.error('Error fetching QCs:', error);
+                setError('Failed to load QCs.');
             }
         };
 
@@ -55,70 +72,87 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
     }, []);
 
     const downtimeCategories = [
-        { id: 'machine', name: 'Machine' },
-        { id: 'quality', name: 'Quality' },
-        { id: 'supply', name: 'Supply' },
-        { id: 'styleChange', name: 'Style Change' }
+        {id: 'machine', name: 'Machine'},
+        {id: 'quality', name: 'Quality'},
+        {id: 'supply', name: 'Supply'},
+        {id: 'styleChange', name: 'Style Change'}
     ];
 
     const handleReworkSubmit = async (data: ReworkFormData) => {
         try {
-            const reworkDoc = {
+            const reworkDocRef = await addDoc(collection(db, 'reworks'), {
                 ...data,
-                sessionId,
-                timestamp: Timestamp.now(),
-                status: 'Booked Out'
-            };
-            await addDoc(collection(db, 'reworks'), reworkDoc);
+                status: 'Open',
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            });
+
+            // Assign reference number (last 4 digits of Firestore doc ID)
+            const refNumber = reworkDocRef.id.slice(-4);
+            await updateDoc(doc(db, 'reworks', reworkDocRef.id), {
+                refNumber
+            });
+
             onEventRecorded('reworks', data.count);
             setIsReworkModalOpen(false);
         } catch (error) {
             console.error('Error submitting rework:', error);
+            setError('Failed to submit rework.');
         }
+    };
+
+    const handleReworkUpdate = () => {
+        setIsReworkUpdateModalOpen(true);
     };
 
     const handleRejectSubmit = async (data: RejectFormData) => {
         try {
-            const rejectDoc = {
+            await addDoc(collection(db, 'rejects'), {
                 ...data,
-                sessionId,
-                timestamp: Timestamp.now()
-            };
-            await addDoc(collection(db, 'rejects'), rejectDoc);
+                timestamp: Timestamp.now(),
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            });
+
             onEventRecorded('rejects', data.count);
             setIsRejectModalOpen(false);
         } catch (error) {
             console.error('Error submitting reject:', error);
+            setError('Failed to submit reject.');
         }
     };
 
     const handleLateSubmit = async (data: LateFormData) => {
         try {
-            const lateDoc = {
+            await addDoc(collection(db, 'attendance'), {
                 ...data,
-                sessionId,
-                timestamp: Timestamp.now()
-            };
-            await addDoc(collection(db, 'attendance'), lateDoc);
+                timestamp: Timestamp.now(),
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            });
+
             onEventRecorded('late', 1);
             setIsLateModalOpen(false);
         } catch (error) {
             console.error('Error submitting late attendance:', error);
+            setError('Failed to submit late attendance.');
         }
     };
 
     const handleAbsentSubmit = async (data: AbsentFormData) => {
         try {
-            const absentDoc = {
+            await addDoc(collection(db, 'attendance'), {
                 ...data,
-                sessionId,
-                timestamp: Timestamp.now()
-            };
-            await addDoc(collection(db, 'attendance'), absentDoc);
+                timestamp: Timestamp.now(),
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            });
+
             onEventRecorded('absent', 1);
             setIsAbsentModalOpen(false);
         } catch (error) {
             console.error('Error submitting absence:', error);
+            setError('Failed to submit absence.');
         }
     };
 
@@ -150,6 +184,12 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                             className="output-button downtime"
                         >
                             Downtime
+                        </button>
+                        <button
+                            onClick={() => handleReworkUpdate()}
+                            className="output-button manage-rework"
+                        >
+                            Manage Reworks
                         </button>
                     </div>
                 ) : (
@@ -205,6 +245,10 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                     />
                 )}
 
+                {isReworkUpdateModalOpen && (
+                    <ReworkUpdate onClose={() => setIsReworkUpdateModalOpen(false)}/>
+                )}
+
                 {isRejectModalOpen && (
                     <Reject
                         onClose={() => setIsRejectModalOpen(false)}
@@ -233,8 +277,14 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                     />
                 )}
             </div>
+            {error && (
+                <div className="error-message">
+                    {error}
+                    <button onClick={() => setError('')} className="error-dismiss-button">✕</button>
+                </div>
+            )}
         </div>
     );
-};
+}
 
 export default RecordEvents;

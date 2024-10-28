@@ -15,24 +15,18 @@ import RecordEvents from './components/RecordEvents';
 import DowntimeTracking from './components/DowntimeTracking';
 import MetricsCounter from './components/MetricsCounter';
 import './ProductionBoard.css';
+import { SessionData } from '../../../types';
 
-export interface SessionData {
-    id: string;
-    lineId: string;
-    supervisorId: string;
-    styleId: string;
-    startTime: Timestamp;
-}
-
-export interface ProductionTrackingProps {
-    sessionData: SessionData | null;
-    onUnitProduced: (slotId: string) => Promise<void>;
-    setSessionData: React.Dispatch<React.SetStateAction<SessionData | null>>;
+interface MetricsState {
+    rejects: number;
+    reworks: number;
+    late: number;
+    absent: number;
 }
 
 const ProductionBoard: React.FC = () => {
     const [sessionData, setSessionData] = useState<SessionData | null>(null);
-    const [metrics, setMetrics] = useState({
+    const [metrics, setMetrics] = useState<MetricsState>({
         rejects: 0,
         reworks: 0,
         late: 0,
@@ -44,7 +38,7 @@ const ProductionBoard: React.FC = () => {
         if (!sessionData) return;
         try {
             await addDoc(collection(db, 'production'), {
-                sessionId: sessionData.id,
+                sessionId: sessionData.sessionId,
                 slotId,
                 timestamp: Timestamp.now(),
                 createdAt: Timestamp.now()
@@ -55,7 +49,7 @@ const ProductionBoard: React.FC = () => {
         }
     };
 
-    const handleEventRecorded = (eventType: 'rejects' | 'reworks' | 'late' | 'absent', count: number) => {
+    const handleEventRecorded = (eventType: keyof MetricsState, count: number) => {
         setMetrics(prev => ({
             ...prev,
             [eventType]: prev[eventType] + count
@@ -69,16 +63,15 @@ const ProductionBoard: React.FC = () => {
 
         try {
             if (sessionData) {
-                await updateDoc(doc(db, 'activeSessions', sessionData.id), {
+                await updateDoc(doc(db, 'activeSessions', sessionData.sessionId), {
                     isActive: false,
                     endTime: Timestamp.now(),
                     updatedAt: Timestamp.now()
                 });
 
-                // Close any open downtimes
                 const downtimesQuery = query(
                     collection(db, 'downtimes'),
-                    where('sessionId', '==', sessionData.id),
+                    where('sessionId', '==', sessionData.sessionId),
                     where('status', '==', 'Open')
                 );
 
@@ -124,20 +117,20 @@ const ProductionBoard: React.FC = () => {
                         <div className="section-counters">
                             <MetricsCounter
                                 metrics={metrics}
-                                sessionId={sessionData.id}
+                                sessionId={sessionData.sessionId}
                             />
                         </div>
 
                         <div className="section-downtimes">
                             <DowntimeTracking
-                                sessionId={sessionData.id}
+                                sessionId={sessionData.sessionId}
                                 lineId={sessionData.lineId}
                             />
                         </div>
 
                         <div className="section-inputs">
                             <RecordEvents
-                                sessionId={sessionData.id}
+                                sessionId={sessionData.sessionId}
                                 lineId={sessionData.lineId}
                                 supervisorId={sessionData.supervisorId}
                                 onEventRecorded={handleEventRecorded}
