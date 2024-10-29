@@ -1,5 +1,3 @@
-// src/components/production/downtime/stylechange/StyleChangeUpdate.tsx
-
 import React, { useState, useEffect } from 'react';
 import {
     collection,
@@ -11,11 +9,13 @@ import {
     Timestamp,
 } from 'firebase/firestore';
 import { db } from '../../../../firebase';
+import { StyleChangeoverRecord } from '../types';
 import './StyleChangeUpdate.css';
 
 interface StyleChangeUpdateProps {
     userRole: 'Supervisor' | 'Mechanic' | 'QC';
     userId: string;
+    selectedChangeover: StyleChangeoverRecord;
 }
 
 interface StyleChangeover {
@@ -30,6 +30,20 @@ interface StyleChangeover {
         firstUnitOffLine: boolean;
         qcApproved: boolean;
     };
+    completedBy?: {
+        [key in keyof StyleChangeover['progressSteps']]?: {
+            userId: string;
+            timestamp: Timestamp;
+        };
+    };
+}
+
+interface User {
+    employeeNumber: string;
+    name: string;
+    surname: string;
+    role: string;
+    password: string;
 }
 
 const StyleChangeUpdate: React.FC<StyleChangeUpdateProps> = ({ userRole, userId }) => {
@@ -37,14 +51,16 @@ const StyleChangeUpdate: React.FC<StyleChangeUpdateProps> = ({ userRole, userId 
     const [selectedChangeover, setSelectedChangeover] = useState<StyleChangeover | null>(null);
     const [password, setPassword] = useState<string>('');
     const [error, setError] = useState<string>('');
+    const [stepToComplete, setStepToComplete] = useState<keyof StyleChangeover['progressSteps'] | null>(null);
+    const [users, setUsers] = useState<User[]>([]);
+    const [selectedUser, setSelectedUser] = useState<string>('');
 
     useEffect(() => {
         const fetchStyleChangeovers = async () => {
             try {
                 const changeoversQuery = query(
-                    collection(db, 'downtimes'),
+                    collection(db, 'styleChangeovers'),
                     where('status', '==', 'In Progress'),
-                    where('type', '==', 'Style Changeover')
                 );
                 const snapshot = await getDocs(changeoversQuery);
                 const changeoversData = snapshot.docs.map((doc) => ({
@@ -61,38 +77,86 @@ const StyleChangeUpdate: React.FC<StyleChangeUpdateProps> = ({ userRole, userId 
         fetchStyleChangeovers();
     }, []);
 
+    const fetchUsers = async (role: string) => {
+        try {
+            const usersQuery = query(
+                collection(db, 'supportFunctions'),
+                where('role', '==', role)
+            );
+            const snapshot = await getDocs(usersQuery);
+            if (!snapshot.empty) {
+                const usersData = snapshot.docs.map((doc) => doc.data() as User);
+                setUsers(usersData);
+            } else {
+                setError('No users found for the selected role.');
+            }
+        } catch (error) {
+            console.error('Error fetching users:', error);
+            setError('Failed to load users.');
+        }
+    };
+
     const handleSelectChangeover = (changeover: StyleChangeover) => {
         setSelectedChangeover(changeover);
         setPassword('');
         setError('');
+        setStepToComplete(null);
     };
 
-    const handleCompleteStep = async (step: keyof StyleChangeover['progressSteps']) => {
+    const handleCompleteStep = async () => {
+        if (!selectedUser) {
+            setError('Please select a user.');
+            return;
+        }
+
         if (!password) {
             setError('Please enter your password.');
             return;
         }
-        // Verify user's password and role permissions
+
+        const user = users.find((user) => user.employeeNumber === selectedUser);
+        if (!user || user.password !== password) {
+            setError('Invalid password. Please try again.');
+            return;
+        }
+
+        if (!selectedChangeover || !stepToComplete) {
+            setError('No step selected to complete.');
+            return;
+        }
+
+        // Verify user's role permissions
         if (
-            (step === 'qcApproved' && userRole !== 'QC') ||
-            (step !== 'qcApproved' && userRole !== 'Supervisor' && userRole !== 'Mechanic')
+            (stepToComplete === 'qcApproved' && user.role !== 'QC') ||
+            (stepToComplete !== 'qcApproved' && user.role !== 'Supervisor')
         ) {
             setError('You do not have permission to complete this step.');
             return;
         }
 
         try {
-            await updateDoc(doc(db, 'downtimes', selectedChangeover!.id), {
-                [`progressSteps.${step}`]: true,
+            await updateDoc(doc(db, 'styleChangeovers', selectedChangeover.id), {
+                [`progressSteps.${stepToComplete}`]: true,
+                [`completedBy.${stepToComplete}`]: {
+                    userId: user.employeeNumber,
+                    timestamp: Timestamp.now(),
+                },
                 updatedAt: Timestamp.now(),
             });
-            alert('Step completed.');
+
             // Check if all steps are completed
             const updatedChangeover = {
-                ...selectedChangeover!,
+                ...selectedChangeover,
                 progressSteps: {
-                    ...selectedChangeover!.progressSteps,
-                    [step]: true,
+                    ...selectedChangeover.progressSteps,
+                    [stepToComplete]: true,
+                },
+                completedBy: {
+                    ...selectedChangeover.completedBy,
+                    [stepToComplete]: {
+                        userId: user.employeeNumber,
+                        timestamp: Timestamp.now(),
+                    },
                 },
             };
             const allStepsCompleted = Object.values(updatedChangeover.progressSteps).every(
@@ -100,21 +164,20 @@ const StyleChangeUpdate: React.FC<StyleChangeUpdateProps> = ({ userRole, userId 
             );
             if (allStepsCompleted) {
                 // Close the style changeover
-                await updateDoc(doc(db, 'downtimes', selectedChangeover!.id), {
+                await updateDoc(doc(db, 'styleChangeovers', selectedChangeover.id), {
                     status: 'Closed',
                     closedAt: Timestamp.now(),
                     updatedAt: Timestamp.now(),
                 });
-                alert('Style changeover completed.');
                 setSelectedChangeover(null);
             } else {
                 setSelectedChangeover(updatedChangeover);
             }
+
             // Refresh style changeovers
             const changeoversQuery = query(
-                collection(db, 'downtimes'),
-                where('status', '==', 'In Progress'),
-                where('type', '==', 'Style Changeover')
+                collection(db, 'styleChangeovers'),
+                where('status', '==', 'In Progress')
             );
             const snapshot = await getDocs(changeoversQuery);
             const changeoversData = snapshot.docs.map((doc) => ({
@@ -122,10 +185,32 @@ const StyleChangeUpdate: React.FC<StyleChangeUpdateProps> = ({ userRole, userId 
                 ...doc.data(),
             })) as StyleChangeover[];
             setStyleChangeovers(changeoversData);
+            setStepToComplete(null);
+            setPassword('');
+            setSelectedUser('');
         } catch (error) {
             console.error('Error completing step:', error);
             setError('Failed to complete step.');
         }
+    };
+
+    const promptPasswordAndCompleteStep = async (step: keyof StyleChangeover['progressSteps']) => {
+        setStepToComplete(step);
+        setPassword('');
+        setError('');
+
+        if (step === 'qcApproved') {
+            await fetchUsers('QC');
+        } else {
+            await fetchUsers('Supervisor');
+        }
+    };
+
+    const handleCancelPasswordPrompt = () => {
+        setStepToComplete(null);
+        setPassword('');
+        setError('');
+        setSelectedUser('');
     };
 
     return (
@@ -154,22 +239,59 @@ const StyleChangeUpdate: React.FC<StyleChangeUpdateProps> = ({ userRole, userId 
                                     {selectedChangeover.progressSteps[step] ? 'Complete' : 'Incomplete'}
                                 </p>
                                 {!selectedChangeover.progressSteps[step] && (
-                                    <button onClick={() => handleCompleteStep(step)} className="complete-step-button">
-                                        Complete Step
+                                    <button
+                                        onClick={() => promptPasswordAndCompleteStep(step)}
+                                        className="complete-step-button"
+                                        style={{ backgroundColor: 'red' }}
+                                    >
+                                        Complete
+                                    </button>
+                                )}
+                                {selectedChangeover.progressSteps[step] && (
+                                    <button
+                                        className="complete-step-button"
+                                        style={{ backgroundColor: 'green' }}
+                                        disabled
+                                    >
+                                        Completed
                                     </button>
                                 )}
                             </div>
                         ))}
                     </div>
-                    <label>
-                        Password:
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
-                    </label>
+                    {stepToComplete && (
+                        <div className="password-prompt">
+                            <label>
+                                Select User:
+                                <select
+                                    value={selectedUser}
+                                    onChange={(e) => setSelectedUser(e.target.value)}
+                                >
+                                    <option value="">Select User</option>
+                                    {users.map((user) => (
+                                        <option key={user.employeeNumber} value={user.employeeNumber}>
+                                            {user.name} {user.surname}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label>
+                                Password:
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                />
+                            </label>
+                            <button onClick={handleCompleteStep} className="confirm-button">
+                                Confirm
+                            </button>
+                            <button onClick={handleCancelPasswordPrompt} className="cancel-button">
+                                Cancel
+                            </button>
+                        </div>
+                    )}
                     <button onClick={() => setSelectedChangeover(null)} className="cancel-button">
                         Cancel
                     </button>
@@ -182,7 +304,7 @@ const StyleChangeUpdate: React.FC<StyleChangeUpdateProps> = ({ userRole, userId 
                         styleChangeovers.map((changeover) => (
                             <div
                                 key={changeover.id}
-                                className="changeover-card"
+                                className={`changeover-card ${changeover.status === 'Closed' ? 'completed' : ''}`}
                                 onClick={() => handleSelectChangeover(changeover)}
                             >
                                 <p>

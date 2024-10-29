@@ -1,5 +1,3 @@
-// src/components/production/productionboard/components/RecordEvents.tsx
-
 import React, { useState, useEffect } from 'react';
 import {
     collection,
@@ -17,15 +15,16 @@ import ReworkUpdate from '../../downtime/rework/ReworkUpdate';
 import Reject from '../../downtime/reject/Reject';
 import Late from '../../downtime/hr/Late';
 import Absent from '../../downtime/hr/Absent';
-import SupplyLog from '../../downtime/supply/Supply'; // <-- Import SupplyLog component
+import SupplyLog from '../../downtime/supply/Supply';
+import StyleChangeover from '../../downtime/stylechange/StyleChangeover'; // Component
 import {
     ReworkFormData,
     RejectFormData,
     LateFormData,
     AbsentFormData,
-    SupplyFormData, // <-- Import SupplyFormData
-    ReworkItem
+    SupplyFormData
 } from '../../downtime/types';
+import { StyleChangeoverFormData } from '../../downtime/types'; // Type import
 import { SupportFunction } from '../../../../types';
 import './RecordEvents.css';
 
@@ -33,7 +32,7 @@ interface RecordEventsProps {
     sessionId: string;
     lineId: string;
     supervisorId: string;
-    onEventRecorded: (eventType: 'rejects' | 'reworks' | 'late' | 'absent', count: number) => void; // <-- Do not include 'supply'
+    onEventRecorded: (eventType: 'rejects' | 'reworks' | 'late' | 'absent', count: number) => void;
 }
 
 const RecordEvents: React.FC<RecordEventsProps> = ({
@@ -42,13 +41,15 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                                                        supervisorId,
                                                        onEventRecorded
                                                    }) => {
+    // State Management
     const [activeSection, setActiveSection] = useState<'hr' | 'downtime' | null>(null);
     const [isReworkModalOpen, setIsReworkModalOpen] = useState(false);
     const [isReworkUpdateModalOpen, setIsReworkUpdateModalOpen] = useState(false);
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
     const [isLateModalOpen, setIsLateModalOpen] = useState(false);
     const [isAbsentModalOpen, setIsAbsentModalOpen] = useState(false);
-    const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false); // <-- New state for Supply modal
+    const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
+    const [isStyleChangeoverModalOpen, setIsStyleChangeoverModalOpen] = useState(false);
     const [qcs, setQcs] = useState<SupportFunction[]>([]);
     const [error, setError] = useState<string>('');
 
@@ -56,7 +57,10 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
     useEffect(() => {
         const fetchQCs = async () => {
             try {
-                const qcsSnapshot = await getDocs(query(collection(db, 'supportFunctions'), where('role', '==', 'QC')));
+                const qcsSnapshot = await getDocs(
+                    query(collection(db, 'supportFunctions'),
+                        where('role', '==', 'QC'))
+                );
                 const qcsList = qcsSnapshot.docs
                     .map(doc => ({
                         id: doc.id,
@@ -76,10 +80,11 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
     const downtimeCategories = [
         { id: 'machine', name: 'Machine' },
         { id: 'quality', name: 'Quality' },
-        { id: 'supply', name: 'Supply' }, // Supply category
+        { id: 'supply', name: 'Supply' },
         { id: 'styleChange', name: 'Style Change' }
     ];
 
+    // Event Handlers
     const handleReworkSubmit = async (data: ReworkFormData) => {
         try {
             const reworkDocRef = await addDoc(collection(db, 'reworks'), {
@@ -89,7 +94,6 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                 updatedAt: Timestamp.now()
             });
 
-            // Assign reference number (last 4 digits of Firestore doc ID)
             const refNumber = reworkDocRef.id.slice(-4);
             await updateDoc(doc(db, 'reworks', reworkDocRef.id), {
                 refNumber
@@ -158,7 +162,6 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         }
     };
 
-    // New handler for Supply submission
     const handleSupplySubmit = async (data: SupplyFormData) => {
         try {
             await addDoc(collection(db, 'supplyDowntime'), {
@@ -167,14 +170,30 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                 startTime: Timestamp.now(),
                 status: 'Open' as const,
             });
-
-            // Since 'supply' is not part of onEventRecorded, we handle it separately
-            // For example, you might want to display a success message or update state
-            alert('Supply downtime logged successfully.');
             setIsSupplyModalOpen(false);
         } catch (err) {
             console.error('Error logging supply downtime:', err);
             setError('Failed to log supply downtime.');
+        }
+    };
+
+    const handleStyleChangeoverSubmit = async (data: StyleChangeoverFormData) => {
+        try {
+            await addDoc(collection(db, 'styleChangeovers'), {
+                ...data,
+                createdAt: Timestamp.now(),
+                status: 'In Progress',
+                progressSteps: {
+                    machineSetupComplete: false,
+                    peopleAllocated: false,
+                    firstUnitOffLine: false,
+                    qcApproved: false
+                }
+            });
+            setIsStyleChangeoverModalOpen(false);
+        } catch (error) {
+            console.error('Error submitting style changeover:', error);
+            setError('Failed to submit style changeover.');
         }
     };
 
@@ -247,10 +266,11 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                                         key={category.id}
                                         onClick={() => {
                                             if (category.id === 'supply') {
-                                                setIsSupplyModalOpen(true); // <-- Open Supply modal
+                                                setIsSupplyModalOpen(true);
+                                            } else if (category.id === 'styleChange') {
+                                                setIsStyleChangeoverModalOpen(true);
                                             } else {
                                                 console.log(category.id);
-                                                // Handle other categories if necessary
                                             }
                                         }}
                                         className="output-button"
@@ -275,7 +295,9 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                 )}
 
                 {isReworkUpdateModalOpen && (
-                    <ReworkUpdate onClose={() => setIsReworkUpdateModalOpen(false)} />
+                    <ReworkUpdate
+                        onClose={() => setIsReworkUpdateModalOpen(false)}
+                    />
                 )}
 
                 {isRejectModalOpen && (
@@ -306,7 +328,6 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                     />
                 )}
 
-                {/* <-- Render SupplyLog Modal */}
                 {isSupplyModalOpen && (
                     <SupplyLog
                         onClose={() => setIsSupplyModalOpen(false)}
@@ -315,7 +336,17 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                         supervisorId={supervisorId}
                     />
                 )}
+
+                {isStyleChangeoverModalOpen && (
+                    <StyleChangeover
+                        onClose={() => setIsStyleChangeoverModalOpen(false)}
+                        onSubmit={handleStyleChangeoverSubmit}
+                        productionLineId={lineId}
+                        supervisorId={supervisorId}
+                    />
+                )}
             </div>
+
             {error && (
                 <div className="error-message">
                     {error}
@@ -324,7 +355,6 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
             )}
         </div>
     );
-
-}
+};
 
 export default RecordEvents;

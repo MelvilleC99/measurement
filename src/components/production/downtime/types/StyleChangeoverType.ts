@@ -1,5 +1,3 @@
-// src/types/downtime/StyleChangeoverType.ts
-
 import { Timestamp } from 'firebase/firestore';
 
 // ------------------------
@@ -12,10 +10,7 @@ export interface StyleChangeoverFormData {
     target: string;
     productionLineId: string;
     supervisorId: string;
-
 }
-
-
 
 // ------------------------
 // Component Props Interfaces
@@ -42,6 +37,18 @@ export interface StyleChangeoverRecord {
     password: string;
     createdAt: Timestamp;
     updatedAt: Timestamp;
+    progressSteps: {
+        machineSetupComplete: boolean;
+        peopleAllocated: boolean;
+        firstUnitOffLine: boolean;
+        qcApproved: boolean;
+    };
+    completedBy?: {
+        [key in keyof StyleChangeoverRecord['progressSteps']]?: {
+            userId: string;
+            timestamp: Timestamp;
+        };
+    };
 }
 
 // ------------------------

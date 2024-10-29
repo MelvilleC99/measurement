@@ -1,17 +1,57 @@
 /* src/components/production/downtime/stylechange/StyleChangeUpdate.css */
 
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.75); /* Increase the opacity for better contrast */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #ffffff;
+    padding: 30px;
+    border-radius: 12px;
+    max-width: 600px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
+    position: relative;
+    animation: slideDown 0.3s ease-in-out;
+}
+
+@keyframes slideDown {
+    0% {
+        transform: translateY(-30px);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
 .style-change-update-container {
     padding: 20px;
 }
 
 h2 {
     text-align: center;
+    font-size: 1.8em;
+    margin-bottom: 20px;
 }
 
 .error-message {
     color: #dc3545;
     text-align: center;
     margin-bottom: 10px;
+    font-weight: bold;
 }
 
 .changeover-list {
@@ -22,16 +62,19 @@ h2 {
 }
 
 .changeover-card {
-    background-color: #f1f3f5;
-    padding: 15px;
+    background-color: #f8f9fa;
+    padding: 20px;
     width: 280px;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
-    border: 1px solid #adb5bd;
+    border: 1px solid #ced4da;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .changeover-card:hover {
     background-color: #e9ecef;
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .changeover-details {
@@ -41,10 +84,13 @@ h2 {
 
 .changeover-details h3 {
     text-align: center;
+    font-size: 1.5em;
+    margin-bottom: 15px;
 }
 
 .changeover-details p {
-    margin-bottom: 10px;
+    margin-bottom: 12px;
+    font-size: 1.1em;
 }
 
 .progress-steps {
@@ -53,18 +99,24 @@ h2 {
 
 .progress-step {
     margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .progress-step p {
     margin-bottom: 5px;
+    font-weight: bold;
 }
 
 .complete-step-button {
-    padding: 8px 16px;
+    padding: 10px 20px;
     border: none;
     cursor: pointer;
     background-color: #28a745;
     color: #fff;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
 }
 
 .complete-step-button:hover {
@@ -73,20 +125,52 @@ h2 {
 
 .cancel-button {
     margin-top: 20px;
-    padding: 10px 20px;
+    padding: 12px 25px;
     border: none;
     cursor: pointer;
     background-color: #dc3545;
     color: #fff;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+.cancel-button:hover {
+    background-color: #c82333;
 }
 
 label {
     display: block;
     margin-top: 15px;
+    font-weight: bold;
 }
 
 input[type="password"] {
     width: 100%;
-    padding: 8px;
+    padding: 10px;
     margin-top: 5px;
+    border-radius: 5px;
+    border: 1px solid #ced4da;
+    font-size: 1em;
+}
+
+.downtime-card {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.downtime-card.clickable:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+}
+
+.downtimes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 20px;
 }
