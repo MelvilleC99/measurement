@@ -1,5 +1,3 @@
-// src/components/production/downtime/supply/SupplyLog.tsx
-
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../../../../firebase';
@@ -58,7 +56,13 @@ const SupplyLog: React.FC<SupplyLogProps> = ({ onClose, onSubmit, productionLine
         };
 
         try {
-            await onSubmit(supplyFormData); // Using onSubmit prop
+            await addDoc(collection(db, 'supplyDowntime'), {
+                ...supplyFormData,
+                createdAt: Timestamp.now(),
+                startTime: Timestamp.now(),
+                status: 'Open' as const,
+            });
+
             alert('Supply downtime logged successfully.');
             onClose();
         } catch (err) {

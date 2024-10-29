@@ -1,165 +1,220 @@
-// src/components/production/downtime/supply/SupplyUpdate.tsx
-
 import React, { useState, useEffect } from 'react';
 import {
-    collection,
-    getDocs,
-    query,
-    where,
     updateDoc,
     doc,
     Timestamp,
+    collection,
+    getDocs,
+    query,
+    where
 } from 'firebase/firestore';
 import { db } from '../../../../firebase';
+import { SupportFunction } from '../../../../types';
+import { SupplyRecord } from '../types';
 import './SupplyUpdate.css';
 
 interface SupplyUpdateProps {
-    userRole: 'Supervisor';
-    userId: string;
+    selectedDowntime: SupplyRecord;
+    onClose: () => void;
 }
 
-interface Downtime {
-    id: string;
-    reason: string;
-    comments: string;
-    status: string;
-}
-
-const SupplyUpdate: React.FC<SupplyUpdateProps> = ({ userRole, userId }) => {
-    const [downtimes, setDowntimes] = useState<Downtime[]>([]);
-    const [selectedDowntime, setSelectedDowntime] = useState<Downtime | null>(null);
+const SupplyUpdate: React.FC<SupplyUpdateProps> = ({
+                                                       selectedDowntime,
+                                                       onClose
+                                                   }) => {
     const [additionalComments, setAdditionalComments] = useState<string>('');
+    const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>('');
     const [password, setPassword] = useState<string>('');
     const [error, setError] = useState<string>('');
+    const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
+    const [supervisors, setSupervisors] = useState<SupportFunction[]>([]);
 
     useEffect(() => {
-        const fetchDowntimes = async () => {
+        const fetchSupervisors = async () => {
             try {
-                const downtimesQuery = query(
-                    collection(db, 'downtimes'),
-                    where('status', '==', 'Open'),
-                    where('type', '==', 'Supply')
+                console.log('Starting supervisor fetch...');
+
+                const supportFunctionsRef = collection(db, 'supportFunctions');
+                const q = query(
+                    supportFunctionsRef,
+                    where('role', '==', 'Supervisor'),
+                    where('hasPassword', '==', true)  // Updated to match your document structure
                 );
-                const snapshot = await getDocs(downtimesQuery);
-                const downtimesData = snapshot.docs.map((doc) => ({
-                    id: doc.id,
-                    ...doc.data(),
-                })) as Downtime[];
-                setDowntimes(downtimesData);
-            } catch (error) {
-                console.error('Error fetching downtimes:', error);
-                setError('Failed to load downtimes.');
+
+                const querySnapshot = await getDocs(q);
+                console.log('Query snapshot received:', querySnapshot.size, 'documents');
+
+                const supervisorsList = querySnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    console.log('Supervisor data:', data);
+                    return {
+                        id: doc.id,
+                        ...data
+                    } as SupportFunction;
+                });
+
+                console.log('Processed supervisors list:', supervisorsList);
+                setSupervisors(supervisorsList);
+            } catch (err) {
+                console.error('Error in fetchSupervisors:', err);
+                setError('Failed to fetch supervisors');
             }
         };
 
-        fetchDowntimes();
+        fetchSupervisors();
     }, []);
 
-    const handleSelectDowntime = (downtime: Downtime) => {
-        setSelectedDowntime(downtime);
-        setAdditionalComments('');
-        setPassword('');
+    const handleResolveClick = () => {
+        setShowPasswordModal(true);
         setError('');
     };
 
-    const handleResolveDowntime = async () => {
-        if (userRole !== 'Supervisor') {
-            setError('Only supervisors can resolve downtime.');
+    const handlePasswordSubmit = async () => {
+        if (!selectedSupervisorId || !password) {
+            setError('Please select a supervisor and enter password');
             return;
         }
-        if (!password) {
-            setError('Please enter your password.');
-            return;
-        }
-        // Implement password verification here
 
         try {
-            await updateDoc(doc(db, 'downtimes', selectedDowntime!.id), {
+            console.log('Verifying supervisor:', selectedSupervisorId);
+
+            // Updated query to match your document structure
+            const supervisorQuery = query(
+                collection(db, 'supportFunctions'),
+                where('employeeNumber', '==', selectedSupervisorId),
+                where('password', '==', password),
+                where('role', '==', 'Supervisor'),
+                where('hasPassword', '==', true)
+            );
+
+            const supervisorSnapshot = await getDocs(supervisorQuery);
+            console.log('Verification result:', {
+                empty: supervisorSnapshot.empty,
+                size: supervisorSnapshot.size
+            });
+
+            if (supervisorSnapshot.empty) {
+                setError('Invalid supervisor credentials');
+                return;
+            }
+
+            await updateDoc(doc(db, 'supplyDowntime', selectedDowntime.id), {
                 status: 'Closed',
-                supervisorId: userId,
+                supervisorId: selectedSupervisorId,
                 additionalComments,
                 resolvedAt: Timestamp.now(),
-                updatedAt: Timestamp.now(),
+                endTime: Timestamp.now(),
+                updatedAt: Timestamp.now()
             });
-            alert('Downtime resolved.');
-            setSelectedDowntime(null);
-            // Refresh downtimes
-            const downtimesQuery = query(
-                collection(db, 'downtimes'),
-                where('status', '==', 'Open'),
-                where('type', '==', 'Supply')
-            );
-            const snapshot = await getDocs(downtimesQuery);
-            const downtimesData = snapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-            })) as Downtime[];
-            setDowntimes(downtimesData);
-        } catch (error) {
-            console.error('Error resolving downtime:', error);
-            setError('Failed to resolve downtime.');
+
+            onClose();
+        } catch (err) {
+            console.error('Error in handlePasswordSubmit:', err);
+            setError('Failed to resolve downtime');
         }
     };
 
+    const handleClose = () => {
+        setShowPasswordModal(false);
+        setPassword('');
+        setSelectedSupervisorId('');
+        setError('');
+    };
+
     return (
-        <div className="supply-update-container">
-            <h2>Active Supply Downtimes</h2>
-            {error && <p className="error-message">{error}</p>}
-            {selectedDowntime ? (
-                <div className="downtime-details">
-                    <h3>Downtime Details</h3>
-                    <p>
-                        <strong>Reason:</strong> {selectedDowntime.reason}
-                    </p>
-                    <p>
-                        <strong>Comments:</strong> {selectedDowntime.comments}
-                    </p>
-                    <label>
-                        Additional Comments:
+        <div className="modal-overlay">
+            <div className="modal-content">
+                <div className="supply-update">
+                    <div className="modal-header">
+                        <h2>Supply Downtime Details</h2>
+                        <button className="close-button" onClick={onClose}>×</button>
+                    </div>
+
+                    <div className="details-grid">
+                        <div className="detail-item">
+                            <span className="label">Reason:</span>
+                            <span className="value">{selectedDowntime.reason}</span>
+                        </div>
+                        <div className="detail-item">
+                            <span className="label">Comments:</span>
+                            <span className="value">{selectedDowntime.comments}</span>
+                        </div>
+                        <div className="detail-item">
+                            <span className="label">Start Time:</span>
+                            <span className="value">
+                                {selectedDowntime.startTime.toDate().toLocaleTimeString()}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="resolution-form">
+                        <label className="form-label">Additional Comments:</label>
                         <textarea
                             value={additionalComments}
                             onChange={(e) => setAdditionalComments(e.target.value)}
-                            placeholder="Enter additional comments..."
+                            className="form-textarea"
+                            placeholder="Enter any additional comments..."
+                            rows={4}
                         />
-                    </label>
-                    <label>
-                        Password:
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
-                    </label>
+                    </div>
+
                     <div className="action-buttons">
-                        <button onClick={handleResolveDowntime} className="resolve-button">
-                            Downtime Resolved
-                        </button>
-                        <button onClick={() => setSelectedDowntime(null)} className="cancel-button">
-                            Cancel
+                        <button onClick={handleResolveClick} className="resolve-button">
+                            Resolve Downtime
                         </button>
                     </div>
                 </div>
-            ) : (
-                <div className="downtime-list">
-                    {downtimes.length === 0 ? (
-                        <p>No active downtimes.</p>
-                    ) : (
-                        downtimes.map((downtime) => (
-                            <div
-                                key={downtime.id}
-                                className="downtime-card"
-                                onClick={() => handleSelectDowntime(downtime)}
+            </div>
+
+            {showPasswordModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content password-modal">
+                        <div className="modal-header">
+                            <h3>Supervisor Verification</h3>
+                            <button className="close-button" onClick={handleClose}>×</button>
+                        </div>
+                        {error && <div className="error-message">{error}</div>}
+
+                        <div className="form-group">
+                            <label className="form-label">Select Supervisor:</label>
+                            <select
+                                value={selectedSupervisorId}
+                                onChange={(e) => setSelectedSupervisorId(e.target.value)}
+                                className="form-input"
+                                required
                             >
-                                <p>
-                                    <strong>Reason:</strong> {downtime.reason}
-                                </p>
-                                <p>
-                                    <strong>Status:</strong> {downtime.status}
-                                </p>
-                            </div>
-                        ))
-                    )}
+                                <option value="">Select Supervisor</option>
+                                {supervisors.map((supervisor) => (
+                                    <option
+                                        key={supervisor.id}
+                                        value={supervisor.employeeNumber}
+                                    >
+                                        {`${supervisor.name} ${supervisor.surname}`}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label">Password:</label>
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="form-input"
+                                placeholder="Enter supervisor password"
+                            />
+                        </div>
+
+                        <div className="action-buttons">
+                            <button onClick={handlePasswordSubmit} className="confirm-button">
+                                Confirm
+                            </button>
+                            <button onClick={handleClose} className="cancel-button">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

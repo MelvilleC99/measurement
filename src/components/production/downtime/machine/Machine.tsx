@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../../../../firebase';
+import { SupportFunction} from '../../../../types';
 import './Machine.css';
 
 interface MachineProps {
@@ -10,6 +11,7 @@ interface MachineProps {
     onSubmit: (data: MachineFormData) => Promise<void>;
     productionLineId: string;
     supervisorId: string;
+
 }
 
 interface MachineFormData {

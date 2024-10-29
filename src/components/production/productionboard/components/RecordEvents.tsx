@@ -17,22 +17,23 @@ import ReworkUpdate from '../../downtime/rework/ReworkUpdate';
 import Reject from '../../downtime/reject/Reject';
 import Late from '../../downtime/hr/Late';
 import Absent from '../../downtime/hr/Absent';
+import SupplyLog from '../../downtime/supply/Supply'; // <-- Import SupplyLog component
 import {
     ReworkFormData,
     RejectFormData,
     LateFormData,
     AbsentFormData,
+    SupplyFormData, // <-- Import SupplyFormData
     ReworkItem
-
 } from '../../downtime/types';
-import { SupportFunction } from '../../../../types'
+import { SupportFunction } from '../../../../types';
 import './RecordEvents.css';
 
 interface RecordEventsProps {
     sessionId: string;
     lineId: string;
     supervisorId: string;
-    onEventRecorded: (eventType: 'rejects' | 'reworks' | 'late' | 'absent', count: number) => void;
+    onEventRecorded: (eventType: 'rejects' | 'reworks' | 'late' | 'absent', count: number) => void; // <-- Do not include 'supply'
 }
 
 const RecordEvents: React.FC<RecordEventsProps> = ({
@@ -47,6 +48,7 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
     const [isLateModalOpen, setIsLateModalOpen] = useState(false);
     const [isAbsentModalOpen, setIsAbsentModalOpen] = useState(false);
+    const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false); // <-- New state for Supply modal
     const [qcs, setQcs] = useState<SupportFunction[]>([]);
     const [error, setError] = useState<string>('');
 
@@ -72,10 +74,10 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
     }, []);
 
     const downtimeCategories = [
-        {id: 'machine', name: 'Machine'},
-        {id: 'quality', name: 'Quality'},
-        {id: 'supply', name: 'Supply'},
-        {id: 'styleChange', name: 'Style Change'}
+        { id: 'machine', name: 'Machine' },
+        { id: 'quality', name: 'Quality' },
+        { id: 'supply', name: 'Supply' }, // Supply category
+        { id: 'styleChange', name: 'Style Change' }
     ];
 
     const handleReworkSubmit = async (data: ReworkFormData) => {
@@ -156,6 +158,26 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         }
     };
 
+    // New handler for Supply submission
+    const handleSupplySubmit = async (data: SupplyFormData) => {
+        try {
+            await addDoc(collection(db, 'supplyDowntime'), {
+                ...data,
+                createdAt: Timestamp.now(),
+                startTime: Timestamp.now(),
+                status: 'Open' as const,
+            });
+
+            // Since 'supply' is not part of onEventRecorded, we handle it separately
+            // For example, you might want to display a success message or update state
+            alert('Supply downtime logged successfully.');
+            setIsSupplyModalOpen(false);
+        } catch (err) {
+            console.error('Error logging supply downtime:', err);
+            setError('Failed to log supply downtime.');
+        }
+    };
+
     return (
         <div className="time-table-section">
             <div className="slot-selection">
@@ -223,7 +245,14 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                                 {downtimeCategories.map((category) => (
                                     <button
                                         key={category.id}
-                                        onClick={() => console.log(category.id)}
+                                        onClick={() => {
+                                            if (category.id === 'supply') {
+                                                setIsSupplyModalOpen(true); // <-- Open Supply modal
+                                            } else {
+                                                console.log(category.id);
+                                                // Handle other categories if necessary
+                                            }
+                                        }}
                                         className="output-button"
                                     >
                                         {category.name}
@@ -246,7 +275,7 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                 )}
 
                 {isReworkUpdateModalOpen && (
-                    <ReworkUpdate onClose={() => setIsReworkUpdateModalOpen(false)}/>
+                    <ReworkUpdate onClose={() => setIsReworkUpdateModalOpen(false)} />
                 )}
 
                 {isRejectModalOpen && (
@@ -276,6 +305,16 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                         supervisorId={supervisorId}
                     />
                 )}
+
+                {/* <-- Render SupplyLog Modal */}
+                {isSupplyModalOpen && (
+                    <SupplyLog
+                        onClose={() => setIsSupplyModalOpen(false)}
+                        onSubmit={handleSupplySubmit}
+                        productionLineId={lineId}
+                        supervisorId={supervisorId}
+                    />
+                )}
             </div>
             {error && (
                 <div className="error-message">
@@ -285,6 +324,7 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
             )}
         </div>
     );
+
 }
 
 export default RecordEvents;

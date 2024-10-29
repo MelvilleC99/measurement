@@ -40,9 +40,11 @@ export interface MachineRecord {
     supervisorId: string;
     mechanicId?: string;
     productionLineId?: string;
+    startTime: Timestamp; // Corrected startTime type
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }
+
 
 // ------------------------
 // Base Interfaces

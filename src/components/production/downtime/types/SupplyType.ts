@@ -1,5 +1,3 @@
-// src/components/production/downtime/types/SupplyType.ts
-
 import { Timestamp } from 'firebase/firestore';
 
 // ------------------------
@@ -11,7 +9,6 @@ export interface SupplyFormData {
     comments: string;
     productionLineId: string;
     supervisorId: string;
-    // Removed password as it's not needed for form submission
 }
 
 // ------------------------
@@ -25,8 +22,15 @@ export interface SupplyLogProps {
     supervisorId: string;
 }
 
+export interface SupplyUpdateProps {
+    userRole: 'Supervisor';
+    userId: string;
+    selectedDowntime: SupplyRecord | null;
+    onClose: () => void;
+}
+
 // ------------------------
-// Document Interfaces
+// Document Interface
 // ------------------------
 
 export interface SupplyRecord {
@@ -35,25 +39,14 @@ export interface SupplyRecord {
     comments: string;
     productionLineId: string;
     supervisorId: string;
-    type: string;
-    status: string;
+    type: 'Supply';
+    category: 'Supply';
+    status: 'Open' | 'Closed';
+    sessionId: string;
     createdAt: Timestamp;
     updatedAt: Timestamp;
-    // Add other necessary fields if needed
-}
-
-// ------------------------
-// Base Interfaces
-// ------------------------
-
-export interface SupplyBase {
-    id: string;
-    reason: string;
-    comments: string;
-    productionLineId: string;
-    supervisorId: string;
-    type: string;
-    status: string;
-    createdAt: Timestamp;
-    updatedAt: Timestamp;
+    startTime: Timestamp;
+    endTime?: Timestamp;
+    resolvedAt?: Timestamp;
+    additionalComments?: string;
 }
