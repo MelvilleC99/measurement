@@ -10,6 +10,7 @@ import {
     query,
 } from 'firebase/firestore';
 import { db } from '../../../firebase';
+import LoginManager from './components/LoginManager';
 import ProductionTracking from './components/ProductionTracking';
 import RecordEvents from './components/RecordEvents';
 import DowntimeTracking from './components/DowntimeTracking';
@@ -24,8 +25,14 @@ interface MetricsState {
     absent: number;
 }
 
+interface LoginState {
+    lineId: string;
+    supervisorId: string;
+}
+
 const ProductionBoard: React.FC = () => {
     const [sessionData, setSessionData] = useState<SessionData | null>(null);
+    const [loginData, setLoginData] = useState<LoginState | null>(null);
     const [metrics, setMetrics] = useState<MetricsState>({
         rejects: 0,
         reworks: 0,
@@ -33,10 +40,6 @@ const ProductionBoard: React.FC = () => {
         absent: 0,
     });
     const [error, setError] = useState<string>('');
-
-    // Assuming these values are available through authentication or context
-    const userRole: 'Supervisor' | 'Mechanic' = 'Supervisor'; // Replace with your logic to get the current user's role
-    const userId = 'exampleUserId'; // Replace with your logic to get the current user's ID
 
     const handleUnitProduced = async (slotId: string) => {
         if (!sessionData) return;
@@ -93,6 +96,7 @@ const ProductionBoard: React.FC = () => {
             }
 
             setSessionData(null);
+            setLoginData(null);
             setMetrics({
                 rejects: 0,
                 reworks: 0,
@@ -107,55 +111,67 @@ const ProductionBoard: React.FC = () => {
 
     return (
         <div className="board-container">
-            <div className="main-section">
-                <ProductionTracking
-                    sessionData={sessionData}
-                    onUnitProduced={handleUnitProduced}
-                    setSessionData={setSessionData}
+            {!loginData ? (
+                <LoginManager
+                    onLoginSuccess={(lineId, supervisorId) => {
+                        setLoginData({ lineId, supervisorId });
+                    }}
                 />
-            </div>
-
-            {sessionData && (
+            ) : (
                 <>
-                    <div className="monitoring-section">
-                        <div className="section-counters">
-                            <MetricsCounter
-                                sessionId={sessionData.sessionId}
-                                lineId={sessionData.lineId}
-                                supervisorId={sessionData.supervisorId}
-                            />
-                        </div>
-
-                        <div className="section-downtimes">
-                            <DowntimeTracking
-                                sessionId={sessionData.sessionId}
-                                lineId={sessionData.lineId}
-                                userRole={userRole} // Added userRole prop
-                                userId={userId} // Added userId prop
-                            />
-                        </div>
-
-                        <div className="section-inputs">
-                            <RecordEvents
-                                sessionId={sessionData.sessionId}
-                                lineId={sessionData.lineId}
-                                supervisorId={sessionData.supervisorId}
-                                onEventRecorded={handleEventRecorded}
-                            />
-                        </div>
+                    <div className="main-section">
+                        <ProductionTracking
+                            sessionData={sessionData}
+                            onUnitProduced={handleUnitProduced}
+                            setSessionData={setSessionData}
+                            selectedLineId={loginData.lineId}
+                            selectedSupervisorId={loginData.supervisorId}
+                        />
                     </div>
 
-                    <button className="end-shift-button" onClick={handleEndShift}>
-                        End Shift
-                    </button>
-                </>
-            )}
+                    {sessionData && (
+                        <>
+                            <div className="monitoring-section">
+                                <div className="section-counters">
+                                    <MetricsCounter
+                                        sessionId={sessionData.sessionId}
+                                        lineId={sessionData.lineId}
+                                        supervisorId={sessionData.supervisorId}
+                                    />
+                                </div>
 
-            {error && (
-                <div className="error-message">
-                    {error}
-                    <button onClick={() => setError('')}>✕</button>
-                </div>
+                                <div className="section-downtimes">
+                                    <DowntimeTracking
+                                        sessionId={sessionData.sessionId}
+                                        lineId={sessionData.lineId}
+                                        userRole="Supervisor"
+                                        userId={sessionData.supervisorId}
+                                    />
+                                </div>
+
+                                <div className="section-inputs">
+                                    <RecordEvents
+                                        sessionId={sessionData.sessionId}
+                                        lineId={sessionData.lineId}
+                                        supervisorId={sessionData.supervisorId}
+                                        onEventRecorded={handleEventRecorded}
+                                    />
+                                </div>
+                            </div>
+
+                            <button className="end-shift-button" onClick={handleEndShift}>
+                                End Shift
+                            </button>
+                        </>
+                    )}
+
+                    {error && (
+                        <div className="error-message">
+                            {error}
+                            <button onClick={() => setError('')}>✕</button>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );

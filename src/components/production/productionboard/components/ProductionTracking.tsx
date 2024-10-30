@@ -1,5 +1,3 @@
-// src/components/production/productionboard/components/ProductionTracking.tsx
-
 import React, { useState, useEffect } from 'react';
 import {
     collection,
@@ -24,6 +22,8 @@ interface ProductionTrackingProps {
     sessionData: SessionData | null;
     onUnitProduced: (slotId: string) => Promise<void>;
     setSessionData: React.Dispatch<React.SetStateAction<SessionData | null>>;
+    selectedLineId: string;  // Added from login
+    selectedSupervisorId: string;  // Added from login
 }
 
 interface CurrentSlot {
@@ -37,7 +37,9 @@ interface CurrentSlot {
 const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                                                                    sessionData,
                                                                    onUnitProduced,
-                                                                   setSessionData
+                                                                   setSessionData,
+                                                                   selectedLineId,
+                                                                   selectedSupervisorId
                                                                }) => {
     // Data states
     const [productionLines, setProductionLines] = useState<ProductionLine[]>([]);
@@ -45,12 +47,6 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
     const [styles, setStyles] = useState<Style[]>([]);
     const [breaks, setBreaks] = useState<Break[]>([]);
     const [timeTables, setTimeTables] = useState<TimeTable[]>([]);
-
-    // Selection states
-    const [selectedLine, setSelectedLine] = useState<string>('');
-    const [selectedLineId, setSelectedLineId] = useState<string>('');
-    const [selectedSupervisor, setSelectedSupervisor] = useState<SupportFunction | null>(null);
-    const [selectedStyle, setSelectedStyle] = useState<Style | null>(null);
 
     // Production states
     const [assignedTimeTable, setAssignedTimeTable] = useState<TimeTable | null>(null);
@@ -62,6 +58,11 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
         outputs: [] as number[],
         balance: 0,
     });
+
+    // Selection states
+    const [selectedStyle, setSelectedStyle] = useState<Style | null>(null);
+    const [selectedLine, setSelectedLine] = useState<string>('');
+    const [selectedSupervisor, setSelectedSupervisor] = useState<SupportFunction | null>(null);
 
     // Modal states
     const [isStyleModalOpen, setIsStyleModalOpen] = useState(false);
@@ -80,18 +81,30 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                         getDocs(collection(db, 'breaks'))
                     ]);
 
-                setProductionLines(linesSnap.docs.map(doc => ({
+                const lines = linesSnap.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
-                } as ProductionLine)));
+                } as ProductionLine));
+                setProductionLines(lines);
 
-                setSupervisors(supportSnap.docs
+                const sups = supportSnap.docs
                     .filter(doc => doc.data().role === 'Supervisor')
                     .map(doc => ({
                         id: doc.id,
                         ...doc.data()
-                    } as SupportFunction))
-                );
+                    } as SupportFunction));
+                setSupervisors(sups);
+
+                // Set selected line and supervisor from props
+                const line = lines.find(l => l.id === selectedLineId);
+                const supervisor = sups.find(s => s.id === selectedSupervisorId);
+
+                if (line) {
+                    setSelectedLine(line.name);
+                }
+                if (supervisor) {
+                    setSelectedSupervisor(supervisor);
+                }
 
                 setStyles(stylesSnap.docs.map(doc => ({
                     id: doc.id,
@@ -122,9 +135,9 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
         };
 
         fetchInitialData();
-    }, []);
+    }, [selectedLineId, selectedSupervisorId]);
 
-// Time table loading effect
+    // Time table loading effect
     useEffect(() => {
         if (selectedLineId) {
             const selectedTimeTable = timeTables.find(tt => tt.lineId === selectedLineId) ||
@@ -140,7 +153,6 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
             }
         }
     }, [selectedLineId, timeTables, selectedLine]);
-
     // Clock update effect
     useEffect(() => {
         const interval = setInterval(() => {
@@ -176,8 +188,8 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
     };
 
     const handleLoadBoard = async () => {
-        if (!selectedLine || !selectedSupervisor || !selectedStyle) {
-            setError('Please select all required fields');
+        if (!selectedStyle) {
+            setError('Please select style');
             return;
         }
 
@@ -330,45 +342,7 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
         <div className="production-tracking">
             {!sessionData ? (
                 <div className="form-group">
-                    <h1>Production Board Setup</h1>
-
-                    <label>
-                        Select Line:
-                        <select
-                            value={selectedLine}
-                            onChange={(e) => {
-                                const line = productionLines.find(l => l.name === e.target.value);
-                                setSelectedLine(e.target.value);
-                                setSelectedLineId(line?.id || '');
-                            }}
-                        >
-                            <option value="">Select a Line</option>
-                            {productionLines.map((line) => (
-                                <option key={line.id} value={line.name}>
-                                    {line.name}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-
-                    <label>
-                        Supervisor:
-                        <select
-                            value={selectedSupervisor?.id || ''}
-                            onChange={(e) => {
-                                const supervisor = supervisors.find(s => s.id === e.target.value);
-                                setSelectedSupervisor(supervisor || null);
-                            }}
-                        >
-                            <option value="">Select a Supervisor</option>
-                            {supervisors.map((sup) => (
-                                <option key={sup.id} value={sup.id}>
-                                    {sup.name} {sup.surname}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-
+                    <h1>Select Style</h1>
                     <label>
                         Select Style:
                         <select
@@ -453,8 +427,8 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                                                 {slot.startTime} - {slot.endTime}
                                                 {breakInfo && (
                                                     <span className="break-indicator">
-                                                            ({breakInfo.breakType} - {breakInfo.duration}min)
-                                                        </span>
+                                                        ({breakInfo.breakType} - {breakInfo.duration}min)
+                                                    </span>
                                                 )}
                                             </td>
                                             <td>{target}</td>
