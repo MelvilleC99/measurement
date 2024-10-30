@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, serverTimestamp, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../../../firebase';
 import { ReworkFormData, ReworkProps } from '../types';
 import './Rework.css';
@@ -69,7 +69,7 @@ const Rework: React.FC<ReworkProps> = ({ onClose, onSubmit, productionLineId, su
 
     const handleConfirm = async () => {
         try {
-            // Updated QC verification query with correct field names
+            // Verify QC credentials
             const qcSnapshot = await getDocs(query(
                 collection(db, 'supportFunctions'),
                 where('employeeNumber', '==', selectedQc),
@@ -79,11 +79,10 @@ const Rework: React.FC<ReworkProps> = ({ onClose, onSubmit, productionLineId, su
 
             if (qcSnapshot.empty) {
                 setError('Invalid QC credentials. Please check the QC ID and password.');
-                console.log('Debug - Selected QC:', selectedQc); // Debug log
                 return;
             }
 
-            // Prepare rework data
+            // Prepare rework data with `status` included
             const reworkData: ReworkFormData = {
                 reason,
                 operation,
@@ -91,13 +90,26 @@ const Rework: React.FC<ReworkProps> = ({ onClose, onSubmit, productionLineId, su
                 qcId: selectedQc,
                 count,
                 productionLineId,
-                supervisorId
+                supervisorId,
+                createdAt: new Date(), // Local creation time
+                status: 'open', // Status is required here
             };
 
-            // Call onSubmit prop with reworkData
-            await onSubmit(reworkData);
+            // Add new document to Firestore and get its ID
+            const docRef = await addDoc(collection(db, 'reworks'), {
+                ...reworkData,
+                createdAt: serverTimestamp(), // Use server timestamp for createdAt
+            });
 
-            // Reset form
+            // Generate itemId from the last 4 characters of the document ID
+            const itemId = docRef.id.slice(-4);
+
+            // Update Firestore document with the generated itemId
+            await updateDoc(doc(db, 'reworks', docRef.id), {
+                itemId,
+            });
+
+            // Reset form fields and close the modal
             setReason('');
             setOperation('');
             setComments('');

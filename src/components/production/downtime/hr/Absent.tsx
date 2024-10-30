@@ -1,141 +1,303 @@
-import React, { useState } from 'react';
-import './Absent.css';
-import { AbsentFormData } from '../types'; // Corrected path
+import React, { useState, useEffect } from 'react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../../../../firebase';
+import { AbsentFormData } from '../types';
 import { SupportFunction } from '../../../../types';
+import './Absent.css';
 
 interface AbsentProps {
     onClose: () => void;
-    onSubmit: (absentData: AbsentFormData) => Promise<void>;
+    onSubmit: (data: AbsentFormData) => Promise<void>;
     productionLineId: string;
-    supervisorId: string;
 }
 
-const Absent: React.FC<AbsentProps> = ({ onClose, onSubmit, productionLineId, supervisorId }) => {
-    const [employeeId, setEmployeeId] = useState<string>('');
-    const [reason, setReason] = useState<string>('');
-    const [startDate, setStartDate] = useState<Date>(new Date());
-    const [endDate, setEndDate] = useState<Date>(new Date());
-    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
+interface Employee {
+    employeeId: string;
+    name: string;
+    surname: string;
+    employeeNumber: string;
+    department?: string;
+}
+
+const Absent: React.FC<AbsentProps> = ({
+                                           onClose,
+                                           onSubmit,
+                                           productionLineId
+                                       }) => {
+    // State for employee search and selection
+    const [searchTerm, setSearchTerm] = useState<string>('');
+    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
+    const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+
+    // Supervisor selection state
+    const [selectedSupervisor, setSelectedSupervisor] = useState<SupportFunction | null>(null);
+    const [password, setPassword] = useState<string>('');
+    const [supervisors, setSupervisors] = useState<SupportFunction[]>([]);
+
+    // UI state
     const [error, setError] = useState<string>('');
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
 
-    // Handle form submission
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-
-        if (!employeeId || !reason || !startDate || !endDate) {
-            setError('Please fill in all required fields.');
-            return;
-        }
-
-        if (endDate < startDate) {
-            setError('End date cannot be before start date.');
-            return;
-        }
-
-        setIsConfirmModalOpen(true);
-    };
-
-    // Handle confirmation
-    const handleConfirm = async () => {
-        const absentData: AbsentFormData = {
-            employeeId,
-            reason,
-            startDate,
-            endDate,
-            productionLineId,
-            supervisorId
+    useEffect(() => {
+        const fetchEmployees = async () => {
+            try {
+                setIsLoading(true);
+                const employeesSnapshot = await getDocs(collection(db, 'supportFunctions'),);
+                const fetchedEmployees = employeesSnapshot.docs.map(doc => ({
+                    employeeId: doc.id,
+                    ...doc.data() as Omit<Employee, 'employeeId'>
+                }));
+                setEmployees(fetchedEmployees);
+            } catch (err) {
+                console.error('Error fetching employees:', err);
+                setError('Failed to load employees');
+            } finally {
+                setIsLoading(false);
+            }
         };
 
+        const fetchSupervisors = async () => {
+            try {
+                const supportFunctionsRef = collection(db, 'supportFunctions');
+                const q = query(
+                    supportFunctionsRef,
+                    where('role', '==', 'Supervisor'),
+                    where('hasPassword', '==', true)
+                );
+
+                const querySnapshot = await getDocs(q);
+                const supervisorsList = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                } as SupportFunction));
+
+                setSupervisors(supervisorsList);
+            } catch (err) {
+                console.error('Error in fetchSupervisors:', err);
+                setError('Failed to fetch supervisors');
+            }
+        };
+
+        fetchEmployees();
+        fetchSupervisors();
+    }, []);
+
+    useEffect(() => {
+        const filtered = employees.filter(emp => {
+            const fullName = `${emp.name} ${emp.surname}`.toLowerCase();
+            const searchLower = searchTerm.toLowerCase();
+            return fullName.includes(searchLower) ||
+                emp.employeeNumber.includes(searchLower);
+        });
+        setFilteredEmployees(filtered);
+    }, [searchTerm, employees]);
+
+    const handleEmployeeSelect = (employee: Employee) => {
+        setSelectedEmployee(employee);
+        setSearchTerm('');
+    };
+
+    const handleResolveClick = () => {
+        setIsConfirmModalOpen(true);
+        setError('');
+    };
+
+    const handlePasswordSubmit = async () => {
+        if (!selectedSupervisor || !password) {
+            setError('Please select a supervisor and enter password');
+            return;
+        }
+
         try {
+            const supervisorQuery = query(
+                collection(db, 'supportFunctions'),
+                where('employeeNumber', '==', selectedSupervisor.employeeNumber),
+                where('password', '==', password),
+                where('role', '==', 'Supervisor'),
+                where('hasPassword', '==', true)
+            );
+
+            const supervisorSnapshot = await getDocs(supervisorQuery);
+
+            if (supervisorSnapshot.empty) {
+                setError('Invalid supervisor credentials');
+                return;
+            }
+
+            if (!selectedEmployee) return;
+
+            const absentData: AbsentFormData = {
+                employeeId: selectedEmployee.employeeId,
+                reason: 'absent',
+                startDate: new Date(),
+                endDate: new Date(),
+                productionLineId,
+                supervisorId: selectedSupervisor.id,
+                type: 'absent',
+                status: 'open'
+            };
+
             await onSubmit(absentData);
-            setEmployeeId('');
-            setReason('');
-            setStartDate(new Date());
-            setEndDate(new Date());
-            setIsConfirmModalOpen(false);
-            alert('Absence logged successfully.');
+            onClose();
         } catch (err) {
-            console.error('Error submitting absence:', err);
-            setError('Failed to log absence.');
+            console.error('Error in handlePasswordSubmit:', err);
+            setError('Failed to submit absent record');
         }
     };
+
+    const handleClose = () => {
+        setIsConfirmModalOpen(false);
+        setPassword('');
+        setSelectedSupervisor(null);
+        setError('');
+    };
+
+    if (isLoading) {
+        return (
+            <div className="modal-overlay">
+                <div className="modal-content">
+                    <div className="loading-state">Loading...</div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="modal-overlay">
             <div className="modal-content">
-                <h2>Log Absence</h2>
-                {error && <p className="error-message">{error}</p>}
-                <form onSubmit={handleSubmit} className="absent-form">
-                    <label>
-                        Employee ID:
-                        <input
-                            type="text"
-                            value={employeeId}
-                            onChange={(e) => setEmployeeId(e.target.value)}
-                            required
-                        />
-                    </label>
-                    <label>
-                        Start Date:
-                        <input
-                            type="date"
-                            value={startDate.toISOString().split('T')[0]}
-                            onChange={(e) => setStartDate(new Date(e.target.value))}
-                            required
-                        />
-                    </label>
-                    <label>
-                        End Date:
-                        <input
-                            type="date"
-                            value={endDate.toISOString().split('T')[0]}
-                            onChange={(e) => setEndDate(new Date(e.target.value))}
-                            min={startDate.toISOString().split('T')[0]}
-                            required
-                        />
-                    </label>
-                    <label>
-                        Reason:
-                        <textarea
-                            value={reason}
-                            onChange={(e) => setReason(e.target.value)}
-                            required
-                        />
-                    </label>
-                    <div className="form-buttons">
-                        <button type="submit" className="submit-button">
-                            Log Absence
-                        </button>
-                        <button type="button" onClick={onClose} className="cancel-button">
-                            Cancel
+                <div className="modal-header">
+                    <h2>Log Absence</h2>
+                    <button
+                        onClick={onClose}
+                        className="close-button"
+                    >
+                        ×
+                    </button>
+                </div>
+
+                {error && (
+                    <div className="error-message">
+                        {error}
+                        <button onClick={() => setError('')} className="error-dismiss">
+                            ×
                         </button>
                     </div>
-                </form>
+                )}
+
+                {!selectedEmployee ? (
+                    <div className="search-section">
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Search by name or employee number..."
+                            className="search-input"
+                        />
+
+                        <div className="employee-list">
+                            {filteredEmployees.map(emp => (
+                                <div
+                                    key={emp.employeeId}
+                                    className="employee-item"
+                                    onClick={() => handleEmployeeSelect(emp)}
+                                >
+                                    <span className="employee-name">
+                                        {emp.name} {emp.surname}
+                                    </span>
+                                    <span className="employee-number">
+                                        {emp.employeeNumber}
+                                    </span>
+                                </div>
+                            ))}
+                            {filteredEmployees.length === 0 && searchTerm && (
+                                <div className="no-results">
+                                    No employees found
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <form onSubmit={(e) => { e.preventDefault(); handleResolveClick(); }} className="absent-form">
+                        <div className="selected-employee-info">
+                            <h3>Selected Employee</h3>
+                            <p>{selectedEmployee.name} {selectedEmployee.surname}</p>
+                            <p>Employee #: {selectedEmployee.employeeNumber}</p>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedEmployee(null)}
+                                className="change-employee-button"
+                            >
+                                Change Employee
+                            </button>
+                        </div>
+
+                        <div className="form-buttons">
+                            <button type="submit" className="submit-button">
+                                Submit
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="cancel-button"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                )}
 
                 {isConfirmModalOpen && (
-                    <div className="modal-overlay">
-                        <div className="modal-content">
-                            <h3>Confirm Absence</h3>
-                            <p>Please confirm absence details:</p>
-                            <div className="confirmation-details">
-                                <p>Employee ID: {employeeId}</p>
-                                <p>Start Date: {startDate.toLocaleDateString()}</p>
-                                <p>End Date: {endDate.toLocaleDateString()}</p>
-                                <p>Reason: {reason}</p>
+                    <div className="confirmation-modal">
+                        <div className="confirmation-content">
+                            <div className="modal-header">
+                                <h3>Supervisor Verification</h3>
+                                <button className="close-button" onClick={handleClose}>×</button>
                             </div>
-                            <div className="modal-buttons">
-                                <button onClick={handleConfirm} className="submit-button">
+                            <div className="form-group">
+                                <label className="form-label">Select Supervisor:</label>
+                                <select
+                                    value={selectedSupervisor?.id || ''}
+                                    onChange={(e) => {
+                                        const supervisor = supervisors.find(s => s.id === e.target.value);
+                                        setSelectedSupervisor(supervisor || null);
+                                    }}
+                                    className="form-input"
+                                    required
+                                >
+                                    <option value="">Select Supervisor</option>
+                                    {supervisors.map((supervisor) => (
+                                        <option
+                                            key={supervisor.id}
+                                            value={supervisor.id}
+                                        >
+                                            {`${supervisor.name} ${supervisor.surname}`}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Password:</label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="form-input"
+                                    placeholder="Enter supervisor password"
+                                    required
+                                />
+                            </div>
+
+                            <div className="confirmation-buttons">
+                                <button onClick={handlePasswordSubmit} className="confirm-button">
                                     Confirm
                                 </button>
-                                <button
-                                    onClick={() => setIsConfirmModalOpen(false)}
-                                    className="cancel-button"
-                                >
-                                    Cancel
+                                <button onClick={handleClose} className="cancel-button">
+                                    Close
                                 </button>
                             </div>
-                            {error && <p className="error-message">{error}</p>}
                         </div>
                     </div>
                 )}

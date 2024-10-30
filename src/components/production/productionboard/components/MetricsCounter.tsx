@@ -1,283 +1,363 @@
-// src/components/production/productionboard/components/MetricsCounter.tsx
-
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, DocumentData } from 'firebase/firestore';
 import { db } from '../../../../firebase';
-import { ReworkItem, RejectRecord } from '../../downtime/types';
+import RejectUpdate from '../../downtime/reject/RejectUpdate';
 import ReworkUpdate from '../../downtime/rework/ReworkUpdate';
-import './MetricsCounter.css';
+import AbsentUpdate from '../../downtime/hr/AbsentUpdate';
+import LateUpdate from '../../downtime/hr/LateUpdate';
 
 interface MetricsCounterProps {
-    sessionId: string | undefined;
-    metrics: {
-        rejects: number;
-        reworks: number;
-        late: number;
-        absent: number;
-    };
+    sessionId: string;
+    lineId: string;
+    supervisorId: string;
+}
+
+interface EventCounts {
+    rejects: number;
+    reworks: number;
+    late: number;
+    absent: number;
 }
 
 interface EventRecord {
     id: string;
     type: 'reject' | 'rework' | 'late' | 'absent';
     createdAt: Timestamp;
-    description: string;
+    updatedAt: Timestamp;
+    status: string;
     count?: number;
-    operator?: string;
     reason?: string;
-    status?: string;
+    comments?: string;
+    employeeName?: string;
+    employeeNumber?: string;
 }
 
-// Helper function for timestamp conversion
-const convertTimestampToDate = (timestamp: Timestamp): Date => {
-    return timestamp.toDate();
-};
+type EventType = 'reject' | 'rework' | 'late' | 'absent';
+type UpdateModalType = EventType | null;
 
-const MetricsCounter: React.FC<MetricsCounterProps> = ({ sessionId, metrics }) => {
+const MetricsCounter: React.FC<MetricsCounterProps> = ({
+                                                           sessionId,
+                                                           lineId,
+                                                           supervisorId,
+                                                       }) => {
+    // State Management
+    const [counts, setCounts] = useState<EventCounts>({
+        rejects: 0,
+        reworks: 0,
+        late: 0,
+        absent: 0,
+    });
     const [recentEvents, setRecentEvents] = useState<EventRecord[]>([]);
-    const [error, setError] = useState<string>('');
-    const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-    const [selectedType, setSelectedType] = useState<'reject' | 'rework' | 'late' | 'absent' | null>(null);
-    const [modalEvents, setModalEvents] = useState<EventRecord[]>([]);
-    const [isReworkUpdateOpen, setIsReworkUpdateOpen] = useState<boolean>(false);
-    const [currentMetrics, setCurrentMetrics] = useState(metrics);
+    const [activeUpdateModal, setActiveUpdateModal] = useState<UpdateModalType>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [showEventDetails, setShowEventDetails] = useState(false);
 
-    const fetchRecentEvents = async () => {
-        if (!sessionId) return;
-
+    // Fetch Functions
+    const fetchCounts = async () => {
         try {
-            // Fetch rejects including those converted from reworks
-            const rejectsSnap = await getDocs(query(
-                collection(db, 'rejects'),
-                where('sessionId', '==', sessionId)
-            ));
+            setError(null);
+            const [rejects, reworks, late, absent] = await Promise.all([
+                fetchRejectCount(),
+                fetchReworkCount(),
+                fetchLateCount(),
+                fetchAbsentCount(),
+            ]);
 
-            // Fetch only open reworks
-            const reworksSnap = await getDocs(query(
-                collection(db, 'reworks'),
-                where('sessionId', '==', sessionId),
-                where('status', '==', 'Open')
-            ));
-
-            const attendanceSnap = await getDocs(query(
-                collection(db, 'attendance'),
-                where('sessionId', '==', sessionId)
-            ));
-
-            // Process reject records
-            const rejectEvents: EventRecord[] = rejectsSnap.docs.map(doc => {
-                const data = doc.data() as RejectRecord;
-                return {
-                    id: doc.id,
-                    type: 'reject',
-                    createdAt: data.createdAt,
-                    description: data.comments || '',
-                    count: data.count,
-                    reason: data.reason,
-                    operator: 'QC'
-                };
+            setCounts({
+                rejects,
+                reworks,
+                late,
+                absent,
             });
 
-            // Process rework records - only include open ones
-            const reworkEvents: EventRecord[] = reworksSnap.docs.map(doc => {
-                const data = doc.data() as ReworkItem;
-                return {
-                    id: doc.id,
-                    type: 'rework',
-                    createdAt: data.createdAt,
-                    description: data.comments || '',
-                    count: data.count,
-                    reason: data.reason,
-                    operator: 'QC',
-                    status: data.status
-                };
-            });
-
-            // Process attendance records
-            const attendanceEvents: EventRecord[] = attendanceSnap.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    type: data.type as 'late' | 'absent',
-                    createdAt: data.createdAt,
-                    description: data.reason || '',
-                    operator: data.employeeName || ''
-                };
-            });
-
-            // Combine and sort all events
-            const allEvents = [...rejectEvents, ...reworkEvents, ...attendanceEvents]
-                .sort((a, b) => b.createdAt.seconds - a.createdAt.seconds);
-
-            setRecentEvents(allEvents);
-
-            // Update metrics based on current counts
-            setCurrentMetrics({
-                rejects: rejectEvents.length,
-                reworks: reworkEvents.length, // Only open reworks
-                late: metrics.late,
-                absent: metrics.absent
-            });
-        } catch (error) {
-            setError('Failed to fetch recent events');
-            console.error(error);
+            await fetchAllEvents();
+        } catch (err) {
+            console.error('Error fetching counts:', err);
+            setError('Failed to update counts');
+        } finally {
+            setIsLoading(false);
         }
     };
 
+    const fetchRejectCount = async (): Promise<number> => {
+        try {
+            const rejectsQuery = query(
+                collection(db, 'rejects'),
+                where('sessionId', '==', sessionId),
+                where('status', '==', 'open')
+            );
+            const snapshot = await getDocs(rejectsQuery);
+            return snapshot.size;
+        } catch (error) {
+            console.error('Error fetching reject count:', error);
+            return 0; // Return 0 on failure to prevent breaking the app
+        }
+    };
+
+    const fetchReworkCount = async (): Promise<number> => {
+        try {
+            const reworksQuery = query(
+                collection(db, 'reworks'),
+                where('sessionId', '==', sessionId),
+                where('status', '==', 'open')
+            );
+            const snapshot = await getDocs(reworksQuery);
+            console.log('Fetched rework count:', snapshot.size); // Debugging log
+            return snapshot.size;
+        } catch (error) {
+            console.error('Error fetching rework count:', error);
+            return 0; // Return 0 on failure to prevent breaking the app
+        }
+    };
+
+    const fetchLateCount = async (): Promise<number> => {
+        try {
+            const lateQuery = query(
+                collection(db, 'attendance'),
+                where('sessionId', '==', sessionId),
+                where('type', '==', 'late'),
+                where('status', '==', 'late')
+            );
+            const snapshot = await getDocs(lateQuery);
+            return snapshot.size;
+        } catch (error) {
+            console.error('Error fetching late count:', error);
+            return 0; // Return 0 on failure to prevent breaking the app
+        }
+    };
+
+    const fetchAbsentCount = async (): Promise<number> => {
+        try {
+            const absentQuery = query(
+                collection(db, 'absent'),
+                where('sessionId', '==', sessionId),
+                where('returned', '==', false)
+            );
+            const snapshot = await getDocs(absentQuery);
+            return snapshot.size;
+        } catch (error) {
+            console.error('Error fetching absent count:', error);
+            return 0; // Return 0 on failure to prevent breaking the app
+        }
+    };
+
+    const fetchAllEvents = async () => {
+        try {
+            const [rejectsData, reworksData, lateData, absentData] = await Promise.all([
+                fetchRejectsData(),
+                fetchReworksData(),
+                fetchLateData(),
+                fetchAbsentData(),
+            ]);
+
+            const allEvents = [
+                ...processEvents(rejectsData, 'reject'),
+                ...processEvents(reworksData, 'rework'),
+                ...processEvents(lateData, 'late'),
+                ...processEvents(absentData, 'absent'),
+            ].sort((a, b) => b.createdAt.seconds - a.createdAt.seconds);
+
+            setRecentEvents(allEvents);
+        } catch (err) {
+            console.error('Error fetching events:', err);
+            setError('Failed to fetch event details');
+        }
+    };
+
+    const fetchRejectsData = async (): Promise<DocumentData[]> => {
+        const rejectsQuery = query(
+            collection(db, 'rejects'),
+            where('sessionId', '==', sessionId)
+        );
+        const snapshot = await getDocs(rejectsQuery);
+        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    };
+
+    const fetchReworksData = async (): Promise<DocumentData[]> => {
+        const reworksQuery = query(
+            collection(db, 'reworks'),
+            where('sessionId', '==', sessionId)
+        );
+        const snapshot = await getDocs(reworksQuery);
+        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    };
+
+    const fetchLateData = async (): Promise<DocumentData[]> => {
+        const lateQuery = query(
+            collection(db, 'attendance'),
+            where('sessionId', '==', sessionId),
+            where('type', '==', 'late')
+        );
+        const snapshot = await getDocs(lateQuery);
+        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    };
+
+    const fetchAbsentData = async (): Promise<DocumentData[]> => {
+        const absentQuery = query(
+            collection(db, 'absent'),
+            where('sessionId', '==', sessionId)
+        );
+        const snapshot = await getDocs(absentQuery);
+        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    };
+
+    const processEvents = (events: DocumentData[], type: EventType): EventRecord[] => {
+        return events.map((event) => ({
+            id: event.id,
+            type,
+            createdAt: event.createdAt,
+            updatedAt: event.updatedAt,
+            status: event.status,
+            count: event.count,
+            reason: event.reason,
+            comments: event.comments,
+            employeeName: event.employeeName,
+            employeeNumber: event.employeeNumber,
+        }));
+    };
+
+    // Effect Hooks
     useEffect(() => {
-        fetchRecentEvents();
-        const interval = setInterval(fetchRecentEvents, 30000);
+        fetchCounts();
+        const interval = setInterval(fetchCounts, 30000);
         return () => clearInterval(interval);
     }, [sessionId]);
 
-    // Handle rework update completion
-    const handleReworkUpdateClose = () => {
-        setIsReworkUpdateOpen(false);
-        fetchRecentEvents(); // Refresh data immediately after rework update
+    // Event Handlers
+    const handleCounterClick = (type: EventType) => {
+        setActiveUpdateModal(type);
+        setShowEventDetails(true);
     };
 
-    const getEventColor = (type: string): string => {
+    const handleCloseModal = () => {
+        setActiveUpdateModal(null);
+        setShowEventDetails(false);
+        fetchCounts();
+    };
+
+    const getCounterClass = (type: EventType): string => {
         switch (type) {
             case 'reject':
-                return 'bg-red-100 border-red-500';
+                return 'border-red-200 bg-red-100 hover:bg-red-200';
             case 'rework':
-                return 'bg-yellow-100 border-yellow-500';
+                return 'border-yellow-200 bg-yellow-100 hover:bg-yellow-200';
             case 'late':
-                return 'bg-orange-100 border-orange-500';
+                return 'border-orange-200 bg-orange-100 hover:bg-orange-200';
             case 'absent':
-                return 'bg-purple-100 border-purple-500';
-            default:
-                return 'bg-gray-100 border-gray-500';
+                return 'border-purple-200 bg-purple-100 hover:bg-purple-200';
         }
     };
 
-    const handleBoxClick = (type: 'reject' | 'rework' | 'late' | 'absent') => {
-        setSelectedType(type);
-        const filtered = recentEvents.filter(event => event.type === type);
-        setModalEvents(filtered);
-        if (type === 'rework') {
-            setIsReworkUpdateOpen(true);
-        } else {
-            setIsModalOpen(true);
-        }
-    };
-
-    const closeModal = () => {
-        setIsModalOpen(false);
-        setSelectedType(null);
-        setModalEvents([]);
-    };
+    if (isLoading) {
+        return (
+            <div className="flex justify-center items-center p-4">
+                <div className="loading-spinner">Loading metrics...</div>
+            </div>
+        );
+    }
 
     return (
-        <div className="metrics-counter">
-            {/* Counter Boxes */}
-            <div className="counters-grid">
-                <div
-                    className={`counter-box reject-counter`}
-                    onClick={() => handleBoxClick('reject')}
-                >
-                    <h3>Rejects</h3>
-                    <span className="counter-value">{currentMetrics.rejects}</span>
+        <div className="p-6">
+            {error && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+                    {error}
+                    <button
+                        onClick={() => setError(null)}
+                        className="absolute top-0 right-0 px-4 py-3"
+                    >
+                        ×
+                    </button>
                 </div>
+            )}
 
-                <div
-                    className={`counter-box rework-counter`}
-                    onClick={() => handleBoxClick('rework')}
-                >
-                    <h3>Reworks</h3>
-                    <span className="counter-value">{currentMetrics.reworks}</span>
-                </div>
-
-                <div
-                    className={`counter-box late-counter`}
-                    onClick={() => handleBoxClick('late')}
-                >
-                    <h3>Late</h3>
-                    <span className="counter-value">{currentMetrics.late}</span>
-                </div>
-
-                <div
-                    className={`counter-box absent-counter`}
-                    onClick={() => handleBoxClick('absent')}
-                >
-                    <h3>Absent</h3>
-                    <span className="counter-value">{currentMetrics.absent}</span>
-                </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                {Object.entries(counts).map(([type, count]) => (
+                    <div
+                        key={type}
+                        className={`cursor-pointer p-6 rounded-lg border transition-colors ${getCounterClass(type as EventType)}`}
+                        onClick={() => handleCounterClick(type as EventType)}
+                    >
+                        <h3 className="text-lg font-semibold capitalize text-center">{type}</h3>
+                        <span className="text-3xl font-bold text-center block mt-2">{count}</span>
+                    </div>
+                ))}
             </div>
 
-            {/* Popup Modal */}
-            {isModalOpen && selectedType && (
-                <div className="modal-overlay" onClick={closeModal}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2>
-                                {selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} Events
-                            </h2>
-                            <button className="modal-close-button" onClick={closeModal}>
-                                &times;
-                            </button>
-                        </div>
-                        <div className="modal-body">
-                            {modalEvents.length > 0 ? (
-                                modalEvents.map(event => (
-                                    <div
-                                        key={event.id}
-                                        className={`event-item ${getEventColor(event.type)}`}
-                                    >
-                                        <div className="event-header">
-                                            <span className="event-type">
-                                                {event.type.charAt(0).toUpperCase() + event.type.slice(1)}
-                                            </span>
-                                            <span className="event-time">
-                                                {convertTimestampToDate(event.createdAt).toLocaleString()}
-                                            </span>
-                                        </div>
-                                        {event.count !== undefined && (
-                                            <div className="event-count">
-                                                Count: {event.count}
-                                            </div>
-                                        )}
-                                        {event.reason && (
-                                            <div className="event-reason">
-                                                Reason: {event.reason}
-                                            </div>
-                                        )}
-                                        {event.description && (
-                                            <div className="event-description">
-                                                Description: {event.description}
-                                            </div>
-                                        )}
-                                        {event.operator && (
-                                            <div className="event-operator">
-                                                By: {event.operator}
-                                            </div>
-                                        )}
+            {showEventDetails && recentEvents.length > 0 && activeUpdateModal && (
+                <div className="mt-6">
+                    <h3 className="text-lg font-semibold mb-4">
+                        Recent {activeUpdateModal} Events
+                    </h3>
+                    <div className="space-y-4">
+                        {recentEvents
+                            .filter((event) => event.type === activeUpdateModal)
+                            .map((event) => (
+                                <div
+                                    key={event.id}
+                                    className="p-4 bg-white rounded-lg shadow border"
+                                >
+                                    <div className="flex justify-between">
+                                        <span className="font-medium">
+                                            {event.employeeName || event.reason || 'No description'}
+                                        </span>
+                                        <span className="text-gray-500">
+                                            {event.createdAt.toDate().toLocaleDateString()}
+                                        </span>
                                     </div>
-                                ))
-                            ) : (
-                                <p>No events to display.</p>
-                            )}
-                        </div>
+                                    {event.count && (
+                                        <div className="text-sm text-gray-600">
+                                            Count: {event.count}
+                                        </div>
+                                    )}
+                                    {event.comments && (
+                                        <div className="text-sm text-gray-600">
+                                            {event.comments}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
                     </div>
                 </div>
             )}
 
-            {/* Rework Update Modal */}
-            {isReworkUpdateOpen && (
-                <ReworkUpdate
-                    onClose={handleReworkUpdateClose}
+            {activeUpdateModal === 'reject' && (
+                <RejectUpdate
+                    onClose={handleCloseModal}
+                    onUpdate={fetchCounts}
+                    lineId={lineId}
+                    supervisorId={supervisorId}
+                    sessionId={sessionId}
                 />
             )}
 
-            {/* Error Message */}
-            {error && (
-                <div className="error-message">
-                    {error}
-                    <button onClick={() => setError('')} className="error-dismiss-button">✕</button>
-                </div>
+            {activeUpdateModal === 'rework' && (
+                <ReworkUpdate
+                    onClose={handleCloseModal}
+                />
+            )}
+
+            {activeUpdateModal === 'late' && (
+                <LateUpdate
+                    onClose={handleCloseModal}
+                    onUpdate={fetchCounts}
+                    lineId={lineId}
+                    supervisorId={supervisorId}
+                    sessionId={sessionId}
+                />
+            )}
+
+            {activeUpdateModal === 'absent' && (
+                <AbsentUpdate
+                    onClose={handleCloseModal}
+                    onUpdate={fetchCounts}
+                    lineId={lineId}
+                    supervisorId={supervisorId}
+                    sessionId={sessionId}
+                />
             )}
         </div>
     );
-}
+};
 
 export default MetricsCounter;

@@ -12,6 +12,8 @@ export interface LateFormData {
     productionLineId: string;
     supervisorId: string;
     comments?: string;
+    type: 'late',
+    status: 'open'
 }
 
 // ------------------------
@@ -42,3 +44,10 @@ export interface LateRecord {
     updatedAt: Timestamp;
 }
 
+// LateUpdate props
+interface LateUpdateProps {
+    onClose: () => void;
+    lineId: string;
+    supervisorId: string;
+    onSubmit: () => Promise<void>;
+}

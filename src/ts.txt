@@ -1,0 +1,456 @@
+// src/types/downtime/AbsentType.ts
+
+import { Timestamp } from 'firebase/firestore';
+
+// ------------------------
+// Form Data Interfaces
+// ------------------------
+
+export interface AbsentFormData {
+    employeeId: string;
+    reason?: string;
+    startDate: Date;
+    endDate: Date;
+    productionLineId: string;
+    supervisorId: string;
+}
+
+// ------------------------
+// Component Props Interfaces
+// ------------------------
+
+export interface AbsentProps {
+    onClose: () => void;
+    onSubmit: (data: AbsentFormData) => Promise<void>;
+    productionLineId: string;
+    supervisorId: string;
+}
+
+// ------------------------
+// Document Interfaces
+// ------------------------
+
+export interface AbsentRecord {
+    id: string;
+    employeeId: string;
+    reason?: string;
+    startDate: Date;
+    endDate: Date;
+    productionLineId: string;
+    supervisorId: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}
+
+import { Timestamp } from 'firebase/firestore';
+
+/**
+ * Interface for all downtime types
+ */
+export interface Downtime {
+    id: string;
+    type: 'reject' | 'rework' | 'late' | 'absent' | 'machine' | 'supply' | 'style' | 'generic';
+    category: string;
+    machine?: string;
+    supplier?: string;
+    supplyId?: string;
+    employeeId: string;
+    createdAt: Timestamp;
+    productionLineId: string;
+    reason: string;
+    startTime: Timestamp;
+    status:
+        | 'Open'
+        | 'Closed'
+        | 'In Progress'
+        | 'Booked Out'
+        | 'Booked In'
+        | 'Rejected'
+        | 'InProgress'
+        | 'Completed'
+        | 'arrived'
+        | 'absent'
+        | 'Mechanic Received'
+        | 'Resolved';
+    supervisorId: string;
+    updatedAt: Timestamp;
+    currentStyle?: string;
+    nextStyle?: string;
+    target?: string;
+    endTime?: Timestamp;
+    comments?: string;
+    mechanicId?: string;
+    qcId?: string;
+    mechanicReceivedTime?: Timestamp;
+    confirmedAt?: Timestamp;
+    movedToAbsentAt?: Timestamp;
+    sessionId?: string;
+    refNumber?: string;
+    progressSteps?: {
+        machineSetupComplete: boolean;
+        peopleAllocated: boolean;
+        firstUnitOffLine: boolean;
+        qcApproved: boolean;
+    };
+}
+
+
+/**
+ * Extended interface including the ID (alias for convenience if needed)
+ */
+export interface DowntimeWithId extends Downtime {}
+
+// src/types/downtime/index.ts
+
+export * from './Downtime';
+export * from './AbsentType';
+export * from './LateType';
+export * from './MachineType';
+export * from './RejectType';
+export * from './ReworkType';
+export * from './StyleChangeoverType';
+export * from './SupplyType';
+
+import { Timestamp } from 'firebase/firestore';
+
+// ------------------------
+// Form Data Interfaces
+// ------------------------
+
+export interface LateFormData {
+    employeeId: string;
+    reason?: string;
+    date: Date;
+    time: string;
+    productionLineId: string;
+    supervisorId: string;
+    comments?: string;
+}
+
+// ------------------------
+// Component Props Interfaces
+// ------------------------
+
+export interface LateProps {
+    onClose: () => void;
+    onSubmit: (data: LateFormData) => Promise<void>;
+    productionLineId: string;
+    supervisorId: string;
+}
+
+// ------------------------
+// Document Interfaces
+// ------------------------
+
+export interface LateRecord {
+    id: string;
+    employeeId: string;
+    reason?: string;
+    date: Date;
+    time: string;
+    productionLineId: string;
+    supervisorId: string;
+    comments?: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}
+
+// src/types/downtime/MachineType.ts
+
+import { Timestamp } from 'firebase/firestore';
+import { SupportFunction } from '../../../../types'; // Import from src/types.ts
+
+// ------------------------
+// Form Data Interfaces
+// ------------------------
+
+export interface MachineFormData {
+    reason: string;
+    machineNumber: string;
+    comments: string;
+    supervisorId: string;
+    mechanicId?: string;
+    productionLineId?: string;
+}
+
+// ------------------------
+// Component Props Interfaces
+// ------------------------
+
+export interface MachineProps {
+    onClose: () => void;
+    onSubmit: (formData: MachineFormData) => Promise<void>;
+    mechanics: SupportFunction[];
+    supervisorId: string;
+    productionLineId: string;
+}
+
+// ------------------------
+// Document Interfaces
+// ------------------------
+
+export interface MachineRecord {
+    id: string;
+    reason: string;
+    machineNumber: string;
+    comments: string;
+    supervisorId: string;
+    mechanicId?: string;
+    productionLineId?: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}
+
+// ------------------------
+// Base Interfaces
+// ------------------------
+
+export interface MachineBase {
+    id: string;
+    reason: string;
+    machineNumber: string;
+    comments: string;
+    supervisorId: string;
+    mechanicId?: string;
+    productionLineId?: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}
+// src/types/downtime/RejectType.ts
+
+import { Timestamp } from 'firebase/firestore';
+import { SupportFunction } from '../../../../types'; // Adjusted import path
+
+// ------------------------
+// Form Data Interfaces
+// ------------------------
+
+export interface RejectFormData {
+    reason: string;
+    operation: string;
+    comments: string;
+    qcId: string;
+    count: number;
+    recordedAsProduced: boolean;
+    productionLineId: string;
+    supervisorId: string;
+}
+
+// ------------------------
+// Component Props Interfaces
+// ------------------------
+
+export interface RejectProps {
+    onClose: () => void;
+    onSubmit: (formData: RejectFormData) => Promise<void>;
+    productionLineId: string;
+    supervisorId: string;
+    qcs: SupportFunction[];
+}
+
+// ------------------------
+// Document Interfaces
+// ------------------------
+
+export interface RejectRecord {
+    id: string;
+    count: number;
+    reason: string;
+    operation: string;
+    recordedAsProduced: boolean;
+    qcApprovedBy: string;
+    productionLineId: string;
+    supervisorId: string;
+    comments: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}
+
+// src/types/downtime/ReworkType.ts
+
+import { Timestamp } from 'firebase/firestore';
+import { SupportFunction } from '../../../../types'; // Import from src/types.ts
+
+// ------------------------
+// Form Data Interfaces
+// ------------------------
+
+export interface ReworkFormData {
+    reason: string;
+    operation: string;
+    comments: string;
+    qcId: string;
+    count: number;
+    productionLineId: string;
+    supervisorId: string;
+}
+
+// ------------------------
+// Component Props Interfaces
+// ------------------------
+
+export interface ReworkProps {
+    onClose: () => void;
+    onSubmit: (formData: ReworkFormData) => Promise<void>;
+    productionLineId: string;
+    supervisorId: string;
+    qcs: SupportFunction[];
+}
+
+// ------------------------
+// Document Interfaces
+// ------------------------
+
+export interface ReworkItem {
+    id: string;
+    refNumber?: string;
+    count: number;
+    reason: string;
+    operation: string;
+    startTime: Timestamp;
+    endTime?: Timestamp;
+    status: 'Booked Out' | 'Booked In' | 'Rejected';
+    productionLineId: string;
+    supervisorId: string;
+    qcId: string;
+    comments: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}
+
+// ------------------------
+// Base Interfaces
+// ------------------------
+
+export interface ReworkBase {
+    id: string;
+    reason: string;
+    operation: string;
+    comments: string;
+    qcId: string;
+    count: number;
+    productionLineId: string;
+    supervisorId: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}
+// src/types/downtime/StyleChangeoverType.ts
+
+import { Timestamp } from 'firebase/firestore';
+
+// ------------------------
+// Form Data Interfaces
+// ------------------------
+
+export interface StyleChangeoverFormData {
+    currentStyle: string;
+    nextStyle: string;
+    target: string;
+    productionLineId: string;
+    supervisorId: string;
+
+}
+
+
+
+// ------------------------
+// Component Props Interfaces
+// ------------------------
+
+export interface StyleChangeProps {
+    onClose: () => void;
+    onSubmit: (formData: StyleChangeoverFormData) => Promise<void>;
+    productionLineId: string;
+    supervisorId: string;
+}
+
+// ------------------------
+// Document Interfaces
+// ------------------------
+
+export interface StyleChangeoverRecord {
+    id: string;
+    currentStyle: string;
+    nextStyle: string;
+    target: string;
+    productionLineId: string;
+    supervisorId: string;
+    password: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}
+
+// ------------------------
+// Base Interfaces
+// ------------------------
+
+export interface StyleChangeoverBase {
+    id: string;
+    currentStyle: string;
+    nextStyle: string;
+    target: string;
+    productionLineId: string;
+    supervisorId: string;
+    password: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}
+// src/components/production/downtime/types/SupplyType.ts
+
+import { Timestamp } from 'firebase/firestore';
+
+// ------------------------
+// Form Data Interfaces
+// ------------------------
+
+export interface SupplyFormData {
+    reason: string;
+    comments: string;
+    productionLineId: string;
+    supervisorId: string;
+    // Removed password as it's not needed for form submission
+}
+
+// ------------------------
+// Component Props Interfaces
+// ------------------------
+
+export interface SupplyLogProps {
+    onClose: () => void;
+    onSubmit: (formData: SupplyFormData) => Promise<void>;
+    productionLineId: string;
+    supervisorId: string;
+}
+
+// ------------------------
+// Document Interfaces
+// ------------------------
+
+export interface SupplyRecord {
+    id: string;
+    reason: string;
+    comments: string;
+    productionLineId: string;
+    supervisorId: string;
+    type: string;
+    status: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+    // Add other necessary fields if needed
+}
+
+// ------------------------
+// Base Interfaces
+// ------------------------
+
+export interface SupplyBase {
+    id: string;
+    reason: string;
+    comments: string;
+    productionLineId: string;
+    supervisorId: string;
+    type: string;
+    status: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}

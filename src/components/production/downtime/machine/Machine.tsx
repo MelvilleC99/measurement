@@ -1,9 +1,7 @@
-// src/components/production/downtime/machine/Machine.tsx
-
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../../../../firebase';
-import { SupportFunction} from '../../../../types';
+import { SupportFunction } from '../../../../types';
 import './Machine.css';
 
 interface MachineProps {
@@ -11,7 +9,6 @@ interface MachineProps {
     onSubmit: (data: MachineFormData) => Promise<void>;
     productionLineId: string;
     supervisorId: string;
-
 }
 
 interface MachineFormData {
@@ -20,7 +17,6 @@ interface MachineFormData {
     comments: string;
     productionLineId: string;
     supervisorId: string;
-    mechanicId?: string; // Assuming mechanicId is optional
 }
 
 interface MachineItem {
@@ -34,7 +30,6 @@ const Machine: React.FC<MachineProps> = ({ onClose, onSubmit, productionLineId, 
     const [comments, setComments] = useState<string>('');
     const [reasonsList, setReasonsList] = useState<string[]>([]);
     const [machinesList, setMachinesList] = useState<MachineItem[]>([]);
-    const [mechanicId, setMechanicId] = useState<string>(''); // New state for mechanicId
     const [error, setError] = useState<string>('');
 
     useEffect(() => {
@@ -66,7 +61,7 @@ const Machine: React.FC<MachineProps> = ({ onClose, onSubmit, productionLineId, 
         e.preventDefault();
         setError('');
 
-        if (!reason || !machineNumber || !mechanicId) {
+        if (!reason || !machineNumber) {
             setError('Please fill in all required fields.');
             return;
         }
@@ -77,7 +72,6 @@ const Machine: React.FC<MachineProps> = ({ onClose, onSubmit, productionLineId, 
             comments,
             productionLineId,
             supervisorId,
-            mechanicId, // Include mechanicId
         };
 
         try {
@@ -120,27 +114,6 @@ const Machine: React.FC<MachineProps> = ({ onClose, onSubmit, productionLineId, 
                                     {machine.assetNumber}
                                 </option>
                             ))}
-                        </select>
-                    </label>
-                    <label>
-                        Mechanic Assigned:
-                        <select
-                            value={mechanicId}
-                            onChange={(e) => setMechanicId(e.target.value)}
-                            required
-                        >
-                            <option value="">Select Mechanic</option>
-                            {/* Assuming you have a list of mechanics */}
-                            {/* Replace this with actual mechanics data if available */}
-                            {/* For example: */}
-                            {/* {mechanicsList.map(mechanic => (
-                                <option key={mechanic.id} value={mechanic.id}>
-                                    {mechanic.name}
-                                </option>
-                            ))} */}
-                            {/* Placeholder options */}
-                            <option value="mechanic1">Mechanic 1</option>
-                            <option value="mechanic2">Mechanic 2</option>
                         </select>
                     </label>
                     <label>

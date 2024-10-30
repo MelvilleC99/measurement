@@ -15,6 +15,8 @@ export interface ReworkFormData {
     count: number;
     productionLineId: string;
     supervisorId: string;
+    createdAt?: Date;
+    status: string
 }
 
 // ------------------------
@@ -65,4 +67,11 @@ export interface ReworkBase {
     supervisorId: string;
     createdAt: Timestamp;
     updatedAt: Timestamp;
+}
+
+
+// ReworkUpdate props
+interface ReworkUpdateProps {
+    onClose: () => void;
+    onSubmit: () => Promise<void>;
 }

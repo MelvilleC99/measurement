@@ -118,14 +118,14 @@ const HRFlow: React.FC<HRFlowProps> = ({ productionLineId }) => {
                         onClose={() => setActiveTab('absent')}
                         onSubmit={handleLateSubmit}
                         productionLineId={productionLineId}
-                        supervisorId={selectedSupervisor?.id || ''}
+
                     />
                 ) : (
                     <Absent
                         onClose={() => setActiveTab('late')}
                         onSubmit={handleAbsentSubmit}
                         productionLineId={productionLineId}
-                        supervisorId={selectedSupervisor?.id || ''}
+
                     />
                 )}
             </div>

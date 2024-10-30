@@ -1,13 +1,9 @@
+// Reject.tsx
 import React, { useState, useEffect } from 'react';
-import {
-    collection,
-    getDocs,
-    query,
-    where
-} from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../../../firebase';
 import { RejectFormData } from '../types';
-import {SupportFunction }  from '../../../../types'
+import { SupportFunction } from '../../../../types';
 import './Reject.css';
 
 interface RejectProps {
@@ -16,11 +12,6 @@ interface RejectProps {
     productionLineId: string;
     supervisorId: string;
     qcs: SupportFunction[];
-}
-
-interface Operation {
-    id: string;
-    name: string;
 }
 
 const Reject: React.FC<RejectProps> = ({
@@ -37,91 +28,142 @@ const Reject: React.FC<RejectProps> = ({
     const [selectedQc, setSelectedQc] = useState<string>('');
     const [qcPassword, setQcPassword] = useState<string>('');
     const [reasonsList, setReasonsList] = useState<string[]>([]);
-    const [operationsList, setOperationsList] = useState<Operation[]>([]);
+    const [operationsList, setOperationsList] = useState<{ id: string; name: string; }[]>([]);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
+    const [isLoading, setIsLoading] = useState<boolean>(true);
 
     useEffect(() => {
-        const fetchReasonsAndOperations = async () => {
+        const fetchData = async () => {
             try {
-                // Fetch Reject reasons from downtimeCategories collection
+                setIsLoading(true);
+
+                // Fetch reject reasons from downtimeCategories
                 const reasonsQuery = query(
                     collection(db, 'downtimeCategories'),
-                    where('categoryName', '==', 'Reject')
+                    where('name', '==', 'Reject')
                 );
                 const reasonsSnapshot = await getDocs(reasonsQuery);
-                const fetchedReasons = reasonsSnapshot.docs.flatMap((doc) => doc.data().reasons || []);
+                const fetchedReasons = reasonsSnapshot.docs.flatMap(doc =>
+                    doc.data().reasons || []
+                );
                 setReasonsList(fetchedReasons);
 
-                // Fetch operations from productHierarchy collection
+                // Fetch operations from productHierarchy
                 const operationsSnapshot = await getDocs(collection(db, 'productHierarchy'));
-                const fetchedOperations = operationsSnapshot.docs.flatMap((doc) =>
-                    (doc.data().operations || []).map((op: { name: string }) => ({
-                        id: doc.id,
-                        name: op.name
-                    }))
-                );
+                const fetchedOperations: { id: string; name: string; }[] = [];
+
+                operationsSnapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    if (data.subCategories && Array.isArray(data.subCategories)) {
+                        data.subCategories.forEach((subCategory: any) => {
+                            if (subCategory.operations && Array.isArray(subCategory.operations)) {
+                                subCategory.operations.forEach((operation: any) => {
+                                    if (operation.name) {
+                                        fetchedOperations.push({
+                                            id: `${doc.id}-${operation.name}`,
+                                            name: operation.name
+                                        });
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+
                 setOperationsList(fetchedOperations);
             } catch (err) {
-                console.error('Error fetching reasons and operations:', err);
-                setError('Failed to load reasons and operations data.');
+                console.error('Error fetching data:', err);
+                setError('Failed to load reasons and operations');
+            } finally {
+                setIsLoading(false);
             }
         };
 
-        fetchReasonsAndOperations();
+        fetchData();
     }, []);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
         if (!reason || !selectedQc || count < 1 || !qcPassword) {
-            setError('Please fill in all required fields.');
+            setError('Please fill in all required fields');
             return;
         }
 
-        const selectedQC = qcs.find(qc => qc.id === selectedQc && qc.password === qcPassword);
-        if (!selectedQC) {
-            setError('Invalid QC credentials.');
-            return;
-        }
+        try {
+            // Verify QC credentials
+            const qcSnapshot = await getDocs(query(
+                collection(db, 'supportFunctions'),
+                where('employeeNumber', '==', selectedQc),
+                where('password', '==', qcPassword),
+                where('role', '==', 'QC')
+            ));
 
-        setIsConfirmModalOpen(true);
+            if (qcSnapshot.empty) {
+                setError('Invalid QC credentials');
+                return;
+            }
+
+            setIsConfirmModalOpen(true);
+        } catch (err) {
+            console.error('Error verifying QC:', err);
+            setError('Failed to verify QC credentials');
+        }
     };
 
     const handleConfirm = async () => {
-        const rejectData: RejectFormData = {
-            reason,
-            operation: operation || '',
-            comments,
-            qcId: selectedQc,
-            count,
-            recordedAsProduced: false,
-            productionLineId,
-            supervisorId
-        };
-
         try {
+            const rejectData: RejectFormData = {
+                reason,
+                operation,
+                comments,
+                qcId: selectedQc,
+                count,
+                recordedAsProduced: false,
+                productionLineId,
+                supervisorId
+            };
+
             await onSubmit(rejectData);
+
+            // Reset form
             setReason('');
             setOperation('');
             setComments('');
             setSelectedQc('');
-            setCount(1);
             setQcPassword('');
+            setCount(1);
             setIsConfirmModalOpen(false);
-            alert('Reject logged successfully.');
+
+            onClose();
         } catch (err) {
             console.error('Error submitting reject:', err);
-            setError('Failed to log reject.');
+            setError('Failed to submit reject');
         }
     };
+
+    if (isLoading) {
+        return (
+            <div className="modal-overlay">
+                <div className="modal-content">
+                    <div className="loading-state">Loading...</div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="modal-overlay">
             <div className="modal-content">
                 <h2>Log Reject</h2>
-                {error && <p className="error-message">{error}</p>}
+                {error && (
+                    <div className="error-message">
+                        {error}
+                        <button onClick={() => setError('')} className="error-dismiss">×</button>
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit} className="reject-form">
                     <label>
@@ -132,13 +174,9 @@ const Reject: React.FC<RejectProps> = ({
                             required
                         >
                             <option value="">Select Reason</option>
-                            {reasonsList.length > 0 ? (
-                                reasonsList.map((r, index) => (
-                                    <option key={index} value={r}>{r}</option>
-                                ))
-                            ) : (
-                                <option value="">No reasons available</option>
-                            )}
+                            {reasonsList.map((r, index) => (
+                                <option key={index} value={r}>{r}</option>
+                            ))}
                         </select>
                     </label>
 
@@ -149,15 +187,11 @@ const Reject: React.FC<RejectProps> = ({
                             onChange={(e) => setOperation(e.target.value)}
                         >
                             <option value="">Select Operation</option>
-                            {operationsList.length > 0 ? (
-                                operationsList.map((op) => (
-                                    <option key={op.id} value={op.name}>
-                                        {op.name}
-                                    </option>
-                                ))
-                            ) : (
-                                <option value="">No operations available</option>
-                            )}
+                            {operationsList.map((op) => (
+                                <option key={op.id} value={op.name}>
+                                    {op.name}
+                                </option>
+                            ))}
                         </select>
                     </label>
 
@@ -167,7 +201,7 @@ const Reject: React.FC<RejectProps> = ({
                             type="number"
                             min="1"
                             value={count}
-                            onChange={(e) => setCount(parseInt(e.target.value))}
+                            onChange={(e) => setCount(parseInt(e.target.value) || 1)}
                             required
                         />
                     </label>
@@ -181,7 +215,7 @@ const Reject: React.FC<RejectProps> = ({
                         >
                             <option value="">Select QC</option>
                             {qcs.map((qc) => (
-                                <option key={qc.id} value={qc.id}>
+                                <option key={qc.id} value={qc.employeeNumber || qc.id}>
                                     {qc.name} {qc.surname}
                                 </option>
                             ))}
@@ -203,7 +237,7 @@ const Reject: React.FC<RejectProps> = ({
                         <textarea
                             value={comments}
                             onChange={(e) => setComments(e.target.value)}
-                            placeholder="Enter any additional comments..."
+                            placeholder="Enter additional comments..."
                         />
                     </label>
 
@@ -219,17 +253,26 @@ const Reject: React.FC<RejectProps> = ({
 
                 {isConfirmModalOpen && (
                     <div className="confirmation-modal">
-                        <div className="modal-content">
+                        <div className="confirmation-content">
                             <h3>Confirm Reject</h3>
-                            <button onClick={handleConfirm} className="submit-button">
-                                Confirm
-                            </button>
-                            <button
-                                onClick={() => setIsConfirmModalOpen(false)}
-                                className="cancel-button"
-                            >
-                                Cancel
-                            </button>
+                            <div className="confirmation-details">
+                                <p><strong>Reason:</strong> {reason}</p>
+                                <p><strong>Count:</strong> {count}</p>
+                                {operation && (
+                                    <p><strong>Operation:</strong> {operation}</p>
+                                )}
+                            </div>
+                            <div className="confirmation-buttons">
+                                <button onClick={handleConfirm} className="confirm-button">
+                                    Confirm
+                                </button>
+                                <button
+                                    onClick={() => setIsConfirmModalOpen(false)}
+                                    className="cancel-button"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}

@@ -315,7 +315,7 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                         onClose={() => setIsLateModalOpen(false)}
                         onSubmit={handleLateSubmit}
                         productionLineId={lineId}
-                        supervisorId={supervisorId}
+
                     />
                 )}
 
@@ -324,7 +324,7 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                         onClose={() => setIsAbsentModalOpen(false)}
                         onSubmit={handleAbsentSubmit}
                         productionLineId={lineId}
-                        supervisorId={supervisorId}
+
                     />
                 )}
 

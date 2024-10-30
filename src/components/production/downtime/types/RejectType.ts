@@ -47,3 +47,11 @@ export interface RejectRecord {
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }
+
+// RejectUpdate props
+interface RejectUpdateProps {
+    onClose: () => void;
+    lineId: string;
+    supervisorId: string;
+    onSubmit: () => Promise<void>;
+}

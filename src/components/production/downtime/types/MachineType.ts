@@ -40,11 +40,15 @@ export interface MachineRecord {
     supervisorId: string;
     mechanicId?: string;
     productionLineId?: string;
-    startTime: Timestamp; // Corrected startTime type
+    status: string; // Open or Closed
+    mechanicAcknowledged?: boolean; // New field to track mechanic acknowledgment
+    startTime: Timestamp;
     createdAt: Timestamp;
     updatedAt: Timestamp;
+    mechanicAcknowledgedAt?: Timestamp; // Added this field to track when the mechanic acknowledged it
+    resolvedAt?: Timestamp;
+    mechanicName?: string; // Added this field for mechanic's name display
 }
-
 
 // ------------------------
 // Base Interfaces

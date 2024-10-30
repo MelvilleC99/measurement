@@ -1,225 +1,309 @@
 import React, { useState, useEffect } from 'react';
-import './Late.css';
-import {
-    collection,
-    getDocs,
-    query,
-    where,
-    doc,
-    updateDoc,
-    addDoc,
-    Timestamp,
-    orderBy,
-    limit
-} from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../../../firebase';
-import { LateFormData, LateProps } from '../types'; // Corrected path
-import {  Downtime } from '../types/Downtime'; // Corrected path
-import { Employee, SupportFunction } from '../../../../types';
+import { LateFormData } from '../types';
+import { SupportFunction } from '../../../../types';
+import './Late.css';
 
-const Late: React.FC<LateProps> = ({ onClose, onSubmit, productionLineId, supervisorId }) => {
+interface LateProps {
+    onClose: () => void;
+    onSubmit: (data: LateFormData) => Promise<void>;
+    productionLineId: string;
+}
+
+interface Employee {
+    employeeId: string;
+    name: string;
+    surname: string;
+    employeeNumber: string;
+    department?: string;
+}
+
+const Late: React.FC<LateProps> = ({
+                                       onClose,
+                                       onSubmit,
+                                       productionLineId
+                                   }) => {
+    // State for employee search and selection
+    const [searchTerm, setSearchTerm] = useState<string>('');
     const [employees, setEmployees] = useState<Employee[]>([]);
-    const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
-    const [reason, setReason] = useState<string>('');
-    const [date, setDate] = useState<string>('');
-    const [time, setTime] = useState<string>('');
-    const [status, setStatus] = useState<'arrived' | 'absent'>('arrived');
-    const [comments, setComments] = useState<string>('');
+    const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
+    const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+
+    // Supervisor selection state
+    const [selectedSupervisor, setSelectedSupervisor] = useState<SupportFunction | null>(null);
+    const [password, setPassword] = useState<string>('');
+    const [supervisors, setSupervisors] = useState<SupportFunction[]>([]);
+
+    // UI state
     const [error, setError] = useState<string>('');
-    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
 
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchEmployees = async () => {
             try {
                 setIsLoading(true);
-                const supportFunctionsSnap = await getDocs(collection(db, 'supportFunctions'));
-                const fetchedEmployees = supportFunctionsSnap.docs
-                    .filter(doc => doc.data().role !== 'Supervisor')
-                    .map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    })) as Employee[];
+                const employeesSnapshot = await getDocs(collection(db, 'supportFunctions'),);
+                const fetchedEmployees = employeesSnapshot.docs.map(doc => ({
+                    employeeId: doc.id,
+                    ...doc.data() as Omit<Employee, 'employeeId'>
+                }));
                 setEmployees(fetchedEmployees);
             } catch (err) {
                 console.error('Error fetching employees:', err);
-                setError('Failed to fetch employees.');
+                setError('Failed to load employees');
             } finally {
                 setIsLoading(false);
             }
         };
 
-        fetchData();
+        const fetchSupervisors = async () => {
+            try {
+                const supportFunctionsRef = collection(db, 'supportFunctions');
+                const q = query(
+                    supportFunctionsRef,
+                    where('role', '==', 'Supervisor'),
+                    where('hasPassword', '==', true)
+                );
+
+                const querySnapshot = await getDocs(q);
+                const supervisorsList = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                } as SupportFunction));
+
+                setSupervisors(supervisorsList);
+            } catch (err) {
+                console.error('Error in fetchSupervisors:', err);
+                setError('Failed to fetch supervisors');
+            }
+        };
+
+        fetchEmployees();
+        fetchSupervisors();
     }, []);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
+    useEffect(() => {
+        const filtered = employees.filter(emp => {
+            const fullName = `${emp.name} ${emp.surname}`.toLowerCase();
+            const searchLower = searchTerm.toLowerCase();
+            return fullName.includes(searchLower) ||
+                emp.employeeNumber.includes(searchLower);
+        });
+        setFilteredEmployees(filtered);
+    }, [searchTerm, employees]);
 
-        if (!selectedEmployeeId || !date || !time) {
-            setError('Please fill in all required fields.');
+    const handleEmployeeSelect = (employee: Employee) => {
+        setSelectedEmployee(employee);
+        setSearchTerm('');
+    };
+
+    const handleResolveClick = () => {
+        setIsConfirmModalOpen(true);
+        setError('');
+    };
+
+    const handlePasswordSubmit = async () => {
+        if (!selectedSupervisor || !password) {
+            setError('Please select a supervisor and enter password');
             return;
         }
 
         try {
-            if (status === 'arrived') {
-                const lateQuery = query(
-                    collection(db, 'downtime'),
-                    where('employeeId', '==', selectedEmployeeId),
-                    where('type', '==', 'late'),
-                    orderBy('createdAt', 'desc'),
-                    limit(1)
-                );
-                const lateSnap = await getDocs(lateQuery);
-                if (!lateSnap.empty) {
-                    const lateDoc = lateSnap.docs[0];
-                    await updateDoc(doc(db, 'downtime', lateDoc.id), {
-                        status: 'arrived',
-                        comments: comments || '',
-                        confirmedAt: Timestamp.now()
-                    });
-                } else {
-                    setError('No late entry found for this employee.');
-                    return;
-                }
-            } else if (status === 'absent') {
-                const lateQuery = query(
-                    collection(db, 'downtime'),
-                    where('employeeId', '==', selectedEmployeeId),
-                    where('type', '==', 'late'),
-                    orderBy('createdAt', 'desc'),
-                    limit(1)
-                );
-                const lateSnap = await getDocs(lateQuery);
-                if (!lateSnap.empty) {
-                    const lateDoc = lateSnap.docs[0];
-                    const lateData = lateDoc.data() as Downtime;
+            const supervisorQuery = query(
+                collection(db, 'supportFunctions'),
+                where('employeeNumber', '==', selectedSupervisor.employeeNumber),
+                where('password', '==', password),
+                where('role', '==', 'Supervisor'),
+                where('hasPassword', '==', true)
+            );
 
-                    const absentData = {
-                        employeeId: lateData.employeeId || '',
-                        reason: reason || '',
-                        startDate: convertTimestampToDate(lateData.startTime),
-                        endDate: new Date(),
-                        productionLineId: lateData.productionLineId || '',
-                        supervisorId: supervisorId,
-                        createdAt: Timestamp.now(),
-                        updatedAt: Timestamp.now(),
-                        type: 'absent' as const,
-                        category: lateData.category || 'Absence',
-                        status: 'Closed' as const,
-                        startTime: lateData.startTime || Timestamp.now(),
-                        comments: lateData.comments || '',
-                    };
+            const supervisorSnapshot = await getDocs(supervisorQuery);
 
-                    await addDoc(collection(db, 'absent'), absentData);
-                    await updateDoc(doc(db, 'downtime', lateDoc.id), {
-                        status: 'absent',
-                        movedToAbsentAt: Timestamp.now(),
-                        updatedAt: Timestamp.now()
-                    });
-                } else {
-                    setError('No late entry found for this employee.');
-                    return;
-                }
+            if (supervisorSnapshot.empty) {
+                setError('Invalid supervisor credentials');
+                return;
             }
 
-            setSelectedEmployeeId('');
-            setReason('');
-            setDate('');
-            setTime('');
-            setComments('');
-            setStatus('arrived');
-            alert('Late status updated successfully.');
+            if (!selectedEmployee) return;
+
+            const lateData: LateFormData = {
+                employeeId: selectedEmployee.employeeId,
+                reason: 'late',
+                date: new Date(),
+                time: '',
+                productionLineId,
+                supervisorId: selectedSupervisor.id,
+                type: 'late',
+                status: 'open'
+            };
+
+            await onSubmit(lateData);
             onClose();
         } catch (err) {
-            console.error('Error updating late status:', err);
-            setError('Failed to update late status.');
+            console.error('Error in handlePasswordSubmit:', err);
+            setError('Failed to submit late record');
         }
     };
+
+    const handleClose = () => {
+        setIsConfirmModalOpen(false);
+        setPassword('');
+        setSelectedSupervisor(null);
+        setError('');
+    };
+
+    if (isLoading) {
+        return (
+            <div className="modal-overlay">
+                <div className="modal-content">
+                    <div className="loading-state">Loading...</div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="modal-overlay">
             <div className="modal-content">
-                <h2>Log Late Arrival</h2>
-                {error && <p className="error-message">{error}</p>}
-                {isLoading ? (
-                    <p>Loading...</p>
+                <div className="modal-header">
+                    <h2>Log Late Arrival</h2>
+                    <button
+                        onClick={onClose}
+                        className="close-button"
+                    >
+                        ×
+                    </button>
+                </div>
+
+                {error && (
+                    <div className="error-message">
+                        {error}
+                        <button onClick={() => setError('')} className="error-dismiss">
+                            ×
+                        </button>
+                    </div>
+                )}
+
+                {!selectedEmployee ? (
+                    <div className="search-section">
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Search by name or employee number..."
+                            className="search-input"
+                        />
+
+                        <div className="employee-list">
+                            {filteredEmployees.map(emp => (
+                                <div
+                                    key={emp.employeeId}
+                                    className="employee-item"
+                                    onClick={() => handleEmployeeSelect(emp)}
+                                >
+                                    <span className="employee-name">
+                                        {emp.name} {emp.surname}
+                                    </span>
+                                    <span className="employee-number">
+                                        {emp.employeeNumber}
+                                    </span>
+                                </div>
+                            ))}
+                            {filteredEmployees.length === 0 && searchTerm && (
+                                <div className="no-results">
+                                    No employees found
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 ) : (
-                    <form onSubmit={handleSubmit} className="late-form">
-                        <label>
-                            Employee Number:
-                            <select
-                                value={selectedEmployeeId}
-                                onChange={(e) => setSelectedEmployeeId(e.target.value)}
-                                required
+                    <form onSubmit={(e) => { e.preventDefault(); handleResolveClick(); }} className="late-form">
+                        <div className="selected-employee-info">
+                            <h3>Selected Employee</h3>
+                            <p>{selectedEmployee.name} {selectedEmployee.surname}</p>
+                            <p>Employee #: {selectedEmployee.employeeNumber}</p>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedEmployee(null)}
+                                className="change-employee-button"
                             >
-                                <option value="">Select Employee</option>
-                                {employees.map(emp => (
-                                    <option key={emp.id} value={emp.employeeNumber}>
-                                        {emp.name} {emp.surname} ({emp.employeeNumber})
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                        <label>
-                            Reason:
-                            <textarea
-                                value={reason}
-                                onChange={(e) => setReason(e.target.value)}
-                                placeholder="Enter reason (optional)..."
-                            />
-                        </label>
-                        <label>
-                            Date:
-                            <input
-                                type="date"
-                                value={date}
-                                onChange={(e) => setDate(e.target.value)}
-                                required
-                            />
-                        </label>
-                        <label>
-                            Time:
-                            <input
-                                type="time"
-                                value={time}
-                                onChange={(e) => setTime(e.target.value)}
-                                required
-                            />
-                        </label>
-                        {status === 'arrived' && (
-                            <label>
-                                Comments:
-                                <textarea
-                                    value={comments}
-                                    onChange={(e) => setComments(e.target.value)}
-                                    placeholder="Enter comments (optional)..."
-                                />
-                            </label>
-                        )}
-                        <label>
-                            Status:
-                            <select
-                                value={status}
-                                onChange={(e) => setStatus(e.target.value as 'arrived' | 'absent')}
-                                required
-                            >
-                                <option value="arrived">Arrived</option>
-                                <option value="absent">Absent</option>
-                            </select>
-                        </label>
+                                Change Employee
+                            </button>
+                        </div>
+
                         <div className="form-buttons">
-                            <button type="submit" className="submit-button">Submit</button>
-                            <button type="button" onClick={onClose} className="cancel-button">Cancel</button>
+                            <button type="submit" className="submit-button">
+                                Submit
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="cancel-button"
+                            >
+                                Cancel
+                            </button>
                         </div>
                     </form>
+                )}
+
+                {isConfirmModalOpen && (
+                    <div className="confirmation-modal">
+                        <div className="confirmation-content">
+                            <div className="modal-header">
+                                <h3>Supervisor Verification</h3>
+                                <button className="close-button" onClick={handleClose}>×</button>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Select Supervisor:</label>
+                                <select
+                                    value={selectedSupervisor?.id || ''}
+                                    onChange={(e) => {
+                                        const supervisor = supervisors.find(s => s.id === e.target.value);
+                                        setSelectedSupervisor(supervisor || null);
+                                    }}
+                                    className="form-input"
+                                    required
+                                >
+                                    <option value="">Select Supervisor</option>
+                                    {supervisors.map((supervisor) => (
+                                        <option
+                                            key={supervisor.id}
+                                            value={supervisor.id}
+                                        >
+                                            {`${supervisor.name} ${supervisor.surname}`}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Password:</label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="form-input"
+                                    placeholder="Enter supervisor password"
+                                    required
+                                />
+                            </div>
+
+                            <div className="confirmation-buttons">
+                                <button onClick={handlePasswordSubmit} className="confirm-button">
+                                    Confirm
+                                </button>
+                                <button onClick={handleClose} className="cancel-button">
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
         </div>
     );
-};
-
-const convertTimestampToDate = (timestamp: Timestamp): Date => {
-    return timestamp.toDate();
 };
 
 export default Late;

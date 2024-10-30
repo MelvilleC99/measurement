@@ -83,6 +83,7 @@ export interface SessionData {
     endTime?: Timestamp;
     isActive: boolean;
 
+
 }
 // ------------------------
 // Helper Functions

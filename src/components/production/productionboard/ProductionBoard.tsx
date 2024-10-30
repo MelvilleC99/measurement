@@ -7,7 +7,7 @@ import {
     doc,
     Timestamp,
     where,
-    query
+    query,
 } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import ProductionTracking from './components/ProductionTracking';
@@ -30,9 +30,13 @@ const ProductionBoard: React.FC = () => {
         rejects: 0,
         reworks: 0,
         late: 0,
-        absent: 0
+        absent: 0,
     });
     const [error, setError] = useState<string>('');
+
+    // Assuming these values are available through authentication or context
+    const userRole: 'Supervisor' | 'Mechanic' = 'Supervisor'; // Replace with your logic to get the current user's role
+    const userId = 'exampleUserId'; // Replace with your logic to get the current user's ID
 
     const handleUnitProduced = async (slotId: string) => {
         if (!sessionData) return;
@@ -41,7 +45,7 @@ const ProductionBoard: React.FC = () => {
                 sessionId: sessionData.sessionId,
                 slotId,
                 timestamp: Timestamp.now(),
-                createdAt: Timestamp.now()
+                createdAt: Timestamp.now(),
             });
         } catch (error) {
             setError('Failed to record production');
@@ -50,9 +54,9 @@ const ProductionBoard: React.FC = () => {
     };
 
     const handleEventRecorded = (eventType: keyof MetricsState, count: number) => {
-        setMetrics(prev => ({
+        setMetrics((prev) => ({
             ...prev,
-            [eventType]: prev[eventType] + count
+            [eventType]: prev[eventType] + count,
         }));
     };
 
@@ -66,7 +70,7 @@ const ProductionBoard: React.FC = () => {
                 await updateDoc(doc(db, 'activeSessions', sessionData.sessionId), {
                     isActive: false,
                     endTime: Timestamp.now(),
-                    updatedAt: Timestamp.now()
+                    updatedAt: Timestamp.now(),
                 });
 
                 const downtimesQuery = query(
@@ -77,11 +81,11 @@ const ProductionBoard: React.FC = () => {
 
                 const downtimesSnapshot = await getDocs(downtimesQuery);
 
-                const closePromises = downtimesSnapshot.docs.map(doc =>
+                const closePromises = downtimesSnapshot.docs.map((doc) =>
                     updateDoc(doc.ref, {
                         status: 'Closed',
                         endTime: Timestamp.now(),
-                        updatedAt: Timestamp.now()
+                        updatedAt: Timestamp.now(),
                     })
                 );
 
@@ -93,7 +97,7 @@ const ProductionBoard: React.FC = () => {
                 rejects: 0,
                 reworks: 0,
                 late: 0,
-                absent: 0
+                absent: 0,
             });
         } catch (error) {
             console.error('Error ending shift:', error);
@@ -116,8 +120,9 @@ const ProductionBoard: React.FC = () => {
                     <div className="monitoring-section">
                         <div className="section-counters">
                             <MetricsCounter
-                                metrics={metrics}
                                 sessionId={sessionData.sessionId}
+                                lineId={sessionData.lineId}
+                                supervisorId={sessionData.supervisorId}
                             />
                         </div>
 
@@ -125,6 +130,8 @@ const ProductionBoard: React.FC = () => {
                             <DowntimeTracking
                                 sessionId={sessionData.sessionId}
                                 lineId={sessionData.lineId}
+                                userRole={userRole} // Added userRole prop
+                                userId={userId} // Added userId prop
                             />
                         </div>
 
@@ -138,10 +145,7 @@ const ProductionBoard: React.FC = () => {
                         </div>
                     </div>
 
-                    <button
-                        className="end-shift-button"
-                        onClick={handleEndShift}
-                    >
+                    <button className="end-shift-button" onClick={handleEndShift}>
                         End Shift
                     </button>
                 </>

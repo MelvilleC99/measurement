@@ -1,5 +1,3 @@
-// src/types/downtime/AbsentType.ts
-
 import { Timestamp } from 'firebase/firestore';
 
 // ------------------------
@@ -8,11 +6,13 @@ import { Timestamp } from 'firebase/firestore';
 
 export interface AbsentFormData {
     employeeId: string;
-    reason?: string;
-    startDate: Date;
-    endDate: Date;
+    reason?: string; // Optional reason field
+    startDate: Date; // Start date is automatically set as new Date()
+    endDate: Date; // End date is automatically set as new Date()
     productionLineId: string;
-    supervisorId: string;
+    supervisorId: string; // This should hold the selected supervisor's employeeNumber
+    type: 'absent',
+    status: 'open'
 }
 
 // ------------------------
@@ -23,7 +23,7 @@ export interface AbsentProps {
     onClose: () => void;
     onSubmit: (data: AbsentFormData) => Promise<void>;
     productionLineId: string;
-    supervisorId: string;
+
 }
 
 // ------------------------
@@ -40,4 +40,12 @@ export interface AbsentRecord {
     supervisorId: string;
     createdAt: Timestamp;
     updatedAt: Timestamp;
+}
+
+// AbsentUpdate props
+interface AbsentUpdateProps {
+    onClose: () => void;
+    lineId: string;
+    supervisorId: string;
+    onSubmit: () => Promise<void>;
 }
