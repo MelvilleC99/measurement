@@ -2,28 +2,30 @@ import React, { useState, useEffect } from 'react';
 import {
     collection,
     getDocs,
-    addDoc,
+    getDoc,
+    updateDoc,
+    Timestamp,
+    doc,
     query,
     where,
-    Timestamp
+    onSnapshot
 } from 'firebase/firestore';
 import { db } from '../../../../firebase';
 import {
-    ProductionLine,
     Style,
-    SupportFunction,
     TimeTable,
     Break,
-    SessionData
+    SessionData,
+    TimeSlot
 } from '../../../../types';
 import './ProductionTracking.css';
 
 interface ProductionTrackingProps {
-    sessionData: SessionData | null;
+    sessionData: SessionData;
     onUnitProduced: (slotId: string) => Promise<void>;
     setSessionData: React.Dispatch<React.SetStateAction<SessionData | null>>;
-    selectedLineId: string;  // Added from login
-    selectedSupervisorId: string;  // Added from login
+    selectedLineId: string;
+    selectedSupervisorId: string;
 }
 
 interface CurrentSlot {
@@ -34,19 +36,22 @@ interface CurrentSlot {
     isActive: boolean;
 }
 
+interface ProductionRecord {
+    sessionId: string;
+    slotId: string;
+    timestamp: Timestamp;
+    createdAt: Timestamp;
+}
+
 const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                                                                    sessionData,
                                                                    onUnitProduced,
-                                                                   setSessionData,
                                                                    selectedLineId,
-                                                                   selectedSupervisorId
                                                                }) => {
     // Data states
-    const [productionLines, setProductionLines] = useState<ProductionLine[]>([]);
-    const [supervisors, setSupervisors] = useState<SupportFunction[]>([]);
     const [styles, setStyles] = useState<Style[]>([]);
-    const [breaks, setBreaks] = useState<Break[]>([]);
     const [timeTables, setTimeTables] = useState<TimeTable[]>([]);
+    const [breaks, setBreaks] = useState<Break[]>([]);
 
     // Production states
     const [assignedTimeTable, setAssignedTimeTable] = useState<TimeTable | null>(null);
@@ -54,64 +59,30 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
     const [currentTimeSlot, setCurrentTimeSlot] = useState<CurrentSlot | null>(null);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [styleDetails, setStyleDetails] = useState({
-        target: 0,
         outputs: [] as number[],
         balance: 0,
     });
 
-    // Selection states
-    const [selectedStyle, setSelectedStyle] = useState<Style | null>(null);
-    const [selectedLine, setSelectedLine] = useState<string>('');
-    const [selectedSupervisor, setSelectedSupervisor] = useState<SupportFunction | null>(null);
-
-    // Modal states
-    const [isStyleModalOpen, setIsStyleModalOpen] = useState(false);
+    // Error state
     const [error, setError] = useState<string>('');
 
-    // Initial data fetch
+    // Fetch necessary data on mount
     useEffect(() => {
-        const fetchInitialData = async () => {
+        const fetchData = async () => {
             try {
-                const [linesSnap, supportSnap, stylesSnap, timeTablesSnap, breaksSnap] =
-                    await Promise.all([
-                        getDocs(collection(db, 'productionLines')),
-                        getDocs(collection(db, 'supportFunctions')),
-                        getDocs(collection(db, 'styles')),
-                        getDocs(collection(db, 'timeTables')),
-                        getDocs(collection(db, 'breaks'))
-                    ]);
+                const [stylesSnap, timeTablesSnap, breaksSnap] = await Promise.all([
+                    getDocs(collection(db, 'styles')),
+                    getDocs(collection(db, 'timeTables')),
+                    getDocs(collection(db, 'breaks'))
+                ]);
 
-                const lines = linesSnap.docs.map(doc => ({
+                const loadedStyles = stylesSnap.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
-                } as ProductionLine));
-                setProductionLines(lines);
+                } as Style));
+                setStyles(loadedStyles);
 
-                const sups = supportSnap.docs
-                    .filter(doc => doc.data().role === 'Supervisor')
-                    .map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    } as SupportFunction));
-                setSupervisors(sups);
-
-                // Set selected line and supervisor from props
-                const line = lines.find(l => l.id === selectedLineId);
-                const supervisor = sups.find(s => s.id === selectedSupervisorId);
-
-                if (line) {
-                    setSelectedLine(line.name);
-                }
-                if (supervisor) {
-                    setSelectedSupervisor(supervisor);
-                }
-
-                setStyles(stylesSnap.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                } as Style)));
-
-                setTimeTables(timeTablesSnap.docs.map(doc => ({
+                const loadedTimeTables = timeTablesSnap.docs.map(doc => ({
                     id: doc.id,
                     name: doc.data().name,
                     lineId: doc.data().lineId || '',
@@ -121,203 +92,162 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                         endTime: slot.endTime,
                         breakId: slot.breakId || null,
                     })),
-                } as TimeTable)));
+                } as TimeTable));
+                setTimeTables(loadedTimeTables);
 
-                setBreaks(breaksSnap.docs.map(doc => ({
+                const loadedBreaks = breaksSnap.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
-                } as Break)));
+                } as Break));
+                setBreaks(loadedBreaks);
 
+                console.log('Initial data loaded successfully');
             } catch (error) {
                 console.error('Error fetching initial data:', error);
-                setError('Failed to load initial data');
+                setError('Failed to load production data');
             }
         };
 
-        fetchInitialData();
-    }, [selectedLineId, selectedSupervisorId]);
+        fetchData();
+    }, []);
 
-    // Time table loading effect
+    // Assign TimeTable based on session data
     useEffect(() => {
-        if (selectedLineId) {
-            const selectedTimeTable = timeTables.find(tt => tt.lineId === selectedLineId) ||
-                timeTables.find(tt => tt.name === selectedLine) ||
-                timeTables[0];
+        const selectedTimeTable = timeTables.find(tt => tt.lineId === selectedLineId) ||
+            timeTables.find(tt => tt.name === 'Default') ||
+            null;
 
-            if (selectedTimeTable) {
-                setAssignedTimeTable(selectedTimeTable);
-                setStyleDetails(prev => ({
-                    ...prev,
-                    outputs: new Array(selectedTimeTable.slots.length).fill(0)
-                }));
-            }
+        if (selectedTimeTable) {
+            setAssignedTimeTable(selectedTimeTable);
+            console.log('Time table assigned:', selectedTimeTable.name);
         }
-    }, [selectedLineId, timeTables, selectedLine]);
-    // Clock update effect
+    }, [timeTables, selectedLineId]);
+
+    // Initialize production details based on session data
+    useEffect(() => {
+        if (assignedTimeTable && sessionData) {
+            const fetchExistingOutputs = async () => {
+                try {
+                    const productionQuery = query(
+                        collection(db, 'production'),
+                        where('sessionId', '==', sessionData.sessionId)
+                    );
+
+                    const unsubscribe = onSnapshot(productionQuery, (snapshot) => {
+                        const outputs = Array(assignedTimeTable.slots.length).fill(0);
+
+                        snapshot.docs.forEach(doc => {
+                            const data = doc.data() as ProductionRecord;
+                            const slotIndex = assignedTimeTable.slots.findIndex(slot => slot.id === data.slotId);
+                            if (slotIndex !== -1) {
+                                outputs[slotIndex]++;
+                            }
+                        });
+
+                        const style = styles.find(s => s.id === sessionData.styleId);
+                        if (style) {
+                            const unitsProduced = outputs.reduce((a, b) => a + b, 0);
+                            setStyleDetails({
+                                outputs,
+                                balance: style.unitsInOrder - unitsProduced
+                            });
+                        }
+                    });
+
+                    return unsubscribe;
+                } catch (err) {
+                    console.error('Error fetching existing production records:', err);
+                    setError('Failed to load existing production records');
+                }
+            };
+
+            fetchExistingOutputs();
+        }
+    }, [assignedTimeTable, sessionData, styles]);
+
+    // Update current time and active slot
     useEffect(() => {
         const interval = setInterval(() => {
             const now = new Date();
             setCurrentTime(now);
+
             if (assignedTimeTable && manualSlot === 'current') {
-                updateCurrentTimeSlot(now);
+                const currentTimeStr = now.toLocaleTimeString('en-GB', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                });
+
+                const activeSlot = assignedTimeTable.slots.find(slot =>
+                    currentTimeStr >= slot.startTime && currentTimeStr < slot.endTime
+                );
+
+                if (activeSlot) {
+                    setCurrentTimeSlot({
+                        ...activeSlot,
+                        isActive: true
+                    });
+                    setManualSlot(activeSlot.id);
+                    console.log('Current active slot updated:', activeSlot.id);
+                } else {
+                    setCurrentTimeSlot(null);
+                }
             }
         }, 1000);
 
         return () => clearInterval(interval);
     }, [assignedTimeTable, manualSlot]);
 
-    const updateCurrentTimeSlot = (now: Date) => {
-        if (!assignedTimeTable) return;
-
-        const currentTimeStr = now.toLocaleTimeString('en-GB', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-        });
-
-        const activeSlot = assignedTimeTable.slots.find(slot =>
-            currentTimeStr >= slot.startTime && currentTimeStr < slot.endTime
-        );
-
-        if (activeSlot) {
-            setCurrentTimeSlot({
-                ...activeSlot,
-                isActive: true
-            });
-        }
-    };
-
-    const handleLoadBoard = async () => {
-        if (!selectedStyle) {
-            setError('Please select style');
-            return;
-        }
-
-        try {
-            const selectedTimeTable = timeTables.find(tt => tt.lineId === selectedLineId) ||
-                timeTables.find(tt => tt.name === selectedLine) ||
-                timeTables[0];
-
-            if (!selectedTimeTable) {
-                throw new Error('No Time Table found for the selected line.');
-            }
-
-            setAssignedTimeTable(selectedTimeTable);
-            setStyleDetails(prev => ({
-                ...prev,
-                outputs: Array(selectedTimeTable.slots.length).fill(0),
-                balance: selectedStyle.unitsInOrder,
-            }));
-
-            setIsStyleModalOpen(true);
-
-        } catch (error) {
-            console.error('Error initializing board:', error);
-            setError(error instanceof Error ? error.message : 'Failed to initialize board.');
-        }
-    };
-
-    const handleConfirmStyle = async (target: number) => {
-        if (target <= 0) {
-            setError('Target must be a positive number');
-            return;
-        }
-
-        try {
-            const sessionRef = await addDoc(collection(db, 'activeSessions'), {
-                lineId: selectedLineId,
-                supervisorId: selectedSupervisor?.id,
-                styleId: selectedStyle?.id,
-                startTime: Timestamp.now(),
-                isActive: true,
-                createdAt: Timestamp.now(),
-                updatedAt: Timestamp.now()
-            });
-
-            setSessionData({
-                sessionId: sessionRef.id,
-                lineId: selectedLineId,
-                supervisorId: selectedSupervisor?.id || '',
-                styleId: selectedStyle?.id || '',
-                startTime: Timestamp.now(),
-                isActive: true
-            });
-
-            setStyleDetails(prev => ({
-                ...prev,
-                target
-            }));
-
-            setIsStyleModalOpen(false);
-        } catch (error) {
-            setError('Failed to create session');
-            console.error(error);
-        }
-    };
-
     const handleAddOutput = async () => {
         if (!assignedTimeTable || !sessionData) {
-            setError('Production tracking not properly initialized.');
+            setError('Production tracking is not properly initialized.');
             return;
         }
 
         try {
             let selectedSlotId: string;
-            let slotToUse: TimeTable['slots'][0];
 
             if (manualSlot === 'current') {
                 if (!currentTimeSlot) {
-                    throw new Error('No active time slot for current time.');
+                    throw new Error('No active time slot.');
                 }
                 selectedSlotId = currentTimeSlot.id;
-                slotToUse = currentTimeSlot;
             } else {
-                const selectedSlot = assignedTimeTable.slots.find(slot => slot.id === manualSlot);
-                if (!selectedSlot) {
-                    throw new Error('Invalid slot selection.');
-                }
                 selectedSlotId = manualSlot;
-                slotToUse = selectedSlot;
             }
 
             await onUnitProduced(selectedSlotId);
 
-            const slotIndex = assignedTimeTable.slots.findIndex(
-                slot => slot.id === selectedSlotId
-            );
+            const styleDocRef = doc(db, 'styles', sessionData.styleId);
+            const styleSnap = await getDoc(styleDocRef);
 
-            if (slotIndex !== -1) {
-                const updatedOutputs = [...styleDetails.outputs];
-                updatedOutputs[slotIndex] += 1;
-                setStyleDetails(prev => ({
-                    ...prev,
-                    outputs: updatedOutputs,
-                    balance: prev.balance - 1
-                }));
+            if (styleSnap.exists()) {
+                const styleData = styleSnap.data() as Style;
+                await updateDoc(styleDocRef, {
+                    unitsProduced: (styleData.unitsProduced || 0) + 1,
+                    updatedAt: Timestamp.now()
+                });
+                console.log('Unit production recorded successfully');
             }
         } catch (error) {
             console.error('Error recording production:', error);
-            setError(error instanceof Error ? error.message : 'Failed to record production.');
+            setError('Failed to record production.');
         }
     };
 
-    const calculateTargetPerSlot = (slot: TimeTable['slots'][0]): number => {
-        if (!slot.breakId) {
-            return styleDetails.target;
-        }
+    const calculateTargetPerSlot = (slot: TimeSlot): number => {
+        if (!slot.breakId) return sessionData.target;
 
         const breakInfo = breaks.find(b => b.id === slot.breakId);
-        if (!breakInfo) {
-            return styleDetails.target;
-        }
+        if (!breakInfo) return sessionData.target;
 
         const effectiveMinutes = 60 - breakInfo.duration;
-        return Math.ceil((styleDetails.target / 60) * effectiveMinutes);
+        return Math.ceil((sessionData.target / 60) * effectiveMinutes);
     };
 
     const calculateEfficiency = (output: number, target: number): string => {
-        if (!target) return 'N/A';
-        return `${((output / target) * 100).toFixed(2)}%`;
+        if (target <= 0) return 'N/A';
+        return `${((output / target) * 100).toFixed(1)}%`;
     };
 
     const calculateCumulativeEfficiency = (upToIndex: number): string => {
@@ -327,169 +257,91 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
         let totalTarget = 0;
 
         for (let i = 0; i <= upToIndex; i++) {
-            const slot = assignedTimeTable.slots[i];
-            if (!slot) continue;
-
             totalOutput += styleDetails.outputs[i];
-            totalTarget += calculateTargetPerSlot(slot);
+            totalTarget += calculateTargetPerSlot(assignedTimeTable.slots[i]);
         }
 
-        if (!totalTarget) return 'N/A';
-        return `${((totalOutput / totalTarget) * 100).toFixed(2)}%`;
+        return totalTarget === 0 ? 'N/A' : `${((totalOutput / totalTarget) * 100).toFixed(1)}%`;
     };
 
     return (
         <div className="production-tracking">
-            {!sessionData ? (
-                <div className="form-group">
-                    <h1>Select Style</h1>
-                    <label>
-                        Select Style:
-                        <select
-                            value={selectedStyle?.id || ''}
-                            onChange={(e) => {
-                                const style = styles.find(s => s.id === e.target.value);
-                                setSelectedStyle(style || null);
-                            }}
-                        >
-                            <option value="">Select a Style</option>
-                            {styles.map((style) => (
-                                <option key={style.id} value={style.id}>
-                                    {style.styleNumber} - {style.styleName}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
+            <div className="time-tracking-container">
+                <div className="slot-controls">
+                    <select
+                        className="slot-select"
+                        value={manualSlot}
+                        onChange={(e) => setManualSlot(e.target.value)}
+                    >
+                        <option value="current">Current Time Slot</option>
+                        {assignedTimeTable?.slots.map((slot, index) => (
+                            <option key={slot.id} value={slot.id}>
+                                Hour {index + 1} ({slot.startTime} - {slot.endTime})
+                            </option>
+                        ))}
+                    </select>
 
-                    <button className="load-button" onClick={handleLoadBoard}>
-                        Load Production Board
+                    <button
+                        className="unit-button"
+                        onClick={handleAddOutput}
+                        disabled={styleDetails.balance <= 0}
+                    >
+                        Record Unit
                     </button>
-                </div>
-            ) : (
-                <div className="input-display">
-                    <div className="board-header">
-                        <div className="clock-display">
-                            <span className="time">{currentTime.toLocaleTimeString()}</span>
-                            <span className="date">{currentTime.toLocaleDateString()}</span>
-                        </div>
-                        <div className="board-info">
-                            <h2>{selectedLine} - {selectedSupervisor?.name}</h2>
-                            <h3>Style: {selectedStyle?.styleNumber}</h3>
-                        </div>
+
+                    <div className="style-stats">
+                        <span className="stat">Order: {styleDetails.balance + styleDetails.outputs.reduce((a, b) => a + b, 0)}</span>
+                        <span className="stat">Balance: {styleDetails.balance}</span>
                     </div>
+                </div>
 
-                    {assignedTimeTable && (
-                        <div className="time-table-section">
-                            <div className="slot-selection">
-                                <label>
-                                    Select Time Slot:
-                                    <select
-                                        value={manualSlot}
-                                        onChange={(e) => setManualSlot(e.target.value)}
-                                    >
-                                        <option value="current">Current Time (Real-time)</option>
-                                        {assignedTimeTable.slots.map((slot, index) => (
-                                            <option key={slot.id} value={slot.id}>
-                                                Hour {index + 1} ({slot.startTime} - {slot.endTime})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-                                <button className="output-button" onClick={handleAddOutput}>
-                                    Unit Produced
-                                </button>
-                            </div>
+                <div className="time-table">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Hour</th>
+                            <th>Time</th>
+                            <th>Target</th>
+                            <th>Output</th>
+                            <th>Efficiency</th>
+                            <th>Cumulative</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {assignedTimeTable?.slots.map((slot, index) => {
+                            const target = calculateTargetPerSlot(slot);
+                            const output = styleDetails.outputs[index];
+                            const isCurrentSlot = manualSlot === slot.id ||
+                                (manualSlot === 'current' && currentTimeSlot?.id === slot.id);
+                            const breakInfo = breaks.find(b => b.id === slot.breakId);
 
-                            <table className="timetable">
-                                <thead>
-                                <tr>
-                                    <th>Hour</th>
-                                    <th>Time Slot</th>
-                                    <th>Target</th>
-                                    <th>Output</th>
-                                    <th>Efficiency</th>
-                                    <th>Cumulative</th>
+                            return (
+                                <tr key={slot.id} className={isCurrentSlot ? 'current-slot' : ''}>
+                                    <td>{index + 1}</td>
+                                    <td>
+                                        {slot.startTime} - {slot.endTime}
+                                        {breakInfo && (
+                                            <span className="break-indicator">
+                                                    ({breakInfo.breakType} - {breakInfo.duration}min)
+                                                </span>
+                                        )}
+                                    </td>
+                                    <td>{target}</td>
+                                    <td>{output}</td>
+                                    <td>{calculateEfficiency(output, target)}</td>
+                                    <td>{calculateCumulativeEfficiency(index)}</td>
                                 </tr>
-                                </thead>
-                                <tbody>
-                                {assignedTimeTable.slots.map((slot, index) => {
-                                    const target = calculateTargetPerSlot(slot);
-                                    const output = styleDetails.outputs[index];
-                                    const breakInfo = breaks.find(b => b.id === slot.breakId);
-                                    const isCurrentSlot = manualSlot === 'current' ?
-                                        currentTimeSlot?.id === slot.id :
-                                        manualSlot === slot.id;
-
-                                    return (
-                                        <tr key={slot.id} className={isCurrentSlot ? 'current-slot' : ''}>
-                                            <td>Hour {index + 1}</td>
-                                            <td>
-                                                {slot.startTime} - {slot.endTime}
-                                                {breakInfo && (
-                                                    <span className="break-indicator">
-                                                        ({breakInfo.breakType} - {breakInfo.duration}min)
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td>{target}</td>
-                                            <td>{output}</td>
-                                            <td>{calculateEfficiency(output, target)}</td>
-                                            <td>{calculateCumulativeEfficiency(index)}</td>
-                                        </tr>
-                                    );
-                                })}
-                                </tbody>
-                            </table>
-
-                            <div className="style-details">
-                                <h3>Style Information</h3>
-                                <p>Description: {selectedStyle?.description}</p>
-                                <p>Units in Order: {selectedStyle?.unitsInOrder}</p>
-                                <p>Balance: {styleDetails.balance}</p>
-                            </div>
-                        </div>
-                    )}
+                            );
+                        })}
+                        </tbody>
+                    </table>
                 </div>
-            )}
-
-            {isStyleModalOpen && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <h2>Set Production Target</h2>
-                        <label>
-                            Target Units per Hour:
-                            <input
-                                type="number"
-                                min="1"
-                                value={styleDetails.target}
-                                onChange={(e) => setStyleDetails(prev => ({
-                                    ...prev,
-                                    target: parseInt(e.target.value) || 0
-                                }))}
-                            />
-                        </label>
-                        <div className="modal-buttons">
-                            <button
-                                className="confirm-button"
-                                onClick={() => handleConfirmStyle(styleDetails.target)}
-                            >
-                                Confirm
-                            </button>
-                            <button
-                                className="cancel-button"
-                                onClick={() => setIsStyleModalOpen(false)}
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            </div>
 
             {error && (
                 <div className="error-message">
                     {error}
-                    <button onClick={() => setError('')} className="error-dismiss-button">✕</button>
+                    <button onClick={() => setError('')}>✕</button>
                 </div>
             )}
         </div>

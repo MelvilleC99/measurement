@@ -1,120 +1,191 @@
-.login-manager {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
+/* src/components/LoginManager.css */
 
-.login-manager .form-group {
-    width: 100%;
-    max-width: 600px;
-    margin: 2rem auto;
-    padding: 2rem;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+/* General Login Manager Styling */
+.login-manager {
+    width: 500px;
+    margin: 50px auto;
+    padding: 30px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    background-color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .login-manager h2 {
-    font-size: 1.5rem;
-    font-weight: 600;
     text-align: center;
-    margin-bottom: 2rem;
+    margin-bottom: 25px;
+    color: #333333;
+    font-size: 24px;
 }
 
-.login-manager label {
-    display: block;
-    margin-bottom: 1.5rem;
+/* Error Message Styling */
+.error-message {
+    background-color: #fee2e2;
+    border: 1px solid #ef4444;
+    color: #721c24;
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.login-manager select,
-.login-manager input {
-    width: 100%;
-    padding: 0.75rem;
-    margin-top: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-.login-manager button {
-    width: 100%;
-    padding: 0.75rem;
-    background-color: #2563eb;
-    color: white;
+.error-message button {
+    background: none;
     border: none;
-    border-radius: 4px;
+    color: #ef4444;
+    font-size: 18px;
     cursor: pointer;
 }
 
-.login-manager button:disabled {
-    background-color: #93c5fd;
-    cursor: not-allowed;
+/* Input Container Styling */
+.input-container {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 10px;
+    margin-bottom: 20px;
 }
 
-.login-manager .error-message {
-    position: fixed;
-    bottom: 1rem;
-    right: 1rem;
-    background: #fee2e2;
-    border: 1px solid #dc2626;
-    padding: 0.75rem 1rem;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    z-index: 1000;
-}
-
-.login-manager .error-message button {
-    width: auto;
-    padding: 0.25rem 0.5rem;
-    background: transparent;
-    color: #dc2626;
+.input-container label {
+    align-self: center;
     font-weight: bold;
+    color: #555555;
 }
 
-/* Session Continue Modal */
-.login-manager .modal-overlay {
+.input-container input,
+.input-container select {
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+}
+
+/* Button Styling */
+.login-button,
+.confirm-button,
+.cancel-button,
+.continue-button,
+.new-session-button {
+    padding: 12px 20px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+/* Specific Button Colors */
+.login-button {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.login-button:hover {
+    background-color: #45a049;
+}
+
+.confirm-button {
+    background-color: #008CBA;
+    color: white;
+}
+
+.confirm-button:hover {
+    background-color: #007bb5;
+}
+
+.cancel-button {
+    background-color: #f44336;
+    color: white;
+}
+
+.cancel-button:hover {
+    background-color: #da190b;
+}
+
+.continue-button {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.continue-button:hover {
+    background-color: #45a049;
+}
+
+.new-session-button {
+    background-color: #f44336;
+    color: white;
+}
+
+.new-session-button:hover {
+    background-color: #da190b;
+}
+
+/* Session Options Styling */
+.session-options {
+    text-align: center;
+    padding: 30px;
+}
+
+.session-options h3 {
+    margin-bottom: 15px;
+    color: #333333;
+    font-size: 20px;
+}
+
+.session-options p {
+    margin-bottom: 25px;
+    color: #555555;
+    font-size: 16px;
+}
+
+.session-buttons {
+    display: flex;
+    justify-content: space-between;
+}
+
+.session-buttons button {
+    width: 48%;
+}
+
+/* Confirmation Modal Styling */
+.confirmation-modal {
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5); /* Dark overlay background */
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000;
 }
 
-.login-manager .modal-content {
-    background: white;
-    padding: 2rem;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 400px;
+.modal-overlay {
+    position: relative;
 }
 
-.login-manager .modal-buttons {
+.modal-content {
+    background-color: #fff;
+    padding: 25px;
+    border-radius: 10px;
+    width: 550px; /* Adjusted width for neatness */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.modal-content h2 {
+    margin-bottom: 25px;
+    color: #333333;
+    font-size: 22px;
+}
+
+.modal-buttons {
     display: flex;
-    justify-content: flex-end;
-    gap: 1rem;
-    margin-top: 1rem;
+    justify-content: space-between;
+    margin-top: 25px;
 }
 
-.login-manager .modal-buttons button {
-    width: auto;
-    padding: 0.75rem 1.5rem;
-}
-
-.login-manager .modal-buttons button.continue {
-    background-color: #2563eb;
-}
-
-.login-manager .modal-buttons button.new {
-    background-color: #10b981;
-}
-
-.login-manager .modal-buttons button.cancel {
-    background-color: #dc2626;
+.modal-buttons button {
+    width: 48%;
 }

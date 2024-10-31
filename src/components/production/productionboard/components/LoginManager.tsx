@@ -1,50 +1,55 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, getDoc, doc } from 'firebase/firestore';
+import {
+    collection,
+    getDocs,
+    query,
+    where,
+    addDoc,
+    updateDoc,
+    doc,
+    Timestamp,
+    and
+} from 'firebase/firestore';
 import { db } from '../../../../firebase';
-import { ProductionLine, SupportFunction, Style } from '../../../../types';
+import { ProductionLine, SupportFunction, Style, SessionData } from '../../../../types';
 import './LoginManager.css';
 
 interface LoginManagerProps {
-    onLoginSuccess: (lineId: string, supervisorId: string, sessionData?: any) => void;
-}
-
-type LoginStep = 'initial' | 'sessionCheck';
-
-interface ActiveSession {
-    id: string;
-    styleId: string;
-    styleName?: string;
-    styleNumber?: string;
-    target: number;
-    startTime: Date;
+    onLoginSuccess: (sessionData: SessionData) => void;
 }
 
 const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
     // Step tracking
-    const [currentStep, setCurrentStep] = useState<LoginStep>('initial');
+    const [currentStep, setCurrentStep] = useState<'login' | 'sessionOptions' | 'confirm'>('login');
 
     // Initial login data
     const [productionLines, setProductionLines] = useState<ProductionLine[]>([]);
     const [supervisors, setSupervisors] = useState<SupportFunction[]>([]);
-    const [selectedLine, setSelectedLine] = useState<string>('');
-    const [selectedLineData, setSelectedLineData] = useState<ProductionLine | null>(null);
-    const [selectedSupervisor, setSelectedSupervisor] = useState<string>('');
+    const [styles, setStyles] = useState<Style[]>([]);
+    const [selectedLineId, setSelectedLineId] = useState<string>('');
+    const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>('');
     const [password, setPassword] = useState<string>('');
 
-    // Session data
-    const [existingSession, setExistingSession] = useState<ActiveSession | null>(null);
+    // Confirmation data
+    const [selectedStyleId, setSelectedStyleId] = useState<string>('');
+    const [target, setTarget] = useState<number>(0);
 
+    // Loading and error states
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string>('');
+
+    // Active session data
+    const [activeSession, setActiveSession] = useState<SessionData | null>(null);
 
     // Fetch initial data
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [linesSnap, supervisorsSnap] = await Promise.all([
+                setLoading(true);
+                const [linesSnap, supervisorsSnap, stylesSnap] = await Promise.all([
                     getDocs(collection(db, 'productionLines')),
-                    getDocs(query(collection(db, 'supportFunctions'),
-                        where('role', '==', 'Supervisor')))
+                    getDocs(query(collection(db, 'supportFunctions'), where('role', '==', 'Supervisor'))),
+                    getDocs(collection(db, 'styles')),
                 ]);
 
                 const lines = linesSnap.docs.map(doc => ({
@@ -53,126 +58,201 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
                 } as ProductionLine));
                 setProductionLines(lines);
 
-                setSupervisors(supervisorsSnap.docs.map(doc => ({
+                const sups = supervisorsSnap.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
-                } as SupportFunction)));
+                } as SupportFunction));
+                setSupervisors(sups);
 
+                const loadedStyles = stylesSnap.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                } as Style));
+                setStyles(loadedStyles);
             } catch (err) {
                 console.error('Error fetching initial data:', err);
                 setError('Failed to load initial data');
+            } finally {
+                setLoading(false);
             }
         };
 
         fetchData();
     }, []);
 
+    // Handle initial login with fixed authentication
     const handleInitialLogin = async () => {
         setError('');
         setLoading(true);
 
         try {
-            // 1. Verify supervisor password
-            const supervisor = supervisors.find(s => s.id === selectedSupervisor);
-            if (!supervisor || supervisor.password !== password) {
-                setError('Invalid supervisor password');
-                setPassword('');
+            const selectedSupervisor = supervisors.find(s => s.id === selectedSupervisorId);
+            if (!selectedSupervisor) {
+                setError('Selected supervisor not found.');
+                setLoading(false);
                 return;
             }
 
-            // 2. Check for active session on this line
+            console.log(`Attempting to log in supervisor: ${selectedSupervisor.name} ${selectedSupervisor.surname} (${selectedSupervisor.employeeNumber})`);
+
+            // Modified query to check for employee number and password
+            const loginQuery = query(
+                collection(db, 'supportFunctions'),
+                and(
+                    where('employeeNumber', '==', selectedSupervisor.employeeNumber),
+                    where('password', '==', password),
+                    where('role', '==', 'Supervisor')
+                )
+            );
+
+            const loginSnap = await getDocs(loginQuery);
+
+            if (loginSnap.empty) {
+                setError('Invalid password. Please try again.');
+                setPassword(''); // Clear password for security
+                setLoading(false);
+                return;
+            }
+
+            // Check for active session on this line
             const sessionsQuery = query(
                 collection(db, 'activeSessions'),
-                where('lineId', '==', selectedLine),
+                where('lineId', '==', selectedLineId),
                 where('isActive', '==', true)
             );
 
             const sessionSnap = await getDocs(sessionsQuery);
 
+            console.log(`Active sessions found: ${sessionSnap.size}`);
+
             if (!sessionSnap.empty) {
+                // If an active session is found, set it and prompt for options
                 const sessionDoc = sessionSnap.docs[0];
-                const sessionData = sessionDoc.data();
+                const sessionData = sessionDoc.data() as SessionData;
 
-                // Fetch style details
-                const styleDoc = await getDoc(doc(db, 'styles', sessionData.styleId));
-                const styleData = styleDoc.data();
-
-                setExistingSession({
-                    id: sessionDoc.id,
+                setActiveSession({
+                    sessionId: sessionDoc.id,
+                    lineId: sessionData.lineId,
+                    supervisorId: selectedSupervisorId,
                     styleId: sessionData.styleId,
-                    styleName: styleData?.styleName,
-                    styleNumber: styleData?.styleNumber,
                     target: sessionData.target,
-                    startTime: sessionData.startTime.toDate()
+                    startTime: sessionData.startTime,
+                    isActive: sessionData.isActive,
                 });
 
-                setCurrentStep('sessionCheck');
+                setCurrentStep('sessionOptions');
+                console.log('Existing session found:', sessionDoc.id);
             } else {
-                // No active session, proceed with new session
-                handleStartNewSession();
+                // No active session, proceed to confirm style and target
+                setCurrentStep('confirm');
+                console.log('No active session found, proceeding to confirmation step');
             }
 
-        } catch (err) {
+        } catch (err: any) {
             console.error('Login error:', err);
-            setError('Failed to verify login');
+            setError('Failed to authenticate. Please try again.');
         } finally {
             setLoading(false);
         }
     };
 
+    // Handle continuing an existing session
     const handleContinueSession = () => {
-        if (!existingSession) return;
-
-        onLoginSuccess(selectedLine, selectedSupervisor, {
-            sessionId: existingSession.id,
-            styleId: existingSession.styleId,
-            target: existingSession.target
-        });
+        if (activeSession) {
+            onLoginSuccess(activeSession);
+            console.log('Continuing existing session:', activeSession.sessionId);
+        } else {
+            setError('No active session to continue.');
+        }
     };
 
-    const handleStartNewSession = () => {
-        onLoginSuccess(selectedLine, selectedSupervisor);
+    // Handle starting a new session
+    const handleStartNewSession = async () => {
+        setError('');
+        setLoading(true);
+
+        try {
+            if (!activeSession) {
+                setError('No active session found to start a new one.');
+                setLoading(false);
+                return;
+            }
+
+            // Deactivate the existing session
+            await updateDoc(doc(db, 'activeSessions', activeSession.sessionId), {
+                isActive: false,
+                endTime: Timestamp.now(),
+                updatedAt: Timestamp.now(),
+            });
+
+            console.log('Deactivated existing session:', activeSession.sessionId);
+
+            // Clear the active session state
+            setActiveSession(null);
+
+            // Proceed to confirm style and target
+            setCurrentStep('confirm');
+            console.log('Proceeding to confirmation step for new session.');
+
+        } catch (err) {
+            console.error('Error deactivating existing session:', err);
+            setError('Failed to start a new session.');
+        } finally {
+            setLoading(false);
+        }
     };
 
-    if (currentStep === 'sessionCheck' && existingSession) {
-        return (
-            <div className="login-manager">
-                <div className="session-check-container">
-                    <h2>Active Session Found</h2>
-                    <div className="session-details">
-                        <p><strong>Line:</strong> {selectedLineData?.name}</p>
-                        <p><strong>Current Style:</strong> {existingSession.styleNumber}</p>
-                        <p><strong>Target:</strong> {existingSession.target} units/hour</p>
-                        <p><strong>Started:</strong> {existingSession.startTime.toLocaleString()}</p>
-                    </div>
-                    <div className="session-actions">
-                        <button
-                            className="continue-button"
-                            onClick={handleContinueSession}
-                        >
-                            Continue This Session
-                        </button>
-                        <button
-                            className="new-button"
-                            onClick={handleStartNewSession}
-                        >
-                            Start New Session
-                        </button>
-                        <button
-                            className="back-button"
-                            onClick={() => {
-                                setCurrentStep('initial');
-                                setExistingSession(null);
-                                setPassword('');
-                            }}
-                        >
-                            Back
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    // Handle confirmation and session creation
+    const handleConfirmAndStart = async () => {
+        setError('');
+        setLoading(true);
+
+        try {
+            const selectedStyle = styles.find(s => s.id === selectedStyleId);
+            if (!selectedStyle) {
+                setError('Please select a valid style.');
+                setLoading(false);
+                return;
+            }
+
+            if (target <= 0) {
+                setError('Target must be a positive number.');
+                setLoading(false);
+                return;
+            }
+
+            // Create a new session
+            const sessionRef = await addDoc(collection(db, 'activeSessions'), {
+                lineId: selectedLineId,
+                supervisorId: selectedSupervisorId,
+                styleId: selectedStyleId,
+                target: target,
+                startTime: Timestamp.now(),
+                isActive: true,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            });
+
+            const newSession: SessionData = {
+                sessionId: sessionRef.id,
+                lineId: selectedLineId,
+                supervisorId: selectedSupervisorId,
+                styleId: selectedStyleId,
+                target: target,
+                startTime: Timestamp.now(),
+                isActive: true
+            };
+
+            onLoginSuccess(newSession);
+            console.log('New session created with ID:', sessionRef.id);
+
+        } catch (err) {
+            console.error('Error creating new session:', err);
+            setError('Failed to create new session.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="login-manager">
@@ -181,65 +261,155 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
             {error && (
                 <div className="error-message">
                     {error}
-                    <button onClick={() => setError('')}>✕</button>
+                    <button onClick={() => setError('')} className="error-dismiss-button">✕</button>
                 </div>
             )}
 
-            <div className="login-form">
-                <label>
-                    Select Line:
-                    <select
-                        value={selectedLine}
-                        onChange={(e) => {
-                            setSelectedLine(e.target.value);
-                            const line = productionLines.find(l => l.id === e.target.value);
-                            setSelectedLineData(line || null);
-                        }}
-                        disabled={loading}
+            {currentStep === 'login' && (
+                <div className="login-form">
+                    <div className="input-container">
+                        <label htmlFor="line-select">Select Line:</label>
+                        <select
+                            id="line-select"
+                            value={selectedLineId}
+                            onChange={(e) => setSelectedLineId(e.target.value)}
+                            disabled={loading}
+                        >
+                            <option value="">Select a Line</option>
+                            {productionLines.map((line) => (
+                                <option key={line.id} value={line.id}>
+                                    {line.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="input-container">
+                        <label htmlFor="supervisor-select">Select Supervisor:</label>
+                        <select
+                            id="supervisor-select"
+                            value={selectedSupervisorId}
+                            onChange={(e) => setSelectedSupervisorId(e.target.value)}
+                            disabled={loading}
+                        >
+                            <option value="">Select a Supervisor</option>
+                            {supervisors.map((sup) => (
+                                <option key={sup.id} value={sup.id}>
+                                    {`${sup.name} ${sup.surname} (${sup.employeeNumber})`}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="input-container">
+                        <label htmlFor="password-input">Password:</label>
+                        <input
+                            id="password-input"
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            disabled={loading}
+                            placeholder="********"
+                        />
+                    </div>
+
+                    <button
+                        className="login-button"
+                        onClick={handleInitialLogin}
+                        disabled={!selectedLineId || !selectedSupervisorId || !password || loading}
                     >
-                        <option value="">Select a Line</option>
-                        {productionLines.map((line) => (
-                            <option key={line.id} value={line.id}>
-                                {line.name}
-                            </option>
-                        ))}
-                    </select>
-                </label>
+                        {loading ? 'Verifying...' : 'Login'}
+                    </button>
+                </div>
+            )}
 
-                <label>
-                    Select Supervisor:
-                    <select
-                        value={selectedSupervisor}
-                        onChange={(e) => setSelectedSupervisor(e.target.value)}
-                        disabled={loading}
-                    >
-                        <option value="">Select a Supervisor</option>
-                        {supervisors.map((sup) => (
-                            <option key={sup.id} value={sup.id}>
-                                {`${sup.name} ${sup.surname} (${sup.employeeNumber})`}
-                            </option>
-                        ))}
-                    </select>
-                </label>
+            {currentStep === 'sessionOptions' && activeSession && (
+                <div className="session-options">
+                    <h3>Active Session Detected</h3>
+                    <p>Would you like to continue with the existing session or start a new one?</p>
+                    <div className="session-buttons">
+                        <button
+                            className="continue-button"
+                            onClick={handleContinueSession}
+                            disabled={loading}
+                        >
+                            Continue Existing Session
+                        </button>
+                        <button
+                            className="new-session-button"
+                            onClick={handleStartNewSession}
+                            disabled={loading}
+                        >
+                            Start New Session
+                        </button>
+                    </div>
+                </div>
+            )}
 
-                <label>
-                    Enter Password:
-                    <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        disabled={loading}
-                    />
-                </label>
+            {currentStep === 'confirm' && (
+                <div className="confirmation-modal">
+                    <div className="modal-overlay">
+                        <div className="modal-content">
+                            <h2>Confirm Style and Set Target</h2>
 
-                <button
-                    className="login-button"
-                    onClick={handleInitialLogin}
-                    disabled={!selectedLine || !selectedSupervisor || !password || loading}
-                >
-                    {loading ? 'Verifying...' : 'Login'}
-                </button>
-            </div>
+                            <div className="input-container">
+                                <label htmlFor="style-select">Select Style:</label>
+                                <select
+                                    id="style-select"
+                                    value={selectedStyleId}
+                                    onChange={(e) => setSelectedStyleId(e.target.value)}
+                                    disabled={loading}
+                                >
+                                    <option value="">Select a Style</option>
+                                    {styles.map((style) => (
+                                        <option key={style.id} value={style.id}>
+                                            {`${style.styleNumber} - ${style.styleName} (Balance: ${style.unitsInOrder - (style.unitsProduced || 0)})`}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="input-container">
+                                <label htmlFor="target-input">Set Target Units per Hour:</label>
+                                <input
+                                    id="target-input"
+                                    type="number"
+                                    min="1"
+                                    value={target}
+                                    onChange={(e) => setTarget(parseInt(e.target.value) || 0)}
+                                    disabled={loading}
+                                    placeholder="e.g., 100"
+                                />
+                            </div>
+
+                            <div className="modal-buttons">
+                                <button
+                                    className="confirm-button"
+                                    onClick={handleConfirmAndStart}
+                                    disabled={loading || !selectedStyleId || target <= 0}
+                                >
+                                    {loading ? 'Setting...' : 'Confirm'}
+                                </button>
+                                <button
+                                    className="cancel-button"
+                                    onClick={() => {
+                                        if (activeSession) {
+                                            // If starting a new session, allow canceling
+                                            setCurrentStep('sessionOptions');
+                                        } else {
+                                            // If no active session, go back to login
+                                            setCurrentStep('login');
+                                        }
+                                    }}
+                                    disabled={loading}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

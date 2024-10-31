@@ -5,6 +5,7 @@ import RejectUpdate from '../../downtime/reject/RejectUpdate';
 import ReworkUpdate from '../../downtime/rework/ReworkUpdate';
 import AbsentUpdate from '../../downtime/hr/AbsentUpdate';
 import LateUpdate from '../../downtime/hr/LateUpdate';
+import './MetricsCounter.css';
 
 interface MetricsCounterProps {
     sessionId: string;
@@ -40,7 +41,6 @@ const MetricsCounter: React.FC<MetricsCounterProps> = ({
                                                            lineId,
                                                            supervisorId,
                                                        }) => {
-    // State Management
     const [counts, setCounts] = useState<EventCounts>({
         rejects: 0,
         reworks: 0,
@@ -53,7 +53,6 @@ const MetricsCounter: React.FC<MetricsCounterProps> = ({
     const [error, setError] = useState<string | null>(null);
     const [showEventDetails, setShowEventDetails] = useState(false);
 
-    // Fetch Functions
     const fetchCounts = async () => {
         try {
             setError(null);
@@ -91,7 +90,7 @@ const MetricsCounter: React.FC<MetricsCounterProps> = ({
             return snapshot.size;
         } catch (error) {
             console.error('Error fetching reject count:', error);
-            return 0; // Return 0 on failure to prevent breaking the app
+            return 0;
         }
     };
 
@@ -103,11 +102,10 @@ const MetricsCounter: React.FC<MetricsCounterProps> = ({
                 where('status', '==', 'open')
             );
             const snapshot = await getDocs(reworksQuery);
-            console.log('Fetched rework count:', snapshot.size); // Debugging log
             return snapshot.size;
         } catch (error) {
             console.error('Error fetching rework count:', error);
-            return 0; // Return 0 on failure to prevent breaking the app
+            return 0;
         }
     };
 
@@ -123,7 +121,7 @@ const MetricsCounter: React.FC<MetricsCounterProps> = ({
             return snapshot.size;
         } catch (error) {
             console.error('Error fetching late count:', error);
-            return 0; // Return 0 on failure to prevent breaking the app
+            return 0;
         }
     };
 
@@ -138,7 +136,7 @@ const MetricsCounter: React.FC<MetricsCounterProps> = ({
             return snapshot.size;
         } catch (error) {
             console.error('Error fetching absent count:', error);
-            return 0; // Return 0 on failure to prevent breaking the app
+            return 0;
         }
     };
 
@@ -217,14 +215,12 @@ const MetricsCounter: React.FC<MetricsCounterProps> = ({
         }));
     };
 
-    // Effect Hooks
     useEffect(() => {
         fetchCounts();
         const interval = setInterval(fetchCounts, 30000);
         return () => clearInterval(interval);
     }, [sessionId]);
 
-    // Event Handlers
     const handleCounterClick = (type: EventType) => {
         setActiveUpdateModal(type);
         setShowEventDetails(true);
@@ -239,79 +235,76 @@ const MetricsCounter: React.FC<MetricsCounterProps> = ({
     const getCounterClass = (type: EventType): string => {
         switch (type) {
             case 'reject':
-                return 'border-red-200 bg-red-100 hover:bg-red-200';
+                return 'counter-card counter-reject';
             case 'rework':
-                return 'border-yellow-200 bg-yellow-100 hover:bg-yellow-200';
+                return 'counter-card counter-rework';
             case 'late':
-                return 'border-orange-200 bg-orange-100 hover:bg-orange-200';
+                return 'counter-card counter-late';
             case 'absent':
-                return 'border-purple-200 bg-purple-100 hover:bg-purple-200';
+                return 'counter-card counter-absent';
         }
     };
 
     if (isLoading) {
         return (
-            <div className="flex justify-center items-center p-4">
+            <div className="metrics-counter">
                 <div className="loading-spinner">Loading metrics...</div>
             </div>
         );
     }
 
     return (
-        <div className="p-6">
+        <div className="metrics-counter">
             {error && (
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+                <div className="error-message">
                     {error}
                     <button
                         onClick={() => setError(null)}
-                        className="absolute top-0 right-0 px-4 py-3"
+                        className="error-dismiss-button"
                     >
                         ×
                     </button>
                 </div>
             )}
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid">
                 {Object.entries(counts).map(([type, count]) => (
                     <div
                         key={type}
-                        className={`cursor-pointer p-6 rounded-lg border transition-colors ${getCounterClass(type as EventType)}`}
+                        className={getCounterClass(type as EventType)}
                         onClick={() => handleCounterClick(type as EventType)}
                     >
-                        <h3 className="text-lg font-semibold capitalize text-center">{type}</h3>
-                        <span className="text-3xl font-bold text-center block mt-2">{count}</span>
+                        <h3 className="counter-title">{type}</h3>
+                        <span className="counter-value">{count}</span>
                     </div>
                 ))}
             </div>
 
             {showEventDetails && recentEvents.length > 0 && activeUpdateModal && (
-                <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-4">
+                <div className="recent-events">
+                    <h3 className="recent-events-title">
                         Recent {activeUpdateModal} Events
                     </h3>
-                    <div className="space-y-4">
+                    <div className="event-list">
                         {recentEvents
                             .filter((event) => event.type === activeUpdateModal)
                             .map((event) => (
-                                <div
-                                    key={event.id}
-                                    className="p-4 bg-white rounded-lg shadow border"
-                                >
-                                    <div className="flex justify-between">
-                                        <span className="font-medium">
+                                <div key={event.id} className="event-item">
+                                    <div className="event-header">
+                                        <span className="event-name">
                                             {event.employeeName || event.reason || 'No description'}
                                         </span>
-                                        <span className="text-gray-500">
+                                        <span className="event-date">
                                             {event.createdAt.toDate().toLocaleDateString()}
                                         </span>
                                     </div>
                                     {event.count && (
-                                        <div className="text-sm text-gray-600">
+                                        <div className="event-details">
                                             Count: {event.count}
                                         </div>
                                     )}
                                     {event.comments && (
-                                        <div className="text-sm text-gray-600">
+                                        <div className="event-details">
                                             {event.comments}
                                         </div>
                                     )}
@@ -322,39 +315,55 @@ const MetricsCounter: React.FC<MetricsCounterProps> = ({
             )}
 
             {activeUpdateModal === 'reject' && (
-                <RejectUpdate
-                    onClose={handleCloseModal}
-                    onUpdate={fetchCounts}
-                    lineId={lineId}
-                    supervisorId={supervisorId}
-                    sessionId={sessionId}
-                />
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <RejectUpdate
+                            onClose={handleCloseModal}
+                            onUpdate={fetchCounts}
+                            lineId={lineId}
+                            supervisorId={supervisorId}
+                            sessionId={sessionId}
+                        />
+                    </div>
+                </div>
             )}
 
             {activeUpdateModal === 'rework' && (
-                <ReworkUpdate
-                    onClose={handleCloseModal}
-                />
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <ReworkUpdate
+                            onClose={handleCloseModal}
+                        />
+                    </div>
+                </div>
             )}
 
             {activeUpdateModal === 'late' && (
-                <LateUpdate
-                    onClose={handleCloseModal}
-                    onUpdate={fetchCounts}
-                    lineId={lineId}
-                    supervisorId={supervisorId}
-                    sessionId={sessionId}
-                />
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <LateUpdate
+                            onClose={handleCloseModal}
+                            onUpdate={fetchCounts}
+                            lineId={lineId}
+                            supervisorId={supervisorId}
+                            sessionId={sessionId}
+                        />
+                    </div>
+                </div>
             )}
 
             {activeUpdateModal === 'absent' && (
-                <AbsentUpdate
-                    onClose={handleCloseModal}
-                    onUpdate={fetchCounts}
-                    lineId={lineId}
-                    supervisorId={supervisorId}
-                    sessionId={sessionId}
-                />
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <AbsentUpdate
+                            onClose={handleCloseModal}
+                            onUpdate={fetchCounts}
+                            lineId={lineId}
+                            supervisorId={supervisorId}
+                            sessionId={sessionId}
+                        />
+                    </div>
+                </div>
             )}
         </div>
     );

@@ -1,216 +1,196 @@
 .production-tracking {
-    width: 100%;
     height: 100%;
+    background: white;
     display: flex;
     flex-direction: column;
 }
 
-/* Initial Setup Form */
-.form-group {
-    width: 100%;
-    max-width: 600px;
-    margin: 2rem auto;
-    padding: 2rem;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.form-group h1 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    text-align: center;
-    margin-bottom: 2rem;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 1.5rem;
-}
-
-.form-group select {
-    width: 100%;
-    padding: 0.75rem;
-    margin-top: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-.load-button {
-    width: 100%;
-    padding: 0.75rem;
-    background-color: #2563eb;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-/* Active Board View */
-.input-display {
-    flex: 1;
+.time-tracking-container {
     display: flex;
     flex-direction: column;
     height: 100%;
+    padding: 1rem;
 }
 
-/* Board Header */
-.board-header {
+/* Top controls styling */
+.slot-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
     padding: 1rem;
-    background: white;
+    background: #f8fafc;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     margin-bottom: 1rem;
 }
 
-.clock-display {
-    font-size: 1.5rem;
-    font-weight: bold;
-    text-align: center;
-    margin-bottom: 0.5rem;
-}
-
-.board-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-/* Time Table Section */
-.time-table-section {
+.slot-select {
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    padding: 1rem;
-    overflow: auto;
-    min-height: 0; /* Important for flex container scrolling */
-}
-
-/* Time Slot Selection */
-.slot-selection {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    background-color: #f8fafc;
+    padding: 0.75rem;
+    border: 1px solid #e2e8f0;
     border-radius: 4px;
-    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    background-color: white;
 }
 
-.slot-selection select {
-    min-width: 300px;
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-.output-button {
+.unit-button {
     padding: 0.75rem 1.5rem;
-    background-color: #2563eb;
+    background-color: #579a67;
     color: white;
     border: none;
     border-radius: 4px;
+    font-weight: 600;
     cursor: pointer;
+    transition: background-color 0.2s;
+    min-width: 120px;
 }
 
-/* Time Table */
-.timetable {
+.unit-button:hover:not(:disabled) {
+    background-color: #2c5282;
+}
+
+.unit-button:disabled {
+    background-color: #cbd5e0;
+    cursor: not-allowed;
+}
+
+.style-stats {
+    display: flex;
+    gap: 1.5rem;
+    padding: 0.75rem 1.5rem;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+}
+
+.stat {
+    font-weight: 600;
+    color: #2d3748;
+}
+
+/* Table styling */
+.time-table {
+    flex: 1;
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 1rem;
 }
 
-.timetable th,
-.timetable td {
-    padding: 0.75rem;
-    border: 1px solid #ddd;
+th, td {
+    padding: 0.75rem 1rem;
     text-align: left;
+    border-bottom: 1px solid #e2e8f0;
 }
 
-.timetable th {
-    background-color: #f8fafc;
+/* Column header styling - You can modify these colors */
+th {
+    background: #0c4c88; /* Dark background for all headers */
+    color: white;
     font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
-.current-slot {
-    background-color: #dbeafe;
+/* Individual column header colors */
+th:nth-child(1) { /* Hour column */
+    background-color: #0c4c88;
+    width: 80px;
+    text-align: center;
+}
+
+th:nth-child(2) { /* Time column */
+    background-color: #0c4c88;
+}
+
+th:nth-child(3) { /* Target column */
+    background-color: #0c4c88;
+}
+
+th:nth-child(4) { /* Output column */
+    background-color: #0c4c88;
+}
+
+th:nth-child(5) { /* Efficiency column */
+    background-color: #0c4c88;
+}
+
+th:nth-child(6) { /* Cumulative column */
+    background-color: #0c4c88;
+}
+
+/* Table cell styling */
+td {
+    background-color: white;
+}
+
+td:first-child { /* Hour number cell */
+    width: 80px;
+    text-align: center;
+    font-weight: 600;
+    color: #4a5568;
+}
+
+/* Current slot highlighting */
+.current-slot td {
+    background-color: #ebf8ff;
 }
 
 .break-indicator {
-    font-size: 0.875rem;
-    color: #666;
+    color: #718096;
+    font-size: 0.8rem;
     margin-left: 0.5rem;
 }
 
-/* Style Details */
-.style-details {
-    margin-top: auto;
-    padding: 1rem;
-    background-color: #f8fafc;
-    border-radius: 4px;
-}
-
-/* Modal */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
-
-.modal-content {
-    background: white;
-    padding: 2rem;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 400px;
-}
-
-.modal-buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 1rem;
-    margin-top: 1rem;
-}
-
-.confirm-button,
-.cancel-button {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.confirm-button {
-    background-color: #2563eb;
-    color: white;
-}
-
-.cancel-button {
-    background-color: #dc2626;
-    color: white;
-}
-
-/* Error Message */
+/* Error message styling */
 .error-message {
     position: fixed;
     bottom: 1rem;
     right: 1rem;
-    background: #fee2e2;
-    border: 1px solid #dc2626;
-    padding: 0.75rem 1rem;
-    border-radius: 4px;
+    background-color: white;
+    border-left: 4px solid #e53e3e;
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 1rem;
     z-index: 1000;
+}
+
+.error-message button {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 0.25rem;
+}
+
+.error-message button:hover {
+    color: #333;
+}
+
+/* Hover effects */
+tr:hover td {
+    background-color: #f7fafc;
+}
+
+.current-slot:hover td {
+    background-color: #e6f6ff;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .slot-controls {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .style-stats {
+        width: 100%;
+        justify-content: space-around;
+    }
 }
