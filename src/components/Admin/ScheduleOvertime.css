@@ -1,0 +1,185 @@
+/* src/components/Admin/ScheduleOvertime.css */
+
+/* Wrapper Styling */
+.schedule-overtime-wrapper {
+    padding: 20px;
+    background-color: #f5f5f5; /* Light gray background for the entire section */
+    min-height: 100vh;
+}
+
+/* Container Styling */
+.schedule-overtime-container {
+    padding: 30px;
+    background-color: #ffffff; /* Solid white background */
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Form Control Styling */
+.form-control {
+    margin-bottom: 15px;
+}
+
+/* Select Dropdown Styling */
+.select-dropdown {
+    background-color: #ffffff; /* Solid background */
+    border: 1px solid #cccccc;
+    border-radius: 5px;
+    padding: 10px;
+    font-size: 16px;
+}
+
+/* View Button Container */
+.view-button-container {
+    text-align: right;
+}
+
+/* View Button Styling */
+.view-button {
+    background-color: #007bff;
+    color: white;
+    border-radius: 5px;
+    padding: 8px 16px;
+    transition: background-color 0.3s ease;
+}
+
+.view-button:hover {
+    background-color: #0056b3;
+}
+
+/* Calendar Container Styling */
+.calendar-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px; /* Space between inputs and separator */
+}
+
+/* Date Separator Styling */
+.date-separator {
+    font-size: 16px;
+    color: #555555;
+}
+
+/* Date Input Styling */
+.date-input {
+    width: 150px;
+    padding: 10px;
+    border: 1px solid #cccccc;
+    border-radius: 5px;
+    font-size: 16px;
+    background-color: #ffffff; /* Solid background */
+}
+
+/* Submit Button Container */
+.submit-button-container {
+    text-align: center;
+}
+
+/* Submit Button Styling */
+.submit-button {
+    background-color: #28a745;
+    color: white;
+    border-radius: 5px;
+    padding: 12px 24px;
+    transition: background-color 0.3s ease;
+}
+
+.submit-button:hover {
+    background-color: #218838;
+}
+
+/* Time Table Details Dialog Styling */
+.time-table-dialog .MuiDialogContent-root {
+    padding: 20px;
+}
+
+.time-table-details {
+    background-color: #f9f9f9; /* Light background for readability */
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.time-slots-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.time-slots-table th, .time-slots-table td {
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    text-align: center;
+}
+
+.time-slots-table th {
+    background-color: #003366;
+    color: white;
+}
+
+.time-slots-table tbody tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+/* Loading Spinner Overlay */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8); /* Semi-transparent white */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+/* Snackbar Styling */
+.MuiSnackbar-root {
+    background-color: #ffffff;
+}
+
+.MuiAlert-root {
+    background-color: #ffffff;
+    color: #000000;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .select-dropdown {
+        font-size: 14px;
+    }
+
+    .date-input {
+        width: 120px;
+    }
+
+    .submit-button {
+        padding: 10px 20px;
+        font-size: 14px;
+    }
+
+    .view-button {
+        padding: 6px 12px;
+        font-size: 14px;
+    }
+
+    .calendar-container {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .date-separator {
+        display: none; /* Hide separator on small screens */
+    }
+}
+
+/* Additional Styling for Inputs */
+input[type="date"] {
+    background-color: #ffffff; /* Solid background */
+    border: 1px solid #cccccc;
+    border-radius: 5px;
+    padding: 10px;
+    font-size: 16px;
+}

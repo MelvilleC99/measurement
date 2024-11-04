@@ -1,3 +1,5 @@
+// ProductionBoard.tsx
+
 import React, { useState, useEffect } from 'react';
 import {
     collection,
@@ -8,7 +10,8 @@ import {
     getDocs,
     query,
     where,
-    getDoc
+    getDoc,
+    increment,
 } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import LoginManager from '../productionboard/components/LoginManager';
@@ -37,7 +40,7 @@ const ProductionBoard: React.FC = () => {
     const [detailNames, setDetailNames] = useState<DetailNames>({
         lineName: '',
         supervisorName: '',
-        styleName: ''
+        styleName: '',
     });
     const [metrics, setMetrics] = useState<MetricsState>({
         rejects: 0,
@@ -56,7 +59,7 @@ const ProductionBoard: React.FC = () => {
                 const [lineDoc, supervisorDoc, styleDoc] = await Promise.all([
                     getDoc(doc(db, 'productionLines', sessionData.lineId)),
                     getDoc(doc(db, 'supportFunctions', sessionData.supervisorId)),
-                    getDoc(doc(db, 'styles', sessionData.styleId))
+                    getDoc(doc(db, 'styles', sessionData.styleId)),
                 ]);
 
                 // Get line name
@@ -64,20 +67,20 @@ const ProductionBoard: React.FC = () => {
 
                 // Get supervisor name
                 const supervisorData = supervisorDoc.data();
-                const supervisorName = supervisorData ?
-                    `${supervisorData.name} ${supervisorData.surname} (${supervisorData.employeeNumber})` :
-                    'Unknown Supervisor';
+                const supervisorName = supervisorData
+                    ? `${supervisorData.name} ${supervisorData.surname} (${supervisorData.employeeNumber})`
+                    : 'Unknown Supervisor';
 
                 // Get style name
                 const styleData = styleDoc.data();
-                const styleName = styleData ?
-                    `${styleData.styleNumber} - ${styleData.styleName}` :
-                    'Unknown Style';
+                const styleName = styleData
+                    ? `${styleData.styleNumber} - ${styleData.styleName}`
+                    : 'Unknown Style';
 
                 setDetailNames({
                     lineName,
                     supervisorName,
-                    styleName
+                    styleName,
                 });
             } catch (err) {
                 console.error('Error fetching names:', err);
@@ -88,16 +91,34 @@ const ProductionBoard: React.FC = () => {
         fetchNames();
     }, [sessionData]);
 
-    const handleUnitProduced = async (slotId: string) => {
+    const handleUnitProduced = async (
+        slotId: string,
+        target: number,
+        assignedTimeTableId: string,
+        unitProduced: number
+    ) => {
         if (!sessionData) return;
         try {
             await addDoc(collection(db, 'production'), {
                 sessionId: sessionData.sessionId,
                 slotId,
+                lineId: sessionData.lineId,
+                supervisorId: sessionData.supervisorId,
+                styleId: sessionData.styleId,
+                target: target,
+                assignedTimeTableId: assignedTimeTableId,
+                unitProduced: unitProduced,
                 timestamp: Timestamp.now(),
                 createdAt: Timestamp.now(),
             });
             console.log('Production unit recorded for slot:', slotId);
+
+            // Update unitsProduced in the style document atomically
+            const styleDocRef = doc(db, 'styles', sessionData.styleId);
+            await updateDoc(styleDocRef, {
+                unitsProduced: increment(unitProduced),
+                updatedAt: Timestamp.now(),
+            });
         } catch (error) {
             setError('Failed to record production');
             console.error('Error recording production:', error);
@@ -186,10 +207,7 @@ const ProductionBoard: React.FC = () => {
                             <div className="target-info">
                                 <p>Target Units per Hour: {sessionData.target}</p>
                             </div>
-                            <button
-                                className="end-shift-button"
-                                onClick={handleEndShift}
-                            >
+                            <button className="end-shift-button" onClick={handleEndShift}>
                                 End Shift
                             </button>
                         </div>
@@ -202,9 +220,6 @@ const ProductionBoard: React.FC = () => {
                             <ProductionTracking
                                 sessionData={sessionData}
                                 onUnitProduced={handleUnitProduced}
-                                setSessionData={setSessionData}
-                                selectedLineId={sessionData.lineId}
-                                selectedSupervisorId={sessionData.supervisorId}
                             />
                         </div>
 

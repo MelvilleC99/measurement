@@ -1,89 +1,362 @@
 .metrics-counter {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    background: white;
     padding: 1rem;
-    overflow: auto;
 }
 
 .grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
-    padding: 10px;
+    gap: 1rem;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
     .grid {
         grid-template-columns: repeat(4, 1fr);
     }
 }
 
-/* Counter Cards - Unified Styling */
 .counter-card {
-    background: white;
-    border-radius: 8px;
-    padding: 1.25rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    padding: 1rem;
+    border-radius: 0.5rem;
     cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    height: 140px;
-    border: 1px solid;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 120px;
 }
 
 .counter-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-/* Counter Types - All using the same style pattern */
-.counter-reject {
-    border-color: #dc2626;
-    background-color: #fef2f2;
+.counter-content {
+    text-align: center;
 }
-.counter-reject:hover {
-    background-color: #fee2e2;
+
+.counter-reject {
+    background-color: #f87171;
+    color: white;
 }
 
 .counter-rework {
-    border-color: #d97706;
-    background-color: #fffbeb;
-}
-.counter-rework:hover {
-    background-color: #fef3c7;
+    background-color: #fcd34d;
+    color: white;
 }
 
 .counter-late {
-    border-color: #2563eb;
-    background-color: #eff6ff;
-}
-.counter-late:hover {
-    background-color: #dbeafe;
+    background-color: #60a5fa;
+    color: white;
 }
 
 .counter-absent {
-    border-color: #7c3aed;
-    background-color: #f5f3ff;
-}
-.counter-absent:hover {
-    background-color: #ede9fe;
+    background-color: #a78bfa;
+    color: white;
 }
 
 .counter-title {
-    font-size: 1.1rem;
+    font-size: 1.125rem;
     font-weight: 600;
+    margin-bottom: 0.5rem;
     text-transform: capitalize;
-    margin-bottom: 0.75rem;
-    color: #374151;
 }
 
 .counter-value {
     font-size: 2rem;
     font-weight: 700;
-    color: #111827;
+    display: block;
+}
+
+.error-message {
+    background-color: #fee2e2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.error-dismiss-button {
+    color: #991b1b;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 10rem;
+    color: #6b7280;
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: white;
+    border-radius: 0.5rem;
+    max-width: 32rem;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    margin: 1rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Recent Events List Styles */
+.recent-events {
+    margin-top: 1rem;
+}
+
+.recent-events-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    padding: 0 1rem;
+}
+
+.event-list {
+    padding: 0 1rem;
+}
+
+.event-item {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.event-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.event-name {
+    font-weight: 600;
+}
+
+.event-date {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.event-details {
+    font-size: 0.875rem;
+    color: #4b5563;
+    margin-top: 0.5rem;
+}
+
+/* Update Forms Styles */
+.update-section {
+    padding: 1rem;
+}
+
+.update-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.present-button, .absent-button {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.present-button {
+    background-color: #10b981;
+    color: white;
+}
+
+.present-button:hover {
+    background-color: #059669;
+}
+
+.absent-button {
+    background-color: #ef4444;
+    color: white;
+}
+
+.absent-button:hover {
+    background-color: #dc2626;
+}
+
+.back-button {
+    width: 100%;
+    padding: 0.5rem;
+    margin-top: 1rem;
+    text-align: center;
+    color: #6b7280;
+    cursor: pointer;
+}
+
+.back-button:hover {
+    color: #374151;
+}
+
+/* Confirmation Modal Styles */
+.confirmation-modal {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1100;
+}
+
+.confirmation-content {
+    background-color: white;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    max-width: 28rem;
+    width: 100%;
+    margin: 1rem;
+}
+
+.confirmation-details {
+    margin: 1rem 0;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-input, .form-textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    margin-top: 0.25rem;
+}
+
+.form-textarea {
+    min-height: 5rem;
+    resize: vertical;
+}
+
+.confirmation-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.confirm-button, .cancel-button {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.confirm-button {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.confirm-button:hover {
+    background-color: #2563eb;
+}
+
+.cancel-button {
+    background-color: #e5e7eb;
+    color: #374151;
+}
+
+.cancel-button:hover {
+    background-color: #d1d5db;
+}
+
+/* Selected Record Info Styles */
+.selected-record-info {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background-color: #f9fafb;
+}
+
+.selected-record-info h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.selected-record-info p {
+    margin: 0.25rem 0;
+    color: #4b5563;
+}
+
+/* No Records Message */
+.no-records {
+    text-align: center;
+    padding: 2rem;
+    color: #6b7280;
+}
+
+/* Late Records List */
+.late-records-list {
+    padding: 1rem;
+}
+
+.late-record-item {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.late-record-item:hover {
+    background-color: #f9fafb;
+}
+
+.record-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.record-header h3 {
+    font-weight: 600;
+}
+
+.employee-number {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.record-details {
+    font-size: 0.875rem;
+    color: #4b5563;
+}
+
+.record-details p {
+    margin: 0.25rem 0;
 }

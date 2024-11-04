@@ -1,8 +1,9 @@
-// LateUpdate.tsx
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where, updateDoc, doc, Timestamp, addDoc } from 'firebase/firestore';
 import { db } from '../../../../firebase';
 import { LateFormData } from '../types';
+import StandardList, { ListItemData } from '../../../StandardDesign/list/StandardList';
+import StandardCard from '../../../StandardDesign/card/StandardCard';
 import './LateUpdate.css';
 
 interface LateUpdateProps {
@@ -24,6 +25,8 @@ interface LateRecord extends Omit<LateFormData, 'date'> {
     updatedAt: Timestamp;
     updatedBy?: string;
     comments?: string;
+    time: string;
+    reason?: string;
 }
 
 const LateUpdate: React.FC<LateUpdateProps> = ({
@@ -70,10 +73,46 @@ const LateUpdate: React.FC<LateUpdateProps> = ({
         }
     };
 
-    const handleRecordSelect = (record: LateRecord) => {
-        setSelectedRecord(record);
-        setComments('');
-        setSelectedStatus(null);
+    const formatLateRecordsForList = (records: LateRecord[]): ListItemData[] => {
+        return records.map(record => ({
+            id: record.id,
+            title: record.name,
+            subtitle: record.surname,
+            status: 'Late',
+            metadata: {
+                employeeNumber: record.employeeNumber
+            }
+        }));
+    };
+
+    const renderLateRecordItem = (item: ListItemData) => {
+        const {
+            title = '',
+            subtitle = '',
+            status = '',
+            metadata = {}
+        } = item;
+
+        const employeeNumber = metadata.employeeNumber || '';
+
+        return (
+            <div className="list-row">
+                <div className="name-cell">{title}</div>
+                <div className="surname-cell">{subtitle}</div>
+                <div className="employee-number-cell">{employeeNumber}</div>
+                <div className="status-cell">{status}</div>
+            </div>
+        );
+    };
+
+    const handleListItemClick = (item: ListItemData) => {
+        const record = lateRecords.find(r => r.id === item.id);
+        if (record) {
+            setSelectedRecord(record);
+            setComments('');
+            setSelectedStatus(null);
+            setError('');
+        }
     };
 
     const verifySupervisor = async (): Promise<boolean> => {
@@ -148,7 +187,6 @@ const LateUpdate: React.FC<LateUpdateProps> = ({
 
             await updateDoc(recordRef, updateData);
 
-            // If marked as absent, create an absent record
             if (selectedStatus === 'absent') {
                 await addAbsentRecord();
             }
@@ -167,150 +205,115 @@ const LateUpdate: React.FC<LateUpdateProps> = ({
         }
     };
 
+    const getStatusDisplayText = (status: 'present' | 'absent' | null): string => {
+        if (!status) return '';
+        return status.charAt(0).toUpperCase() + status.slice(1);
+    };
+
     if (isLoading) {
         return (
             <div className="modal-overlay">
-                <div className="modal-content">
+                <StandardCard title="Loading">
                     <div className="loading-state">Loading...</div>
-                </div>
+                </StandardCard>
             </div>
         );
     }
 
     return (
         <div className="modal-overlay">
-            <div className="modal-content">
-                <div className="modal-header">
-                    <h2>Update Late Records</h2>
-                    <button onClick={onClose} className="close-button">×</button>
-                </div>
-
+            <StandardCard
+                title={selectedRecord ? 'Update Late Record' : 'Update Late Records'}
+                onClose={selectedRecord && !isConfirmModalOpen ? () => setSelectedRecord(null) : onClose}
+            >
                 {error && (
                     <div className="error-message">
-                        {error}
-                        <button onClick={() => setError('')} className="error-dismiss">×</button>
+                        <span>{error}</span>
+                        <button onClick={() => setError('')}>×</button>
                     </div>
                 )}
 
                 {!selectedRecord ? (
-                    <div className="late-records-list">
-                        {lateRecords.length === 0 ? (
-                            <div className="no-records">No late records to display</div>
+                    <StandardList
+                        items={formatLateRecordsForList(lateRecords)}
+                        onItemClick={handleListItemClick}
+                        renderItemContent={renderLateRecordItem}
+                        emptyMessage="No late records to display"
+                    />
+                ) : (
+                    <div className="selected-item-view">
+                        {!isConfirmModalOpen ? (
+                            <>
+                                <div className="details-grid">
+                                    <p><strong>Name:</strong> {selectedRecord.name} {selectedRecord.surname}</p>
+                                    <p><strong>Employee #:</strong> {selectedRecord.employeeNumber}</p>
+                                    <p><strong>Date:</strong> {selectedRecord.date.toLocaleDateString()}</p>
+                                    <p><strong>Time:</strong> {selectedRecord.time}</p>
+                                    {selectedRecord.reason && (
+                                        <p><strong>Reason:</strong> {selectedRecord.reason}</p>
+                                    )}
+                                </div>
+                                <div className="action-buttons">
+                                    <button
+                                        onClick={() => handleStatusUpdate('present')}
+                                        className="btn-present"
+                                    >
+                                        Mark as Present
+                                    </button>
+                                    <button
+                                        onClick={() => handleStatusUpdate('absent')}
+                                        className="btn-absent"
+                                    >
+                                        Mark as Absent
+                                    </button>
+                                </div>
+                            </>
                         ) : (
-                            lateRecords.map(record => (
-                                <div
-                                    key={record.id}
-                                    className="late-record-item"
-                                    onClick={() => handleRecordSelect(record)}
-                                >
-                                    <div className="record-header">
-                                        <h3>{record.name} {record.surname}</h3>
-                                        <span className="employee-number">
-                                            {record.employeeNumber}
-                                        </span>
-                                    </div>
-                                    <div className="record-details">
-                                        <p>Date: {record.date.toLocaleDateString()}</p>
-                                        <p>Time: {record.time}</p>
-                                        {record.reason && (
-                                            <p>Reason: {record.reason}</p>
-                                        )}
+                            <>
+                                <div className="details-grid">
+                                    <h3>
+                                        Confirm Status Update: {getStatusDisplayText(selectedStatus)}
+                                    </h3>
+                                    <div className="confirmation-inputs">
+                                        <input
+                                            type="password"
+                                            value={supervisorPassword}
+                                            onChange={(e) => setSupervisorPassword(e.target.value)}
+                                            placeholder="Enter Supervisor Password"
+                                            className="supervisor-password-input"
+                                            autoFocus
+                                        />
+                                        <textarea
+                                            value={comments}
+                                            onChange={(e) => setComments(e.target.value)}
+                                            placeholder="Add comments (optional)"
+                                            className="comments-input"
+                                        />
                                     </div>
                                 </div>
-                            ))
+                                <div className="action-buttons">
+                                    <button
+                                        onClick={handleConfirm}
+                                        className="btn-confirm"
+                                    >
+                                        Confirm
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setIsConfirmModalOpen(false);
+                                            setSupervisorPassword('');
+                                            setComments('');
+                                        }}
+                                        className="btn-cancel"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </>
                         )}
                     </div>
-                ) : (
-                    <div className="update-section">
-                        <div className="selected-record-info">
-                            <h3>{selectedRecord.name} {selectedRecord.surname}</h3>
-                            <p>Employee #: {selectedRecord.employeeNumber}</p>
-                            <p>Date: {selectedRecord.date.toLocaleDateString()}</p>
-                            <p>Time: {selectedRecord.time}</p>
-                            {selectedRecord.reason && (
-                                <p>Reason: {selectedRecord.reason}</p>
-                            )}
-                        </div>
-
-                        <div className="update-actions">
-                            <button
-                                onClick={() => handleStatusUpdate('present')}
-                                className="present-button"
-                            >
-                                Mark as Present
-                            </button>
-                            <button
-                                onClick={() => handleStatusUpdate('absent')}
-                                className="absent-button"
-                            >
-                                Mark as Absent
-                            </button>
-                        </div>
-
-                        <button
-                            onClick={() => setSelectedRecord(null)}
-                            className="back-button"
-                        >
-                            Back to List
-                        </button>
-                    </div>
                 )}
-
-                {isConfirmModalOpen && selectedRecord && selectedStatus && (
-                    <div className="confirmation-modal">
-                        <div className="confirmation-content">
-                            <h3>Confirm Update</h3>
-
-                            <div className="confirmation-details">
-                                <p>
-                                    <strong>Employee:</strong> {selectedRecord.name} {selectedRecord.surname}
-                                </p>
-                                <p>
-                                    <strong>New Status:</strong>{' '}
-                                    {selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)}
-                                </p>
-                            </div>
-
-                            <div className="form-group">
-                                <label htmlFor="supervisorPassword">
-                                    Supervisor Password:
-                                </label>
-                                <input
-                                    id="supervisorPassword"
-                                    type="password"
-                                    value={supervisorPassword}
-                                    onChange={(e) => setSupervisorPassword(e.target.value)}
-                                    required
-                                    className="form-input"
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label htmlFor="comments">Comments:</label>
-                                <textarea
-                                    id="comments"
-                                    value={comments}
-                                    onChange={(e) => setComments(e.target.value)}
-                                    placeholder="Add any comments..."
-                                    className="form-textarea"
-                                />
-                            </div>
-
-                            <div className="confirmation-buttons">
-                                <button onClick={handleConfirm} className="confirm-button">
-                                    Confirm
-                                </button>
-                                <button
-                                    onClick={() => setIsConfirmModalOpen(false)}
-                                    className="cancel-button"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
+            </StandardCard>
         </div>
     );
 };

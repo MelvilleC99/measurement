@@ -8,7 +8,8 @@ import {
     updateDoc,
     doc,
     Timestamp,
-    and
+    and,
+    getDoc as getSingleDoc,
 } from 'firebase/firestore';
 import { db } from '../../../../firebase';
 import { ProductionLine, SupportFunction, Style, SessionData } from '../../../../types';
@@ -52,22 +53,26 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
                     getDocs(collection(db, 'styles')),
                 ]);
 
-                const lines = linesSnap.docs.map(doc => ({
+                const lines = linesSnap.docs.map((doc) => ({
                     id: doc.id,
-                    ...doc.data()
-                } as ProductionLine));
+                    name: doc.data().name,
+                    active: doc.data().active || false,
+                    assignedTimeTable: doc.data().assignedTimeTable || '',
+                    createdAt: doc.data().createdAt,
+                    updatedAt: doc.data().updatedAt,
+                })) as ProductionLine[];
                 setProductionLines(lines);
 
-                const sups = supervisorsSnap.docs.map(doc => ({
+                const sups = supervisorsSnap.docs.map((doc) => ({
                     id: doc.id,
-                    ...doc.data()
-                } as SupportFunction));
+                    ...doc.data(),
+                })) as SupportFunction[];
                 setSupervisors(sups);
 
-                const loadedStyles = stylesSnap.docs.map(doc => ({
+                const loadedStyles = stylesSnap.docs.map((doc) => ({
                     id: doc.id,
-                    ...doc.data()
-                } as Style));
+                    ...doc.data(),
+                })) as Style[];
                 setStyles(loadedStyles);
             } catch (err) {
                 console.error('Error fetching initial data:', err);
@@ -86,14 +91,16 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
         setLoading(true);
 
         try {
-            const selectedSupervisor = supervisors.find(s => s.id === selectedSupervisorId);
+            const selectedSupervisor = supervisors.find((s) => s.id === selectedSupervisorId);
             if (!selectedSupervisor) {
                 setError('Selected supervisor not found.');
                 setLoading(false);
                 return;
             }
 
-            console.log(`Attempting to log in supervisor: ${selectedSupervisor.name} ${selectedSupervisor.surname} (${selectedSupervisor.employeeNumber})`);
+            console.log(
+                `Attempting to log in supervisor: ${selectedSupervisor.name} ${selectedSupervisor.surname} (${selectedSupervisor.employeeNumber})`
+            );
 
             // Modified query to check for employee number and password
             const loginQuery = query(
@@ -130,6 +137,35 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
                 const sessionDoc = sessionSnap.docs[0];
                 const sessionData = sessionDoc.data() as SessionData;
 
+                // Check if timeTableId is present, if not, fetch it from the production line
+                if (!sessionData.timeTableId) {
+                    const productionLineDocRef = doc(db, 'productionLines', selectedLineId);
+                    const productionLineSnap = await getSingleDoc(productionLineDocRef);
+
+                    if (!productionLineSnap.exists()) {
+                        setError('Selected production line does not exist.');
+                        setLoading(false);
+                        return;
+                    }
+
+                    const productionLineData = productionLineSnap.data() as ProductionLine;
+                    const assignedTimeTableId = productionLineData.assignedTimeTable;
+
+                    if (!assignedTimeTableId) {
+                        setError('No TimeTable assigned to the selected production line.');
+                        setLoading(false);
+                        return;
+                    }
+
+                    sessionData.timeTableId = assignedTimeTableId;
+
+                    // Optionally, update the session in the database to include timeTableId
+                    await updateDoc(doc(db, 'activeSessions', sessionDoc.id), {
+                        timeTableId: assignedTimeTableId,
+                        updatedAt: Timestamp.now(),
+                    });
+                }
+
                 setActiveSession({
                     sessionId: sessionDoc.id,
                     lineId: sessionData.lineId,
@@ -138,6 +174,7 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
                     target: sessionData.target,
                     startTime: sessionData.startTime,
                     isActive: sessionData.isActive,
+                    timeTableId: sessionData.timeTableId, // Ensure this is included
                 });
 
                 setCurrentStep('sessionOptions');
@@ -147,7 +184,6 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
                 setCurrentStep('confirm');
                 console.log('No active session found, proceeding to confirmation step');
             }
-
         } catch (err: any) {
             console.error('Login error:', err);
             setError('Failed to authenticate. Please try again.');
@@ -193,7 +229,6 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
             // Proceed to confirm style and target
             setCurrentStep('confirm');
             console.log('Proceeding to confirmation step for new session.');
-
         } catch (err) {
             console.error('Error deactivating existing session:', err);
             setError('Failed to start a new session.');
@@ -208,7 +243,7 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
         setLoading(true);
 
         try {
-            const selectedStyle = styles.find(s => s.id === selectedStyleId);
+            const selectedStyle = styles.find((s) => s.id === selectedStyleId);
             if (!selectedStyle) {
                 setError('Please select a valid style.');
                 setLoading(false);
@@ -221,16 +256,36 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
                 return;
             }
 
+            // Fetch the assigned TimeTable for the selected line
+            const productionLineDocRef = doc(db, 'productionLines', selectedLineId);
+            const productionLineSnap = await getSingleDoc(productionLineDocRef);
+
+            if (!productionLineSnap.exists()) {
+                setError('Selected production line does not exist.');
+                setLoading(false);
+                return;
+            }
+
+            const productionLineData = productionLineSnap.data() as ProductionLine;
+            const assignedTimeTableId = productionLineData.assignedTimeTable;
+
+            if (!assignedTimeTableId) {
+                setError('No TimeTable assigned to the selected production line.');
+                setLoading(false);
+                return;
+            }
+
             // Create a new session
             const sessionRef = await addDoc(collection(db, 'activeSessions'), {
                 lineId: selectedLineId,
                 supervisorId: selectedSupervisorId,
                 styleId: selectedStyleId,
                 target: target,
+                timeTableId: assignedTimeTableId, // Include timeTableId
                 startTime: Timestamp.now(),
                 isActive: true,
                 createdAt: Timestamp.now(),
-                updatedAt: Timestamp.now()
+                updatedAt: Timestamp.now(),
             });
 
             const newSession: SessionData = {
@@ -239,13 +294,13 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
                 supervisorId: selectedSupervisorId,
                 styleId: selectedStyleId,
                 target: target,
+                timeTableId: assignedTimeTableId, // Include timeTableId
                 startTime: Timestamp.now(),
-                isActive: true
+                isActive: true,
             };
 
             onLoginSuccess(newSession);
             console.log('New session created with ID:', sessionRef.id);
-
         } catch (err) {
             console.error('Error creating new session:', err);
             setError('Failed to create new session.');
@@ -261,7 +316,9 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
             {error && (
                 <div className="error-message">
                     {error}
-                    <button onClick={() => setError('')} className="error-dismiss-button">✕</button>
+                    <button onClick={() => setError('')} className="error-dismiss-button">
+                        ✕
+                    </button>
                 </div>
             )}
 
@@ -328,18 +385,10 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
                     <h3>Active Session Detected</h3>
                     <p>Would you like to continue with the existing session or start a new one?</p>
                     <div className="session-buttons">
-                        <button
-                            className="continue-button"
-                            onClick={handleContinueSession}
-                            disabled={loading}
-                        >
+                        <button className="continue-button" onClick={handleContinueSession} disabled={loading}>
                             Continue Existing Session
                         </button>
-                        <button
-                            className="new-session-button"
-                            onClick={handleStartNewSession}
-                            disabled={loading}
-                        >
+                        <button className="new-session-button" onClick={handleStartNewSession} disabled={loading}>
                             Start New Session
                         </button>
                     </div>
@@ -363,7 +412,9 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
                                     <option value="">Select a Style</option>
                                     {styles.map((style) => (
                                         <option key={style.id} value={style.id}>
-                                            {`${style.styleNumber} - ${style.styleName} (Balance: ${style.unitsInOrder - (style.unitsProduced || 0)})`}
+                                            {`${style.styleNumber} - ${style.styleName} (Balance: ${
+                                                style.unitsInOrder - (style.unitsProduced || 0)
+                                            })`}
                                         </option>
                                     ))}
                                 </select>

@@ -1,72 +1,31 @@
-/* src/index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* Set base styles for body and html, keeping them minimal */
-body, html {
-  margin: 0;
-  padding: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  background-color: #f4f4f4;
-  height: 100%;
-  width: 100%;
-  box-sizing: border-box;
+/* Custom base styles that don't conflict with Tailwind */
+@layer base {
+  body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+  }
+
+  #root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
 }
 
-/* Ensure the root element uses full height */
-#root {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start; /* Let page-specific CSS control the alignment */
-}
+/* Custom components */
+@layer components {
+  .card {
+    @apply bg-white rounded-lg shadow-md p-5 w-full max-w-[1000px] mx-auto my-5;
+  }
 
-/* Define classes for general use */
-.text-dark {
-  color: #333;
+  .button {
+    @apply bg-blue-500 text-white rounded px-5 py-2.5 cursor-pointer
+    hover:bg-blue-600 transition-colors duration-300;
+  }
 }
-
-.text-light {
-  color: white;
-}
-
-.bg-primary {
-  background-color: #003366; /* Blue background */
-}
-
-.bg-light {
-  background-color: #f4f4f4; /* Light gray background */
-}
-
-.card {
-  background-color: #ffffff;
-  border-radius: 10px;
-  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 20px;
-  width: 100%;
-  max-width: 1000px;
-  margin: 20px auto;
-  box-sizing: border-box;
-}
-
-/* Buttons */
-.button {
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  padding: 10px 20px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  font-family: inherit;
-}
-
-.button:hover {
-  background-color: #0056b3;
-}
-
-/* Headers and text */
-h1, h2, h3, h4, p {
-  margin: 0;
-}
-
-/* Let page-specific styles control the background and text alignment */

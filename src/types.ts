@@ -14,6 +14,8 @@ export interface ProductionLine {
     currentStyle?: string;
     createdAt: Timestamp;
     updatedAt: Timestamp;
+    assignedTimeTable: string;
+
 }
 
 export interface Style {
@@ -26,6 +28,10 @@ export interface Style {
     hourlyTarget: number;
     createdAt: Timestamp;
     updatedAt: Timestamp;
+    unitsProduced: number;
+    customer: string;     // New field for customer
+    smv: number;
+    status: string;
 }
 
 export interface SupportFunction {
@@ -78,12 +84,26 @@ export interface SessionData {
     sessionId: string;
     lineId: string;
     supervisorId: string;
-    styleId: string;
     startTime: Timestamp;
     endTime?: Timestamp;
     isActive: boolean;
+    styleId: string ;
+    target: number;
+    timeTableId: string;
 
 
+}
+
+export interface ScheduledStyle {
+    id: string;
+    styleName: string;
+    styleNumber: string;
+    lineId: string;
+    onLineDate: string;
+    offLineDate: string; // New field for offline date
+    expectedDeliveryDate: string; // New field for expected delivery date
+    deliveryDate: string;
+    status: string;
 }
 // ------------------------
 // Helper Functions

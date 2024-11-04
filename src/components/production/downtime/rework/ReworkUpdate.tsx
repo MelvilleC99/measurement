@@ -1,86 +1,119 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, updateDoc, doc, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, where, updateDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../../firebase';
-import { ReworkItem, RejectFormData } from '../types';
-import { SupportFunction } from '../../../../types';
+import { ReworkRecord, ReworkUpdateProps } from '../types';
+import { RejectFormData } from '../types';
+import StandardList, { ListItemData } from '../../../StandardDesign/list/StandardList';
+import StandardCard from '../../../StandardDesign/card/StandardCard';
 import './ReworkUpdate.css';
 
-interface ReworkUpdateProps {
-    onClose: () => void;
-}
-
-const ReworkUpdate: React.FC<ReworkUpdateProps> = ({ onClose }) => {
-    const [reworks, setReworks] = useState<ReworkItem[]>([]);
-    const [selectedRework, setSelectedRework] = useState<ReworkItem | null>(null);
+const ReworkUpdate: React.FC<ReworkUpdateProps> = ({
+                                                       onClose,
+                                                       onUpdate,
+                                                       lineId,
+                                                       supervisorId,
+                                                       sessionId
+                                                   }) => {
+    const [reworks, setReworks] = useState<ReworkRecord[]>([]);
+    const [selectedRework, setSelectedRework] = useState<ReworkRecord | null>(null);
     const [qcPassword, setQcPassword] = useState<string>('');
     const [error, setError] = useState<string>('');
-    const [qcs, setQcs] = useState<SupportFunction[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
     const [actionType, setActionType] = useState<'complete' | 'reject'>('complete');
 
     useEffect(() => {
-        const fetchReworksAndQCs = async () => {
-            try {
-                const reworksSnapshot = await getDocs(query(collection(db, 'reworks'), where('status', '==', 'Open')));
-                const fetchedReworks: ReworkItem[] = reworksSnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    refNumber: doc.data().refNumber,
-                    count: doc.data().count,
-                    reason: doc.data().reason,
-                    operation: doc.data().operation,
-                    startTime: doc.data().startTime,
-                    endTime: doc.data().endTime,
-                    status: doc.data().status,
-                    productionLineId: doc.data().productionLineId,
-                    supervisorId: doc.data().supervisorId,
-                    qcId: doc.data().qcId,
-                    comments: doc.data().comments,
-                    createdAt: doc.data().createdAt,
-                    updatedAt: doc.data().updatedAt
-                }));
+        fetchReworks();
+    }, [sessionId]);
 
-                setReworks(fetchedReworks);
+    const fetchReworks = async () => {
+        try {
+            setIsLoading(true);
+            const reworksQuery = query(
+                collection(db, 'reworks'),
+                where('sessionId', '==', sessionId),
+                where('status', '==', 'open')
+            );
 
-                // Updated QC query to match database structure
-                const qcsSnapshot = await getDocs(query(
-                    collection(db, 'supportFunctions'),
-                    where('role', '==', 'QC'),
-                    where('hasPassword', '==', true)
-                ));
-                const fetchedQCs: SupportFunction[] = qcsSnapshot.docs.map(doc => ({
+            const snapshot = await getDocs(reworksQuery);
+            const fetchedReworks = snapshot.docs.map(doc => {
+                const data = doc.data();
+                const reworkRef = doc.id.slice(-4);
+                return {
                     id: doc.id,
-                    ...doc.data()
-                })) as SupportFunction[];
-                setQcs(fetchedQCs);
-            } catch (err) {
-                console.error('Error fetching reworks or QCs:', err);
-                setError('Failed to load reworks or QCs.');
+                    itemId: reworkRef,
+                    count: data.count || 0,
+                    reason: data.reason || '',
+                    operation: data.operation || '',
+                    qcId: data.qcId || '',
+                    productionLineId: data.productionLineId || '',
+                    supervisorId: data.supervisorId || '',
+                    sessionId: data.sessionId || '',
+                    styleNumber: data.styleNumber || '',
+                    status: data.status || 'open',
+                    comments: data.comments || '',
+                    createdAt: data.createdAt,
+                    updatedAt: data.updatedAt,
+                    refNumber: reworkRef
+                } as ReworkRecord;
+            });
+
+            setReworks(fetchedReworks);
+        } catch (err) {
+            console.error('Error fetching reworks:', err);
+            setError('Failed to load reworks');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const formatReworksForList = (reworks: ReworkRecord[]): ListItemData[] => {
+        return reworks.map(rework => ({
+            id: rework.id,
+            title: `#${rework.itemId}`,
+            subtitle: rework.reason,
+            status: rework.status,
+            metadata: {
+                styleNumber: rework.styleNumber,
+                count: rework.count,
+                operation: rework.operation
             }
-        };
+        }));
+    };
 
-        fetchReworksAndQCs();
-    }, []);
+    const renderReworkItem = (item: ListItemData) => (
+        <div className="list-row">
+            <div className="ref-cell">{item.title}</div>
+            <div className="style-cell">{item.metadata?.styleNumber}</div>
+            <div className="reason-cell">{item.subtitle}</div>
+            <div className="operation-cell">{item.metadata?.operation || '-'}</div>
+            <div className="count-cell">{item.metadata?.count}</div>
+        </div>
+    );
 
-    const handleSelectRework = (rework: ReworkItem) => {
-        setSelectedRework(rework);
-        setError(''); // Clear any previous errors
+    const handleListItemClick = (item: ListItemData) => {
+        const rework = reworks.find(r => r.id === item.id);
+        if (rework) {
+            setSelectedRework(rework);
+            setIsConfirmModalOpen(false);
+            setError('');
+        }
     };
 
     const handleAction = (type: 'complete' | 'reject') => {
         if (!selectedRework) {
-            setError('No rework selected.');
+            setError('No rework selected');
             return;
         }
         setActionType(type);
         setIsConfirmModalOpen(true);
-        setError(''); // Clear any previous errors
+        setError('');
     };
 
     const handleConfirm = async () => {
         if (!selectedRework) return;
 
         try {
-            // Updated QC verification query to match database structure
             const qcSnapshot = await getDocs(query(
                 collection(db, 'supportFunctions'),
                 where('employeeNumber', '==', selectedRework.qcId),
@@ -89,133 +122,164 @@ const ReworkUpdate: React.FC<ReworkUpdateProps> = ({ onClose }) => {
             ));
 
             if (qcSnapshot.empty) {
-                setError('Invalid QC credentials. Please check your password.');
+                setError('Invalid QC credentials');
                 return;
             }
 
+            const timestamp = serverTimestamp();
+
             if (actionType === 'complete') {
                 await updateDoc(doc(db, 'reworks', selectedRework.id), {
-                    status: 'Booked In',
-                    endTime: Timestamp.now(),
-                    updatedAt: Timestamp.now()
+                    status: 'closed',
+                    closedAt: timestamp,
+                    closedBy: selectedRework.qcId,
+                    updatedAt: timestamp
                 });
-                alert('Rework marked as complete.');
-            } else if (actionType === 'reject') {
-                // Create a reject entry
+            } else {
                 const rejectData: RejectFormData = {
                     reason: selectedRework.reason,
                     operation: selectedRework.operation,
-                    comments: selectedRework.comments,
+                    comments: `Converted from Rework #${selectedRework.itemId}. ${selectedRework.comments}`,
                     qcId: selectedRework.qcId,
                     count: selectedRework.count,
                     recordedAsProduced: false,
                     productionLineId: selectedRework.productionLineId,
-                    supervisorId: selectedRework.supervisorId
+                    supervisorId: selectedRework.supervisorId,
+                    sessionId: selectedRework.sessionId,
+                    styleNumber: selectedRework.styleNumber,
+                    status: 'open'
                 };
-                await addDoc(collection(db, 'rejects'), rejectData);
 
-                // Update rework status
-                await updateDoc(doc(db, 'reworks', selectedRework.id), {
-                    status: 'Rejected',
-                    endTime: Timestamp.now(),
-                    updatedAt: Timestamp.now()
-                });
-                alert('Rework converted to reject.');
+                await Promise.all([
+                    addDoc(collection(db, 'rejects'), {
+                        ...rejectData,
+                        createdAt: timestamp,
+                        updatedAt: timestamp
+                    }),
+                    updateDoc(doc(db, 'reworks', selectedRework.id), {
+                        status: 'rejected',
+                        closedAt: timestamp,
+                        closedBy: selectedRework.qcId,
+                        updatedAt: timestamp
+                    })
+                ]);
             }
 
-            // Refresh reworks list
-            const reworksSnapshot = await getDocs(query(collection(db, 'reworks'), where('status', '==', 'Open')));
-            const fetchedReworks: ReworkItem[] = reworksSnapshot.docs.map(doc => ({
-                id: doc.id,
-                refNumber: doc.data().refNumber,
-                count: doc.data().count,
-                reason: doc.data().reason,
-                operation: doc.data().operation,
-                startTime: doc.data().startTime,
-                endTime: doc.data().endTime,
-                status: doc.data().status,
-                productionLineId: doc.data().productionLineId,
-                supervisorId: doc.data().supervisorId,
-                qcId: doc.data().qcId,
-                comments: doc.data().comments,
-                createdAt: doc.data().createdAt,
-                updatedAt: doc.data().updatedAt
-            }));
+            await fetchReworks();
+            if (onUpdate) {
+                onUpdate();
+            }
 
-            setReworks(fetchedReworks);
-
-            // Reset selections
             setSelectedRework(null);
             setQcPassword('');
             setIsConfirmModalOpen(false);
-            setError(''); // Clear any errors on success
+            setError('');
         } catch (err) {
             console.error('Error updating rework:', err);
-            setError('Failed to update rework. Please try again.');
+            setError('Failed to update rework');
         }
     };
 
+    if (isLoading) {
+        return (
+            <div className="modal-overlay">
+                <StandardCard title="Loading">
+                    <div className="loading-state">Loading...</div>
+                </StandardCard>
+            </div>
+        );
+    }
+
     return (
         <div className="modal-overlay">
-            <div className="rework-update-modal">
-                <h2>Manage Reworks</h2>
-                {error && <p className="error-message">{error}</p>}
+            <StandardCard
+                title={selectedRework ? 'Rework Details' : 'Manage Reworks'}
+                onClose={selectedRework ? () => setSelectedRework(null) : onClose}
+            >
+                {error && (
+                    <div className="error-message">
+                        <span>{error}</span>
+                        <button onClick={() => setError('')}>×</button>
+                    </div>
+                )}
 
                 {!selectedRework ? (
-                    <div className="rework-list">
-                        {reworks.length === 0 ? (
-                            <p>No active reworks.</p>
-                        ) : (
-                            reworks.map(rework => (
-                                <div key={rework.id} className="rework-card" onClick={() => handleSelectRework(rework)}>
-                                    <p><strong>Ref Number:</strong> {rework.refNumber || rework.id.slice(-4)}</p>
-                                    <p><strong>Reason:</strong> {rework.reason}</p>
-                                    <p><strong>Operation:</strong> {rework.operation}</p>
-                                    <p><strong>Comments:</strong> {rework.comments || 'N/A'}</p>
+                    <StandardList
+                        items={formatReworksForList(reworks)}
+                        onItemClick={handleListItemClick}
+                        renderItemContent={renderReworkItem}
+                        emptyMessage="No active reworks to display"
+                    />
+                ) : (
+                    <div className="selected-item-view">
+                        {!isConfirmModalOpen ? (
+                            <>
+                                <div className="details-grid">
+                                    <p><strong>Reference #:</strong> {selectedRework.itemId}</p>
+                                    <p><strong>Style Number:</strong> {selectedRework.styleNumber}</p>
+                                    <p><strong>Reason:</strong> {selectedRework.reason}</p>
+                                    <p><strong>Count:</strong> {selectedRework.count}</p>
+                                    {selectedRework.operation && (
+                                        <p><strong>Operation:</strong> {selectedRework.operation}</p>
+                                    )}
+                                    {selectedRework.comments && (
+                                        <p><strong>Comments:</strong> {selectedRework.comments}</p>
+                                    )}
                                 </div>
-                            ))
+                                <div className="action-buttons">
+                                    <button
+                                        onClick={() => handleAction('complete')}
+                                        className="btn-complete"
+                                    >
+                                        Mark as Complete
+                                    </button>
+                                    <button
+                                        onClick={() => handleAction('reject')}
+                                        className="btn-reject"
+                                    >
+                                        Convert to Reject
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="details-grid">
+                                    <h3>
+                                        Confirm {actionType === 'complete' ? 'Complete' : 'Convert to Reject'}
+                                    </h3>
+                                    <div className="confirmation-inputs">
+                                        <input
+                                            type="password"
+                                            value={qcPassword}
+                                            onChange={(e) => setQcPassword(e.target.value)}
+                                            placeholder="Enter QC Password"
+                                            className="qc-password-input"
+                                            autoFocus
+                                        />
+                                    </div>
+                                </div>
+                                <div className="action-buttons">
+                                    <button
+                                        onClick={handleConfirm}
+                                        className="btn-confirm"
+                                    >
+                                        Confirm
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setIsConfirmModalOpen(false);
+                                            setQcPassword('');
+                                        }}
+                                        className="btn-cancel"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </>
                         )}
                     </div>
-                ) : (
-                    <div className="rework-actions">
-                        <h3>Selected Rework: {selectedRework.refNumber || selectedRework.id.slice(-4)}</h3>
-                        <p><strong>Reason:</strong> {selectedRework.reason}</p>
-                        <p><strong>Operation:</strong> {selectedRework.operation}</p>
-                        <p><strong>Comments:</strong> {selectedRework.comments || 'N/A'}</p>
-
-                        <div className="action-buttons">
-                            <button onClick={() => handleAction('complete')} className="complete-button">Rework Complete</button>
-                            <button onClick={() => handleAction('reject')} className="reject-button">Convert to Reject</button>
-                        </div>
-                    </div>
                 )}
-
-                {/* Confirmation Modal */}
-                {isConfirmModalOpen && (
-                    <div className="modal-overlay">
-                        <div className="confirmation-modal">
-                            <h3>Confirm Action</h3>
-                            <p>Enter QC Password to confirm.</p>
-                            <input
-                                type="password"
-                                value={qcPassword}
-                                onChange={(e) => setQcPassword(e.target.value)}
-                                placeholder="QC Password"
-                            />
-                            <div className="modal-buttons">
-                                <button onClick={handleConfirm} className="confirm-button">Confirm</button>
-                                <button onClick={() => {
-                                    setIsConfirmModalOpen(false);
-                                    setQcPassword('');
-                                    setError('');
-                                }} className="cancel-button">Cancel</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                <button onClick={onClose} className="close-modal-button">✕</button>
-            </div>
+            </StandardCard>
         </div>
     );
 };

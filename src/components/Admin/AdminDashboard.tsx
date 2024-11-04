@@ -1,3 +1,5 @@
+// src/components/Admin/AdminDashboard.tsx
+
 import React, { useState } from 'react';
 import './AdminDashboard.css';
 import ProductionLines from './ProductionLines';
@@ -8,7 +10,9 @@ import MachineList from './MachineList';
 import ProductionSchedule from './ProductionSchedule';
 import Downtime from './DownTime';
 import StyleCard from './StyleCard';
-import ProductHierarchyList from './ProductHierarchyList'; // Import the new component
+import ProductHierarchyList from './ProductHierarchyList'; // Import the existing component
+import ScheduleOvertime from './ScheduleOvertime'; // Import the ScheduleOvertime component
+import TestSchedule from './TestSchedule'; // Import the TestSchedule component
 
 const AdminDashboard: React.FC = () => {
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -56,6 +60,14 @@ const AdminDashboard: React.FC = () => {
                     <button className="toolbar-button" onClick={() => handleOptionClick('ProductHierarchy')}>
                         Product Hierarchy
                     </button>
+                    {/* Add the new Schedule Overtime button */}
+                    <button className="toolbar-button" onClick={() => handleOptionClick('ScheduleOvertime')}>
+                        Schedule Overtime
+                    </button>
+                    {/* Add the new Test Schedule button */}
+                    <button className="toolbar-button" onClick={() => handleOptionClick('TestSchedule')}>
+                        Test Schedule
+                    </button>
                 </div>
 
                 <div className="content-area">
@@ -72,12 +84,14 @@ const AdminDashboard: React.FC = () => {
                     {selectedOption === 'ProductionSchedule' && <ProductionSchedule />}
                     {selectedOption === 'Downtime' && <Downtime />}
                     {selectedOption === 'StyleCard' && <StyleCard />}
-                    {/* Render the new ProductHierarchyList component */}
                     {selectedOption === 'ProductHierarchy' && <ProductHierarchyList />}
+                    {selectedOption === 'ScheduleOvertime' && <ScheduleOvertime />}
+                    {selectedOption === 'TestSchedule' && <TestSchedule />} {/* Render TestSchedule Component */}
                 </div>
             </div>
         </div>
     );
+
 };
 
 export default AdminDashboard;

@@ -1,6 +1,5 @@
-// Reject.tsx
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../../firebase';
 import { RejectFormData } from '../types';
 import { SupportFunction } from '../../../../types';
@@ -11,6 +10,7 @@ interface RejectProps {
     onSubmit: (rejectData: RejectFormData) => Promise<void>;
     productionLineId: string;
     supervisorId: string;
+    sessionId: string;
     qcs: SupportFunction[];
 }
 
@@ -19,6 +19,7 @@ const Reject: React.FC<RejectProps> = ({
                                            onSubmit,
                                            productionLineId,
                                            supervisorId,
+                                           sessionId,
                                            qcs
                                        }) => {
     const [reason, setReason] = useState<string>('');
@@ -32,13 +33,18 @@ const Reject: React.FC<RejectProps> = ({
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [styleNumber, setStyleNumber] = useState<string>('');
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setIsLoading(true);
 
-                // Fetch reject reasons from downtimeCategories
+                // Fetch current style number (for database only)
+                const lineDoc = await getDoc(doc(db, 'productionLines', productionLineId));
+                setStyleNumber(lineDoc.data()?.currentStyle || '');
+
+                // Fetch reject reasons
                 const reasonsQuery = query(
                     collection(db, 'downtimeCategories'),
                     where('name', '==', 'Reject')
@@ -49,7 +55,7 @@ const Reject: React.FC<RejectProps> = ({
                 );
                 setReasonsList(fetchedReasons);
 
-                // Fetch operations from productHierarchy
+                // Fetch operations
                 const operationsSnapshot = await getDocs(collection(db, 'productHierarchy'));
                 const fetchedOperations: { id: string; name: string; }[] = [];
 
@@ -74,14 +80,14 @@ const Reject: React.FC<RejectProps> = ({
                 setOperationsList(fetchedOperations);
             } catch (err) {
                 console.error('Error fetching data:', err);
-                setError('Failed to load reasons and operations');
+                setError('Failed to load data');
             } finally {
                 setIsLoading(false);
             }
         };
 
         fetchData();
-    }, []);
+    }, [productionLineId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -123,8 +129,18 @@ const Reject: React.FC<RejectProps> = ({
                 count,
                 recordedAsProduced: false,
                 productionLineId,
-                supervisorId
+                supervisorId,
+                sessionId,
+                styleNumber,
+                status: 'open',
             };
+
+            // Add to Firestore with server timestamp
+            await addDoc(collection(db, 'rejects'), {
+                ...rejectData,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            });
 
             await onSubmit(rejectData);
 
@@ -147,8 +163,8 @@ const Reject: React.FC<RejectProps> = ({
     if (isLoading) {
         return (
             <div className="modal-overlay">
-                <div className="modal-content">
-                    <div className="loading-state">Loading...</div>
+                <div className="modal-content modal-content-compact">
+                    <div className="loading-spinner">Loading...</div>
                 </div>
             </div>
         );
@@ -156,8 +172,18 @@ const Reject: React.FC<RejectProps> = ({
 
     return (
         <div className="modal-overlay">
-            <div className="modal-content">
-                <h2>Log Reject</h2>
+            <div className="modal-content modal-content-compact">
+                <div className="modal-header">
+                    <h2>Log Reject</h2>
+                    <button
+                        onClick={onClose}
+                        className="close-button"
+                        aria-label="Close"
+                    >
+                        ×
+                    </button>
+                </div>
+
                 {error && (
                     <div className="error-message">
                         {error}
@@ -166,52 +192,62 @@ const Reject: React.FC<RejectProps> = ({
                 )}
 
                 <form onSubmit={handleSubmit} className="reject-form">
-                    <label>
-                        Reason:
+                    <div className="form-group">
+                        <label>
+                            Reason: <span className="required">*</span>
+                        </label>
                         <select
                             value={reason}
                             onChange={(e) => setReason(e.target.value)}
                             required
+                            className="form-select"
                         >
                             <option value="">Select Reason</option>
                             {reasonsList.map((r, index) => (
                                 <option key={index} value={r}>{r}</option>
                             ))}
                         </select>
-                    </label>
+                    </div>
 
-                    <label>
-                        Operation:
+                    <div className="form-group">
+                        <label>
+                            Operation:
+                        </label>
                         <select
                             value={operation}
                             onChange={(e) => setOperation(e.target.value)}
+                            className="form-select"
                         >
                             <option value="">Select Operation</option>
                             {operationsList.map((op) => (
-                                <option key={op.id} value={op.name}>
-                                    {op.name}
-                                </option>
+                                <option key={op.id} value={op.name}>{op.name}</option>
                             ))}
                         </select>
-                    </label>
+                    </div>
 
-                    <label>
-                        Count:
+                    <div className="form-group">
+                        <label>
+                            Count: <span className="required">*</span>
+                        </label>
                         <input
                             type="number"
                             min="1"
                             value={count}
                             onChange={(e) => setCount(parseInt(e.target.value) || 1)}
                             required
+                            className="form-input"
                         />
-                    </label>
+                    </div>
 
-                    <label>
-                        Quality Controller:
+                    <div className="form-group">
+                        <label>
+                            Quality Controller: <span className="required">*</span>
+                        </label>
                         <select
                             value={selectedQc}
                             onChange={(e) => setSelectedQc(e.target.value)}
                             required
+                            className="form-select"
                         >
                             <option value="">Select QC</option>
                             {qcs.map((qc) => (
@@ -220,33 +256,38 @@ const Reject: React.FC<RejectProps> = ({
                                 </option>
                             ))}
                         </select>
-                    </label>
+                    </div>
 
-                    <label>
-                        QC Password:
+                    <div className="form-group">
+                        <label>
+                            QC Password: <span className="required">*</span>
+                        </label>
                         <input
                             type="password"
                             value={qcPassword}
                             onChange={(e) => setQcPassword(e.target.value)}
                             required
+                            className="form-input"
                         />
-                    </label>
+                    </div>
 
-                    <label>
-                        Comments:
+                    <div className="form-group">
+                        <label>Comments:</label>
                         <textarea
                             value={comments}
                             onChange={(e) => setComments(e.target.value)}
                             placeholder="Enter additional comments..."
+                            rows={3}
+                            className="form-textarea"
                         />
-                    </label>
+                    </div>
 
                     <div className="form-buttons">
-                        <button type="submit" className="submit-button">
-                            Log Reject
-                        </button>
-                        <button type="button" onClick={onClose} className="cancel-button">
+                        <button type="button" onClick={onClose} className="button cancel-button">
                             Cancel
+                        </button>
+                        <button type="submit" className="button submit-button">
+                            Submit
                         </button>
                     </div>
                 </form>
@@ -263,14 +304,17 @@ const Reject: React.FC<RejectProps> = ({
                                 )}
                             </div>
                             <div className="confirmation-buttons">
-                                <button onClick={handleConfirm} className="confirm-button">
-                                    Confirm
-                                </button>
                                 <button
                                     onClick={() => setIsConfirmModalOpen(false)}
-                                    className="cancel-button"
+                                    className="button cancel-button"
                                 >
                                     Cancel
+                                </button>
+                                <button
+                                    onClick={handleConfirm}
+                                    className="button confirm-button"
+                                >
+                                    Confirm
                                 </button>
                             </div>
                         </div>

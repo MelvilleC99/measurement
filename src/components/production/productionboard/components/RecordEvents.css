@@ -26,9 +26,11 @@
     padding: 0.5rem;
 }
 
+/* Base button styles for all output buttons */
 .output-button {
     padding: 1rem;
-    color: white;
+    color: white !important; /* Force the text to be white */
+    background-color: #1872cc !important; /* Default background to dark grey */
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -42,31 +44,52 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+/* Hover effect for buttons */
 .output-button:hover {
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
+/* Specific button colors to make them distinguishable */
 .output-button.reject {
-    background-color: #dc2626;
+    background-color: #dc2626 !important; /* Bright Red for Reject */
 }
 
 .output-button.rework {
-    background-color: #f97316;
+    background-color: #f97316 !important; /* Bright Orange for Rework */
 }
 
 .output-button.hr {
-    background-color: #579a67;
+    background-color: #579a67 !important; /* Bright Green for HR */
 }
 
 .output-button.downtime {
-    background-color: #0c4c88;
+    background-color: #0c4c88 !important; /* Bright Blue for Downtime */
 }
 
-.output-button.manage-rework {
-    background-color: #2563eb;
+/* Sub-option buttons inside HR and Downtime sections */
+.output-button.sub-option {
+    background-color: #4a5568 !important; /* Medium Grey for Sub-options */
+    color: white !important; /* Ensure text is white */
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 1rem;
+    font-weight: 500;
+    min-height: 50px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+.output-button.sub-option:hover {
+    background-color: #2d3748 !important; /* Darker Grey on Hover */
+}
+
+/* Section content container styling */
 .section-content {
     width: 100%;
     height: 100%;
@@ -74,6 +97,7 @@
     flex-direction: column;
 }
 
+/* Back link button styling */
 .back-link {
     padding: 0.5rem;
     color: #4a5568;
@@ -92,6 +116,7 @@
     color: #1a202c;
 }
 
+/* Error message styling */
 .error-message {
     position: fixed;
     bottom: 1rem;
@@ -122,7 +147,7 @@
     color: #333;
 }
 
-/* Responsive adjustments */
+/* Responsive adjustments for smaller screens */
 @media (max-width: 1024px) {
     .button-grid {
         grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

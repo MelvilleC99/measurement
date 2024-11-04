@@ -1,7 +1,5 @@
-// src/types/downtime/ReworkType.ts
-
 import { Timestamp } from 'firebase/firestore';
-import { SupportFunction } from '../../../../types'; // Import from src/types.ts
+import { SupportFunction } from '../../../../types';
 
 // ------------------------
 // Form Data Interfaces
@@ -15,8 +13,12 @@ export interface ReworkFormData {
     count: number;
     productionLineId: string;
     supervisorId: string;
+    sessionId: string;
+    styleNumber: string;
+    status: string;
     createdAt?: Date;
-    status: string
+    updatedAt?: Date;
+    itemId?: string;
 }
 
 // ------------------------
@@ -28,6 +30,7 @@ export interface ReworkProps {
     onSubmit: (formData: ReworkFormData) => Promise<void>;
     productionLineId: string;
     supervisorId: string;
+    sessionId: string;
     qcs: SupportFunction[];
 }
 
@@ -35,43 +38,44 @@ export interface ReworkProps {
 // Document Interfaces
 // ------------------------
 
-export interface ReworkItem {
+export interface ReworkRecord {
     id: string;
+    itemId: string;
+    count: number;
+    reason: string;
+    operation: string;
+    qcId: string;
+    productionLineId: string;
+    supervisorId: string;
+    sessionId: string;
+    styleNumber: string;
+    status: string;
+    comments: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}
+
+// Add this interface for backward compatibility
+export interface ReworkItem extends ReworkRecord {
     refNumber?: string;
-    count: number;
-    reason: string;
-    operation: string;
-    startTime: Timestamp;
+    startTime?: Timestamp;
     endTime?: Timestamp;
-    status: 'Booked Out' | 'Booked In' | 'Rejected';
-    productionLineId: string;
-    supervisorId: string;
-    qcId: string;
-    comments: string;
-    createdAt: Timestamp;
-    updatedAt: Timestamp;
 }
 
 // ------------------------
-// Base Interfaces
+// Update Props Interface
 // ------------------------
 
-export interface ReworkBase {
-    id: string;
-    reason: string;
-    operation: string;
-    comments: string;
-    qcId: string;
-    count: number;
-    productionLineId: string;
-    supervisorId: string;
-    createdAt: Timestamp;
-    updatedAt: Timestamp;
-}
-
-
-// ReworkUpdate props
-interface ReworkUpdateProps {
+export interface ReworkUpdateProps {
     onClose: () => void;
-    onSubmit: () => Promise<void>;
+    onUpdate?: () => void;
+    lineId: string;
+    supervisorId: string;
+    sessionId: string;
 }
+
+// ------------------------
+// Status Type
+// ------------------------
+
+export type ReworkStatus = 'open' | 'closed';

@@ -11,20 +11,20 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../../../firebase';
 import Rework from '../../downtime/rework/Rework';
-import ReworkUpdate from '../../downtime/rework/ReworkUpdate';
 import Reject from '../../downtime/reject/Reject';
 import Late from '../../downtime/hr/Late';
 import Absent from '../../downtime/hr/Absent';
 import SupplyLog from '../../downtime/supply/Supply';
-import StyleChangeover from '../../downtime/stylechange/StyleChangeover'; // Component
+import StyleChangeover from '../../downtime/stylechange/StyleChangeover';
+import Machine from '../../downtime/machine/Machine';
 import {
     ReworkFormData,
     RejectFormData,
     LateFormData,
     AbsentFormData,
-    SupplyFormData
+    SupplyFormData,
+    StyleChangeoverFormData
 } from '../../downtime/types';
-import { StyleChangeoverFormData } from '../../downtime/types'; // Type import
 import { SupportFunction } from '../../../../types';
 import './RecordEvents.css';
 
@@ -44,16 +44,15 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
     // State Management
     const [activeSection, setActiveSection] = useState<'hr' | 'downtime' | null>(null);
     const [isReworkModalOpen, setIsReworkModalOpen] = useState(false);
-    const [isReworkUpdateModalOpen, setIsReworkUpdateModalOpen] = useState(false);
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
     const [isLateModalOpen, setIsLateModalOpen] = useState(false);
     const [isAbsentModalOpen, setIsAbsentModalOpen] = useState(false);
     const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
     const [isStyleChangeoverModalOpen, setIsStyleChangeoverModalOpen] = useState(false);
+    const [isMachineModalOpen, setIsMachineModalOpen] = useState(false);
     const [qcs, setQcs] = useState<SupportFunction[]>([]);
     const [error, setError] = useState<string>('');
 
-    // Fetch QCs on component mount
     useEffect(() => {
         const fetchQCs = async () => {
             try {
@@ -84,11 +83,11 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         { id: 'styleChange', name: 'Style Change' }
     ];
 
-    // Event Handlers
     const handleReworkSubmit = async (data: ReworkFormData) => {
         try {
             const reworkDocRef = await addDoc(collection(db, 'reworks'), {
                 ...data,
+                sessionId,
                 status: 'Open',
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now()
@@ -107,15 +106,12 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         }
     };
 
-    const handleReworkUpdate = () => {
-        setIsReworkUpdateModalOpen(true);
-    };
-
     const handleRejectSubmit = async (data: RejectFormData) => {
         try {
             await addDoc(collection(db, 'rejects'), {
                 ...data,
-                timestamp: Timestamp.now(),
+                sessionId,
+                status: 'open',
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now()
             });
@@ -132,7 +128,10 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         try {
             await addDoc(collection(db, 'attendance'), {
                 ...data,
-                timestamp: Timestamp.now(),
+                type: 'late',
+                status: 'late',
+                sessionId,
+                supervisorId,
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now()
             });
@@ -149,7 +148,10 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         try {
             await addDoc(collection(db, 'attendance'), {
                 ...data,
-                timestamp: Timestamp.now(),
+                type: 'absent',
+                status: 'absent',
+                sessionId,
+                supervisorId,
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now()
             });
@@ -166,9 +168,10 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         try {
             await addDoc(collection(db, 'supplyDowntime'), {
                 ...data,
+                sessionId,
+                status: 'Open',
                 createdAt: Timestamp.now(),
-                startTime: Timestamp.now(),
-                status: 'Open' as const,
+                startTime: Timestamp.now()
             });
             setIsSupplyModalOpen(false);
         } catch (err) {
@@ -181,8 +184,9 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         try {
             await addDoc(collection(db, 'styleChangeovers'), {
                 ...data,
-                createdAt: Timestamp.now(),
+                sessionId,
                 status: 'In Progress',
+                createdAt: Timestamp.now(),
                 progressSteps: {
                     machineSetupComplete: false,
                     peopleAllocated: false,
@@ -194,6 +198,16 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         } catch (error) {
             console.error('Error submitting style changeover:', error);
             setError('Failed to submit style changeover.');
+        }
+    };
+
+    const handleMachineSubmit = async (data: any): Promise<void> => {
+        try {
+            console.log("Machine downtime data submitted", data);
+            setIsMachineModalOpen(false);
+        } catch (error) {
+            console.error("Error logging machine downtime:", error);
+            setError("Failed to log machine downtime.");
         }
     };
 
@@ -225,12 +239,6 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                             className="output-button downtime"
                         >
                             Downtime
-                        </button>
-                        <button
-                            onClick={() => handleReworkUpdate()}
-                            className="output-button manage-rework"
-                        >
-                            Manage Reworks
                         </button>
                     </div>
                 ) : (
@@ -265,12 +273,12 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                                     <button
                                         key={category.id}
                                         onClick={() => {
-                                            if (category.id === 'supply') {
+                                            if (category.id === 'machine') {
+                                                setIsMachineModalOpen(true);
+                                            } else if (category.id === 'supply') {
                                                 setIsSupplyModalOpen(true);
                                             } else if (category.id === 'styleChange') {
                                                 setIsStyleChangeoverModalOpen(true);
-                                            } else {
-                                                console.log(category.id);
                                             }
                                         }}
                                         className="output-button"
@@ -290,13 +298,8 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                         onSubmit={handleReworkSubmit}
                         productionLineId={lineId}
                         supervisorId={supervisorId}
+                        sessionId={sessionId}
                         qcs={qcs}
-                    />
-                )}
-
-                {isReworkUpdateModalOpen && (
-                    <ReworkUpdate
-                        onClose={() => setIsReworkUpdateModalOpen(false)}
                     />
                 )}
 
@@ -306,6 +309,7 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                         onSubmit={handleRejectSubmit}
                         productionLineId={lineId}
                         supervisorId={supervisorId}
+                        sessionId={sessionId}
                         qcs={qcs}
                     />
                 )}
@@ -315,7 +319,6 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                         onClose={() => setIsLateModalOpen(false)}
                         onSubmit={handleLateSubmit}
                         productionLineId={lineId}
-
                     />
                 )}
 
@@ -324,7 +327,6 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                         onClose={() => setIsAbsentModalOpen(false)}
                         onSubmit={handleAbsentSubmit}
                         productionLineId={lineId}
-
                     />
                 )}
 
@@ -341,6 +343,15 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                     <StyleChangeover
                         onClose={() => setIsStyleChangeoverModalOpen(false)}
                         onSubmit={handleStyleChangeoverSubmit}
+                        productionLineId={lineId}
+                        supervisorId={supervisorId}
+                    />
+                )}
+
+                {isMachineModalOpen && (
+                    <Machine
+                        onClose={() => setIsMachineModalOpen(false)}
+                        onSubmit={handleMachineSubmit}
                         productionLineId={lineId}
                         supervisorId={supervisorId}
                     />

@@ -1,77 +1,148 @@
-/* src/components/production/downtime/rework/Rework.css */
-
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 1000;
 }
 
-.rework-modal {
-    background: #ffffff;
-    padding: 2rem;
+.modal-content {
+    background-color: white;
     border-radius: 8px;
-    width: 400px;
-    position: relative;
-}
-
-.rework-modal h2 {
-    margin-bottom: 1rem;
-}
-
-.rework-form label {
-    display: block;
-    margin-bottom: 0.5rem;
-}
-
-.rework-form select,
-.rework-form textarea,
-.rework-form input {
     width: 100%;
-    padding: 0.5rem;
-    margin-bottom: 1rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    max-width: 600px; /* Increased for side-by-side */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.form-buttons {
+.modal-header {
+    padding: 1rem;
+    border-bottom: 1px solid #e5e7eb;
     display: flex;
     justify-content: space-between;
+    align-items: center;
 }
 
-.confirm-button {
-    background-color: #4caf50;
-    color: white;
-    border: none;
-    padding: 0.5rem 1rem;
+/* Style Banner */
+.style-banner {
+    background-color: #f3f4f6;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.form-group {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 0 1rem;
+}
+
+.form-group label {
+    text-align: right;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.required {
+    color: #dc2626;
+}
+
+.form-select,
+.form-input {
+    width: 100%;
+    height: 36px;
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
     border-radius: 4px;
-    cursor: pointer;
+    font-size: 0.875rem;
 }
 
-.cancel-button {
-    background-color: #f44336;
-    color: white;
-    border: none;
-    padding: 0.5rem 1rem;
+.form-textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
     border-radius: 4px;
-    cursor: pointer;
-}
-
-.confirm-button:hover {
-    background-color: #45a049;
-}
-
-.cancel-button:hover {
-    background-color: #e53935;
+    font-size: 0.875rem;
+    min-height: 60px;
+    resize: vertical;
 }
 
 .error-message {
-    color: #f44336;
-    margin-bottom: 1rem;
+    margin: 0 1rem;
+    background-color: #fef2f2;
+    border: 1px solid #fee2e2;
+    color: #991b1b;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.form-actions {
+    padding: 1rem;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.button {
+    height: 36px;
+    padding: 0 1rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 80px;
+}
+
+.cancel-button {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+}
+
+.submit-button {
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+}
+
+/* Confirmation Modal */
+.confirmation-modal {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1100;
+}
+
+.confirmation-content {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    width: 100%;
+    max-width: 400px;
+}
+
+.confirmation-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding-top: 1rem;
+    margin-top: 1rem;
+    border-top: 1px solid #e5e7eb;
 }

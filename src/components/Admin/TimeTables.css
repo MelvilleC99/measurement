@@ -1,4 +1,5 @@
-/* TimeTables.css */
+/* src/components/Admin/TimeTables.css */
+
 .timetables-container {
     display: flex;
     height: 100vh;
@@ -30,6 +31,7 @@
     width: 100%;
     cursor: pointer;
     border-radius: 5px;
+    transition: background-color 0.3s ease;
 }
 
 .toolbar button:hover {
@@ -40,6 +42,7 @@
     flex-grow: 1;
     background-color: #f2f2f2;
     padding: 20px;
+    overflow-y: auto;
 }
 
 .bounded-box {
@@ -57,20 +60,61 @@
 }
 
 .break-item button, .time-table-item button {
-    background-color: red;
+    background-color: #dc3545;
     color: white;
     border: none;
     padding: 5px 10px;
     cursor: pointer;
     border-radius: 3px;
+    transition: background-color 0.3s ease;
+}
+
+.break-item button:hover, .time-table-item button:hover {
+    background-color: #c82333;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
 }
 
 .modal-content {
     background-color: white;
     padding: 20px;
     border-radius: 10px;
-    width: 650px; /* Made the modal wider */
-    margin: 0 auto;
+    width: 600px; /* Adjusted width */
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+.modal-wide {
+    width: 700px; /* Increased the modal width further */
+}
+
+.time-slots-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.time-slots-table th, .time-slots-table td {
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    text-align: center;
+}
+
+.time-slots-table th {
+    background-color: #003366;
+    color: white;
 }
 
 .modal-buttons {
@@ -80,54 +124,6 @@
     gap: 10px; /* Added gap to evenly space the buttons */
 }
 
-.modal-wide {
-    width: 700px; /* Increased the modal width further */
-}
-
-table {
-    min-width: 100%;
-    text-align: center;
-    font-size: 0.9rem;
-    border-collapse: collapse;
-}
-
-table th, table td {
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-}
-
-thead th {
-    background-color: #003366;
-    color: white;
-}
-
-tbody tr:nth-child(even) {
-    background-color: #f2f2f2;
-}
-
-tbody td {
-    white-space: nowrap;
-}
-
-.button-group {
-    display: flex;
-    justify-content: flex-end;
-}
-
-.button-group button {
-    background-color: #003366;
-    color: white;
-    padding: 10px 20px;
-    margin-left: 10px;
-    border-radius: 5px;
-    border: none;
-    cursor: pointer;
-}
-
-.button-group button:hover {
-    background-color: #002244;
-}
-
 .modal-buttons button {
     padding: 8px 16px; /* Reduced padding to make buttons smaller */
     margin: 0;
@@ -135,29 +131,46 @@ tbody td {
     border: none;
     cursor: pointer;
     flex: 1; /* Added to evenly distribute space between buttons */
+    transition: background-color 0.3s ease;
 }
 
 .modal-buttons .delete-btn {
-    background-color: red;
+    background-color: #dc3545;
     color: white;
+}
+
+.modal-buttons .delete-btn:hover {
+    background-color: #c82333;
 }
 
 .modal-buttons .cancel-btn {
-    background-color: blue;
+    background-color: #6c757d;
     color: white;
+}
+
+.modal-buttons .cancel-btn:hover {
+    background-color: #5a6268;
 }
 
 .modal-buttons .save-btn {
-    background-color: green;
+    background-color: #28a745;
     color: white;
 }
 
-input[type="number"] {
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none; /* Remove the scroller */
-    padding: 8px;
-    width: 100%;
-    border-radius: 5px;
-    border: 1px solid #ddd;
+.modal-buttons .save-btn:hover {
+    background-color: #218838;
+}
+
+.overtime-label {
+    background-color: #28a745;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-left: 10px;
+}
+
+.error-message {
+    color: red;
+    margin-bottom: 10px;
 }

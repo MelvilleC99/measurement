@@ -1,42 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import './ProductionSchedule.css';
 import { db } from '../../firebase';
-import { collection, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-
-interface ProductionLine {
-    id: string;
-    name: string;
-}
-
-interface ScheduledStyle {
-    id: string;
-    styleName: string;
-    styleNumber: string;
-    lineId: string;
-    onLineDate: string;
-    deliveryDate: string;
-    status: string;
-}
-
-interface StyleCard {
-    id: string;
-    styleName: string;
-    styleNumber: string;
-    description: string;
-    productType: string;
-    productCategory: string;
-    unitsInOrder: number;
-    cost: number;
-    deliveryDate: string;
-    status: string;
-}
+import {
+    collection,
+    getDocs,
+    updateDoc,
+    deleteDoc,
+    doc,
+} from 'firebase/firestore';
+import { ScheduledStyle, Style, ProductionLine } from '../../types';
 
 const ProductionSchedule: React.FC = () => {
     const [productionLines, setProductionLines] = useState<ProductionLine[]>([]);
     const [scheduledStyles, setScheduledStyles] = useState<ScheduledStyle[]>([]);
-    const [styles, setStyles] = useState<StyleCard[]>([]);
+    const [styles, setStyles] = useState<Style[]>([]);
     const [selectedStyle, setSelectedStyle] = useState<ScheduledStyle | null>(null);
     const [onLineDate, setOnLineDate] = useState<string>('');
+    const [offLineDate, setOffLineDate] = useState<string>('');
+    const [expectedDeliveryDate, setExpectedDeliveryDate] = useState<string>('');
     const [selectedLine, setSelectedLine] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [showStyleSelector, setShowStyleSelector] = useState(true);
@@ -51,10 +32,17 @@ const ProductionSchedule: React.FC = () => {
     const fetchProductionLines = async () => {
         try {
             const linesSnapshot = await getDocs(collection(db, 'productionLines'));
-            const linesList = linesSnapshot.docs.map((doc) => ({
-                id: doc.id,
-                name: doc.data().name,
-            })) as ProductionLine[];
+            const linesList: ProductionLine[] = linesSnapshot.docs.map((doc) => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    name: data.name,
+                    active: data.active || false,
+                    assignedTimeTable: data.assignedTimeTable || '', // Include assignedTimeTable
+                    createdAt: data.createdAt,
+                    updatedAt: data.updatedAt,
+                };
+            });
             setProductionLines(linesList);
         } catch (error) {
             console.error('Error fetching production lines:', error);
@@ -64,10 +52,20 @@ const ProductionSchedule: React.FC = () => {
     const fetchScheduledStyles = async () => {
         try {
             const stylesSnapshot = await getDocs(collection(db, 'scheduledStyles'));
-            const stylesList = stylesSnapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-            })) as ScheduledStyle[];
+            const stylesList: ScheduledStyle[] = stylesSnapshot.docs.map((doc) => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    styleName: data.styleName,
+                    styleNumber: data.styleNumber,
+                    lineId: data.lineId,
+                    onLineDate: data.onLineDate,
+                    offLineDate: data.offLineDate,
+                    expectedDeliveryDate: data.expectedDeliveryDate,
+                    deliveryDate: data.deliveryDate,
+                    status: data.status,
+                };
+            });
             setScheduledStyles(stylesList);
         } catch (error) {
             console.error('Error fetching scheduled styles:', error);
@@ -77,10 +75,27 @@ const ProductionSchedule: React.FC = () => {
     const fetchStyles = async () => {
         try {
             const stylesSnapshot = await getDocs(collection(db, 'styles'));
-            const stylesList = stylesSnapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-            })) as StyleCard[];
+            const stylesList: Style[] = stylesSnapshot.docs.map((doc) => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    styleName: data.styleName,
+                    styleNumber: data.styleNumber,
+                    description: data.description,
+                    productType: data.productType,
+                    productCategory: data.productCategory,
+                    unitsInOrder: data.unitsInOrder,
+                    cost: data.cost,
+                    deliveryDate: data.deliveryDate,
+                    status: data.status,
+                    hourlyTarget: data.hourlyTarget || 0,
+                    unitsProduced: data.unitsProduced || 0,
+                    createdAt: data.createdAt,
+                    updatedAt: data.updatedAt,
+                    customer: data.customer || '',
+                    smv: data.smv || 0,
+                };
+            });
             setStyles(stylesList);
         } catch (error) {
             console.error('Error fetching styles:', error);
@@ -95,16 +110,18 @@ const ProductionSchedule: React.FC = () => {
 
     // Save the scheduled style to Firestore
     const handleSaveStyleToLine = async () => {
-        if (!selectedLine || !onLineDate || !selectedStyle) {
+        if (!selectedLine || !onLineDate || !offLineDate || !expectedDeliveryDate || !selectedStyle) {
             alert('Please fill out all fields.');
             return;
         }
 
-        const updatedFields = {
+        const updatedFields: Partial<ScheduledStyle> = {
             styleName: selectedStyle.styleName,
             styleNumber: selectedStyle.styleNumber,
             lineId: selectedLine,
             onLineDate: onLineDate,
+            offLineDate: offLineDate,
+            expectedDeliveryDate: expectedDeliveryDate,
             deliveryDate: selectedStyle.deliveryDate,
             status: 'scheduled',
         };
@@ -124,6 +141,8 @@ const ProductionSchedule: React.FC = () => {
         setSelectedStyle(null);
         setSelectedLine(null);
         setOnLineDate('');
+        setOffLineDate('');
+        setExpectedDeliveryDate('');
     };
 
     // Handle clicking on an existing scheduled style for editing
@@ -131,6 +150,8 @@ const ProductionSchedule: React.FC = () => {
         setSelectedStyle(style);
         setSelectedLine(style.lineId);
         setOnLineDate(style.onLineDate);
+        setOffLineDate(style.offLineDate);
+        setExpectedDeliveryDate(style.expectedDeliveryDate);
         setShowStyleSelector(false); // Now switching to "edit" mode
         openModal();
     };
@@ -145,6 +166,8 @@ const ProductionSchedule: React.FC = () => {
                 styleNumber: selected.styleNumber,
                 lineId: '',
                 onLineDate: '',
+                offLineDate: '',
+                expectedDeliveryDate: '',
                 deliveryDate: selected.deliveryDate,
                 status: 'unscheduled',
             };
@@ -177,7 +200,7 @@ const ProductionSchedule: React.FC = () => {
                 ) : (
                     productionLines.map((line) => (
                         <div key={line.id} className="schedule-line">
-                            <div className="line-name">{line.name}</div> {/* Correct line name field */}
+                            <div className="line-name">{line.name}</div>
                             <div className="line-scheduled-styles">
                                 {scheduledStyles
                                     .filter((style) => style.lineId === line.id)
@@ -202,11 +225,10 @@ const ProductionSchedule: React.FC = () => {
                         {showStyleSelector ? (
                             <>
                                 <h2>Select Style to Schedule</h2>
-                                <select
-                                    onChange={(e) => handleSelectStyle(e.target.value)}
-                                    defaultValue=""
-                                >
-                                    <option value="" disabled>Select a Style</option>
+                                <select onChange={(e) => handleSelectStyle(e.target.value)} defaultValue="">
+                                    <option value="" disabled>
+                                        Select a Style
+                                    </option>
                                     {styles.map((style) => (
                                         <option key={style.id} value={style.id}>
                                             {style.styleName} - {style.styleNumber}
@@ -219,13 +241,19 @@ const ProductionSchedule: React.FC = () => {
                             <>
                                 <h2>Style Card</h2>
                                 <div className="input-container">
-                                    <label><strong>Style Name:</strong></label>
+                                    <label>
+                                        <strong>Style Name:</strong>
+                                    </label>
                                     <p>{selectedStyle?.styleName}</p>
 
-                                    <label><strong>Style Number:</strong></label>
+                                    <label>
+                                        <strong>Style Number:</strong>
+                                    </label>
                                     <p>{selectedStyle?.styleNumber}</p>
 
-                                    <label><strong>Delivery Date:</strong></label>
+                                    <label>
+                                        <strong>Delivery Date:</strong>
+                                    </label>
                                     <p>{selectedStyle?.deliveryDate}</p>
 
                                     <label>Select Line:</label>
@@ -236,7 +264,7 @@ const ProductionSchedule: React.FC = () => {
                                         <option value="">Select a Line</option>
                                         {productionLines.map((line) => (
                                             <option key={line.id} value={line.id}>
-                                                {line.name} {/* Correct field reference for line name */}
+                                                {line.name}
                                             </option>
                                         ))}
                                     </select>
@@ -246,6 +274,20 @@ const ProductionSchedule: React.FC = () => {
                                         type="date"
                                         value={onLineDate}
                                         onChange={(e) => setOnLineDate(e.target.value)}
+                                    />
+
+                                    <label>Off Line Date:</label>
+                                    <input
+                                        type="date"
+                                        value={offLineDate}
+                                        onChange={(e) => setOffLineDate(e.target.value)}
+                                    />
+
+                                    <label>Expected Delivery Date:</label>
+                                    <input
+                                        type="date"
+                                        value={expectedDeliveryDate}
+                                        onChange={(e) => setExpectedDeliveryDate(e.target.value)}
                                     />
                                 </div>
 

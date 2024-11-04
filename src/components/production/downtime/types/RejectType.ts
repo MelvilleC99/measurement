@@ -1,7 +1,5 @@
-// src/types/downtime/RejectType.ts
-
 import { Timestamp } from 'firebase/firestore';
-import { SupportFunction } from '../../../../types'; // Adjusted import path
+import { SupportFunction } from '../../../../types'
 
 // ------------------------
 // Form Data Interfaces
@@ -16,6 +14,11 @@ export interface RejectFormData {
     recordedAsProduced: boolean;
     productionLineId: string;
     supervisorId: string;
+    sessionId: string;
+    styleNumber: string;
+    status: string;
+    createdAt?: Date;
+    updatedAt?: Date;
 }
 
 // ------------------------
@@ -27,6 +30,7 @@ export interface RejectProps {
     onSubmit: (formData: RejectFormData) => Promise<void>;
     productionLineId: string;
     supervisorId: string;
+    sessionId: string;
     qcs: SupportFunction[];
 }
 
@@ -40,18 +44,31 @@ export interface RejectRecord {
     reason: string;
     operation: string;
     recordedAsProduced: boolean;
-    qcApprovedBy: string;
+    qcId: string;
     productionLineId: string;
     supervisorId: string;
+    sessionId: string;
+    styleNumber: string;
     comments: string;
+    status: string;
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }
 
-// RejectUpdate props
-interface RejectUpdateProps {
+// ------------------------
+// Update Props Interface
+// ------------------------
+
+export interface RejectUpdateProps {
     onClose: () => void;
+    onUpdate?: () => void;
     lineId: string;
     supervisorId: string;
-    onSubmit: () => Promise<void>;
+    sessionId: string;
 }
+
+// ------------------------
+// Status Type
+// ------------------------
+
+export type RejectStatus = 'open' | 'perfect' | 'closed';
