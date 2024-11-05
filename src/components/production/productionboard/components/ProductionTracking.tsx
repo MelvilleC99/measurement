@@ -1,5 +1,3 @@
-// ProductionTracking.tsx
-
 import React, { useState, useEffect } from 'react';
 import {
     collection,
@@ -44,7 +42,6 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                                                                    onUnitProduced,
                                                                }) => {
     // Data states
-    const [styles, setStyles] = useState<Style[]>([]);
     const [breaks, setBreaks] = useState<Break[]>([]);
 
     // Production states
@@ -60,6 +57,7 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
         outputs: [] as number[],
         balance: 0,
         unitsProduced: 0,
+        unitsInOrder: 0,
     });
 
     // Error state
@@ -69,16 +67,7 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [stylesSnap, breaksSnap] = await Promise.all([
-                    getDocs(collection(db, 'styles')),
-                    getDocs(collection(db, 'breaks')),
-                ]);
-
-                const loadedStyles = stylesSnap.docs.map((doc) => ({
-                    id: doc.id,
-                    ...doc.data(),
-                })) as Style[];
-                setStyles(loadedStyles);
+                const breaksSnap = await getDocs(collection(db, 'breaks'));
 
                 const loadedBreaks = breaksSnap.docs.map((doc) => ({
                     id: doc.id,
@@ -86,7 +75,7 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                 })) as Break[];
                 setBreaks(loadedBreaks);
 
-                console.log('Initial data loaded successfully');
+                console.log('Initial breaks data loaded successfully');
             } catch (error) {
                 console.error('Error fetching initial data:', error);
                 setError('Failed to load production data');
@@ -131,47 +120,57 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
     // Initialize production details based on session data
     useEffect(() => {
         if (assignedTimeTable && sessionData) {
-            const fetchExistingOutputs = async () => {
+            const fetchProductionData = async () => {
                 try {
-                    const productionQuery = query(
-                        collection(db, 'production'),
-                        where('sessionId', '==', sessionData.sessionId)
-                    );
+                    // Fetch the style document to get unitsProduced and unitsInOrder
+                    const styleDocRef = doc(db, 'styles', sessionData.styleId);
+                    const styleSnap = await getDoc(styleDocRef);
+                    if (styleSnap.exists()) {
+                        const style = styleSnap.data() as Style;
+                        const totalUnitsProduced = style.unitsProduced || 0;
+                        const unitsInOrder = style.unitsInOrder || 0;
+                        const balance = unitsInOrder - totalUnitsProduced;
 
-                    const unsubscribe = onSnapshot(productionQuery, (snapshot) => {
-                        const outputs = Array(assignedTimeTable.slots.length).fill(0);
+                        // Fetch production records for the current session
+                        const productionQuery = query(
+                            collection(db, 'production'),
+                            where('sessionId', '==', sessionData.sessionId)
+                        );
 
-                        snapshot.docs.forEach((doc) => {
-                            const data = doc.data();
-                            const slotIndex = assignedTimeTable.slots.findIndex(
-                                (slot) => slot.id === data.slotId
-                            );
-                            if (slotIndex !== -1) {
-                                outputs[slotIndex] += data.unitProduced || 1;
-                            }
-                        });
+                        const unsubscribe = onSnapshot(productionQuery, (snapshot) => {
+                            const outputs = Array(assignedTimeTable.slots.length).fill(0);
 
-                        const style = styles.find((s) => s.id === sessionData.styleId);
-                        if (style) {
-                            const unitsProduced = outputs.reduce((a, b) => a + b, 0);
+                            snapshot.docs.forEach((doc) => {
+                                const data = doc.data();
+                                const slotIndex = assignedTimeTable.slots.findIndex(
+                                    (slot) => slot.id === data.slotId
+                                );
+                                if (slotIndex !== -1) {
+                                    outputs[slotIndex] += data.unitProduced || 1;
+                                }
+                            });
+
                             setStyleDetails({
                                 outputs,
-                                balance: style.unitsInOrder - unitsProduced,
-                                unitsProduced: unitsProduced,
+                                balance,
+                                unitsProduced: totalUnitsProduced,
+                                unitsInOrder,
                             });
-                        }
-                    });
+                        });
 
-                    return unsubscribe;
+                        return unsubscribe;
+                    } else {
+                        setError('Style not found');
+                    }
                 } catch (err) {
-                    console.error('Error fetching existing production records:', err);
-                    setError('Failed to load existing production records');
+                    console.error('Error fetching production data:', err);
+                    setError('Failed to load production data');
                 }
             };
 
-            fetchExistingOutputs();
+            fetchProductionData();
         }
-    }, [assignedTimeTable, sessionData, styles]);
+    }, [assignedTimeTable, sessionData]);
 
     // Update current time and active slot
     useEffect(() => {
@@ -206,6 +205,7 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
         return () => clearInterval(interval);
     }, [assignedTimeTable, manualSlot]);
 
+    // Handle adding a production unit
     const handleAddOutput = async () => {
         if (!assignedTimeTable || !sessionData) {
             setError('Production tracking is not properly initialized.');
@@ -241,8 +241,8 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                 return {
                     ...prev,
                     outputs: newOutputs,
-                    balance: prev.balance - unitProduced,
                     unitsProduced: prev.unitsProduced + unitProduced,
+                    balance: prev.balance - unitProduced,
                 };
             });
         } catch (error) {
@@ -306,9 +306,7 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                     </button>
 
                     <div className="style-stats">
-            <span className="stat">
-              Order: {styleDetails.balance + styleDetails.unitsProduced}
-            </span>
+                        <span className="stat">Order: {styleDetails.unitsInOrder}</span>
                         <span className="stat">Balance: {styleDetails.balance}</span>
                     </div>
                 </div>
@@ -330,7 +328,8 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                             const target = calculateTargetPerSlot(slot);
                             const output = styleDetails.outputs[index] || 0;
                             const isCurrentSlot =
-                                manualSlot === slot.id || (manualSlot === 'current' && currentTimeSlot?.id === slot.id);
+                                manualSlot === slot.id ||
+                                (manualSlot === 'current' && currentTimeSlot?.id === slot.id);
                             const breakInfo = breaks.find((b) => b.id === slot.breakId);
 
                             return (

@@ -1,7 +1,7 @@
+// Machine.tsx
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../../../../firebase';
-import { SupportFunction } from '../../../../types';
 import './Machine.css';
 
 interface MachineProps {
@@ -35,13 +35,11 @@ const Machine: React.FC<MachineProps> = ({ onClose, onSubmit, productionLineId, 
     useEffect(() => {
         const fetchReasonsAndMachines = async () => {
             try {
-                // Fetch reasons from downtimeCategories where name is 'Machine'
                 const reasonsSnapshot = await getDocs(collection(db, 'downtimeCategories'));
                 const machineDoc = reasonsSnapshot.docs.find((doc) => doc.data().name === 'Machine');
                 const reasonsData = machineDoc?.data().reasons || [];
                 setReasonsList(reasonsData);
 
-                // Fetch machines from machines collection
                 const machinesSnapshot = await getDocs(collection(db, 'machines'));
                 const machinesData = machinesSnapshot.docs.map((doc) => ({
                     id: doc.id,
@@ -66,17 +64,33 @@ const Machine: React.FC<MachineProps> = ({ onClose, onSubmit, productionLineId, 
             return;
         }
 
-        const machineFormData: MachineFormData = {
-            reason,
-            machineNumber,
-            comments,
-            productionLineId,
-            supervisorId,
-        };
-
         try {
-            await onSubmit(machineFormData); // Using onSubmit prop
-            alert('Machine downtime logged successfully.');
+            const machineFormData: MachineFormData = {
+                reason,
+                machineNumber,
+                comments,
+                productionLineId,
+                supervisorId,
+            };
+
+            console.log('Submitting Machine Downtime:', machineFormData); // Debugging
+
+            // Create machine downtime document
+            const docRef = await addDoc(collection(db, 'machineDowntimes'), {
+                ...machineFormData,
+                createdAt: Timestamp.now(),
+                status: 'Open',
+                mechanicAcknowledged: false,
+                mechanicId: null,
+                mechanicName: null,
+                mechanicAcknowledgedAt: null,
+                resolvedAt: null,
+                updatedAt: Timestamp.now()
+            });
+
+            console.log('Downtime Document Created with ID:', docRef.id); // Debugging
+
+            await onSubmit(machineFormData);
             onClose();
         } catch (err) {
             console.error('Error logging downtime:', err);

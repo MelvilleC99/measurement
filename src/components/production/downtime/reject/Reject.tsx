@@ -40,11 +40,11 @@ const Reject: React.FC<RejectProps> = ({
             try {
                 setIsLoading(true);
 
-                // Fetch current style number (for database only)
+                // Get current style number
                 const lineDoc = await getDoc(doc(db, 'productionLines', productionLineId));
                 setStyleNumber(lineDoc.data()?.currentStyle || '');
 
-                // Fetch reject reasons
+                // Get reject reasons
                 const reasonsQuery = query(
                     collection(db, 'downtimeCategories'),
                     where('name', '==', 'Reject')
@@ -55,7 +55,7 @@ const Reject: React.FC<RejectProps> = ({
                 );
                 setReasonsList(fetchedReasons);
 
-                // Fetch operations
+                // Get operations
                 const operationsSnapshot = await getDocs(collection(db, 'productHierarchy'));
                 const fetchedOperations: { id: string; name: string; }[] = [];
 
@@ -99,7 +99,6 @@ const Reject: React.FC<RejectProps> = ({
         }
 
         try {
-            // Verify QC credentials
             const qcSnapshot = await getDocs(query(
                 collection(db, 'supportFunctions'),
                 where('employeeNumber', '==', selectedQc),
@@ -135,7 +134,6 @@ const Reject: React.FC<RejectProps> = ({
                 status: 'open',
             };
 
-            // Add to Firestore with server timestamp
             await addDoc(collection(db, 'rejects'), {
                 ...rejectData,
                 createdAt: serverTimestamp(),
@@ -144,7 +142,6 @@ const Reject: React.FC<RejectProps> = ({
 
             await onSubmit(rejectData);
 
-            // Reset form
             setReason('');
             setOperation('');
             setComments('');
@@ -152,18 +149,18 @@ const Reject: React.FC<RejectProps> = ({
             setQcPassword('');
             setCount(1);
             setIsConfirmModalOpen(false);
-
             onClose();
         } catch (err) {
             console.error('Error submitting reject:', err);
             setError('Failed to submit reject');
+            setIsConfirmModalOpen(false);
         }
     };
 
     if (isLoading) {
         return (
             <div className="modal-overlay">
-                <div className="modal-content modal-content-compact">
+                <div className="modal-content">
                     <div className="loading-spinner">Loading...</div>
                 </div>
             </div>
@@ -171,157 +168,149 @@ const Reject: React.FC<RejectProps> = ({
     }
 
     return (
-        <div className="modal-overlay">
-            <div className="modal-content modal-content-compact">
-                <div className="modal-header">
-                    <h2>Log Reject</h2>
-                    <button
-                        onClick={onClose}
-                        className="close-button"
-                        aria-label="Close"
-                    >
-                        ×
-                    </button>
+        <>
+            <div className="modal-overlay">
+                <div className="modal-content">
+                    {/* Header */}
+                    <div className="modal-header">
+                        <h2>Log Reject</h2>
+                        <button
+                            onClick={onClose}
+                            className="close-button"
+                            aria-label="Close"
+                        >
+                            ×
+                        </button>
+                    </div>
+
+                    <div className="style-banner">
+                        <span>Current Style: {styleNumber}</span>
+                    </div>
+
+                    {error && (
+                        <div className="error-message">
+                            {error}
+                            <button onClick={() => setError('')} className="error-dismiss">×</button>
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSubmit} className="compact-form">
+                        <div className="form-group">
+                            <select
+                                value={reason}
+                                onChange={(e) => setReason(e.target.value)}
+                                required
+                                className="form-select"
+                            >
+                                <option value="">Select Reason *</option>
+                                {reasonsList.map((r, index) => (
+                                    <option key={index} value={r}>{r}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="form-group">
+                            <select
+                                value={operation}
+                                onChange={(e) => setOperation(e.target.value)}
+                                className="form-select"
+                            >
+                                <option value="">Select Operation *</option>
+                                {operationsList.map((op) => (
+                                    <option key={op.id} value={op.name}>
+                                        {op.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="form-group">
+                            <input
+                                type="number"
+                                min="1"
+                                value={count}
+                                onChange={(e) => setCount(parseInt(e.target.value) || 1)}
+                                required
+                                className="form-input"
+                                placeholder="Enter Count *"
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <select
+                                value={selectedQc}
+                                onChange={(e) => setSelectedQc(e.target.value)}
+                                required
+                                className="form-select"
+                            >
+                                <option value="">Select QC *</option>
+                                {qcs.map((qc) => (
+                                    <option key={qc.id} value={qc.employeeNumber || qc.id}>
+                                        {qc.name} {qc.surname}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="form-group">
+                            <input
+                                type="password"
+                                value={qcPassword}
+                                onChange={(e) => setQcPassword(e.target.value)}
+                                required
+                                className="form-input"
+                                placeholder="QC Password *"
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <textarea
+                                value={comments}
+                                onChange={(e) => setComments(e.target.value)}
+                                placeholder="Comments (optional)"
+                                rows={3}
+                                className="form-textarea"
+                            />
+                        </div>
+
+                        <div className="form-buttons">
+                            <button type="button" onClick={onClose} className="cancel-button">
+                                Cancel
+                            </button>
+                            <button type="submit" className="submit-button">
+                                Submit Reject
+                            </button>
+                        </div>
+                    </form>
                 </div>
+            </div>
 
-                {error && (
-                    <div className="error-message">
-                        {error}
-                        <button onClick={() => setError('')} className="error-dismiss">×</button>
-                    </div>
-                )}
-
-                <form onSubmit={handleSubmit} className="reject-form">
-                    <div className="form-group">
-                        <label>
-                            Reason: <span className="required">*</span>
-                        </label>
-                        <select
-                            value={reason}
-                            onChange={(e) => setReason(e.target.value)}
-                            required
-                            className="form-select"
-                        >
-                            <option value="">Select Reason</option>
-                            {reasonsList.map((r, index) => (
-                                <option key={index} value={r}>{r}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="form-group">
-                        <label>
-                            Operation:
-                        </label>
-                        <select
-                            value={operation}
-                            onChange={(e) => setOperation(e.target.value)}
-                            className="form-select"
-                        >
-                            <option value="">Select Operation</option>
-                            {operationsList.map((op) => (
-                                <option key={op.id} value={op.name}>{op.name}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="form-group">
-                        <label>
-                            Count: <span className="required">*</span>
-                        </label>
-                        <input
-                            type="number"
-                            min="1"
-                            value={count}
-                            onChange={(e) => setCount(parseInt(e.target.value) || 1)}
-                            required
-                            className="form-input"
-                        />
-                    </div>
-
-                    <div className="form-group">
-                        <label>
-                            Quality Controller: <span className="required">*</span>
-                        </label>
-                        <select
-                            value={selectedQc}
-                            onChange={(e) => setSelectedQc(e.target.value)}
-                            required
-                            className="form-select"
-                        >
-                            <option value="">Select QC</option>
-                            {qcs.map((qc) => (
-                                <option key={qc.id} value={qc.employeeNumber || qc.id}>
-                                    {qc.name} {qc.surname}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="form-group">
-                        <label>
-                            QC Password: <span className="required">*</span>
-                        </label>
-                        <input
-                            type="password"
-                            value={qcPassword}
-                            onChange={(e) => setQcPassword(e.target.value)}
-                            required
-                            className="form-input"
-                        />
-                    </div>
-
-                    <div className="form-group">
-                        <label>Comments:</label>
-                        <textarea
-                            value={comments}
-                            onChange={(e) => setComments(e.target.value)}
-                            placeholder="Enter additional comments..."
-                            rows={3}
-                            className="form-textarea"
-                        />
-                    </div>
-
-                    <div className="form-buttons">
-                        <button type="button" onClick={onClose} className="button cancel-button">
-                            Cancel
-                        </button>
-                        <button type="submit" className="button submit-button">
-                            Submit
-                        </button>
-                    </div>
-                </form>
-
-                {isConfirmModalOpen && (
-                    <div className="confirmation-modal">
-                        <div className="confirmation-content">
-                            <h3>Confirm Reject</h3>
-                            <div className="confirmation-details">
-                                <p><strong>Reason:</strong> {reason}</p>
-                                <p><strong>Count:</strong> {count}</p>
-                                {operation && (
-                                    <p><strong>Operation:</strong> {operation}</p>
-                                )}
-                            </div>
-                            <div className="confirmation-buttons">
-                                <button
-                                    onClick={() => setIsConfirmModalOpen(false)}
-                                    className="button cancel-button"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleConfirm}
-                                    className="button confirm-button"
-                                >
-                                    Confirm
-                                </button>
-                            </div>
+            {/* Confirmation Modal */}
+            {isConfirmModalOpen && (
+                <div className="confirmation-modal">
+                    <div className="confirmation-content">
+                        <h3>Confirm Reject</h3>
+                        <div className="confirmation-details">
+                            <p><strong>Style:</strong> {styleNumber}</p>
+                            <p><strong>Reason:</strong> {reason}</p>
+                            <p><strong>Operation:</strong> {operation}</p>
+                            <p><strong>Count:</strong> {count}</p>
+                        </div>
+                        <div className="confirmation-buttons">
+                            <button
+                                onClick={() => setIsConfirmModalOpen(false)}
+                                className="cancel-button"
+                            >
+                                Cancel
+                            </button>
+                            <button onClick={handleConfirm} className="submit-button">
+                                Confirm
+                            </button>
                         </div>
                     </div>
-                )}
-            </div>
-        </div>
+                </div>
+            )}
+        </>
     );
 };
 

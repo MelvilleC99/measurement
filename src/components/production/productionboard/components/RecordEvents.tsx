@@ -1,3 +1,4 @@
+// RecordEvents.tsx
 import React, { useState, useEffect } from 'react';
 import {
     collection,
@@ -83,6 +84,7 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         { id: 'styleChange', name: 'Style Change' }
     ];
 
+    // Handler for Rework Submission
     const handleReworkSubmit = async (data: ReworkFormData) => {
         try {
             const reworkDocRef = await addDoc(collection(db, 'reworks'), {
@@ -98,6 +100,9 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                 refNumber
             });
 
+            console.log('Rework Submitted:', reworkDocRef.id); // Debugging
+
+            // Only pass supported event types to onEventRecorded
             onEventRecorded('reworks', data.count);
             setIsReworkModalOpen(false);
         } catch (error) {
@@ -106,9 +111,10 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         }
     };
 
+    // Handler for Reject Submission
     const handleRejectSubmit = async (data: RejectFormData) => {
         try {
-            await addDoc(collection(db, 'rejects'), {
+            const rejectDocRef = await addDoc(collection(db, 'rejects'), {
                 ...data,
                 sessionId,
                 status: 'open',
@@ -116,6 +122,9 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                 updatedAt: Timestamp.now()
             });
 
+            console.log('Reject Submitted:', rejectDocRef.id); // Debugging
+
+            // Only pass supported event types to onEventRecorded
             onEventRecorded('rejects', data.count);
             setIsRejectModalOpen(false);
         } catch (error) {
@@ -124,9 +133,10 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         }
     };
 
+    // Handler for Late Submission
     const handleLateSubmit = async (data: LateFormData) => {
         try {
-            await addDoc(collection(db, 'attendance'), {
+            const attendanceDocRef = await addDoc(collection(db, 'attendance'), {
                 ...data,
                 type: 'late',
                 status: 'late',
@@ -136,6 +146,9 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                 updatedAt: Timestamp.now()
             });
 
+            console.log('Late Attendance Submitted:', attendanceDocRef.id); // Debugging
+
+            // Only pass supported event types to onEventRecorded
             onEventRecorded('late', 1);
             setIsLateModalOpen(false);
         } catch (error) {
@@ -144,9 +157,10 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         }
     };
 
+    // Handler for Absent Submission
     const handleAbsentSubmit = async (data: AbsentFormData) => {
         try {
-            await addDoc(collection(db, 'attendance'), {
+            const attendanceDocRef = await addDoc(collection(db, 'attendance'), {
                 ...data,
                 type: 'absent',
                 status: 'absent',
@@ -156,6 +170,9 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                 updatedAt: Timestamp.now()
             });
 
+            console.log('Absent Attendance Submitted:', attendanceDocRef.id); // Debugging
+
+            // Only pass supported event types to onEventRecorded
             onEventRecorded('absent', 1);
             setIsAbsentModalOpen(false);
         } catch (error) {
@@ -164,15 +181,22 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         }
     };
 
+    // Handler for Supply Downtime Submission
     const handleSupplySubmit = async (data: SupplyFormData) => {
         try {
-            await addDoc(collection(db, 'supplyDowntime'), {
+            const supplyDocRef = await addDoc(collection(db, 'supplyDowntime'), {
                 ...data,
                 sessionId,
                 status: 'Open',
                 createdAt: Timestamp.now(),
                 startTime: Timestamp.now()
             });
+
+            console.log('Supply Downtime Submitted:', supplyDocRef.id); // Debugging
+
+            // Removed onEventRecorded call for 'supply' to fix TypeScript error
+            // onEventRecorded('supply', 1); // Removed
+
             setIsSupplyModalOpen(false);
         } catch (err) {
             console.error('Error logging supply downtime:', err);
@@ -180,9 +204,10 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         }
     };
 
+    // Handler for Style Changeover Submission
     const handleStyleChangeoverSubmit = async (data: StyleChangeoverFormData) => {
         try {
-            await addDoc(collection(db, 'styleChangeovers'), {
+            const styleChangeoverDocRef = await addDoc(collection(db, 'styleChangeovers'), {
                 ...data,
                 sessionId,
                 status: 'In Progress',
@@ -192,8 +217,15 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
                     peopleAllocated: false,
                     firstUnitOffLine: false,
                     qcApproved: false
-                }
+                },
+                productionLineId: lineId // Ensure productionLineId is set
             });
+
+            console.log('Style Changeover Submitted:', styleChangeoverDocRef.id); // Debugging
+
+            // Removed onEventRecorded call for 'styleChange' to fix TypeScript error
+            // onEventRecorded('styleChange', 1); // Removed
+
             setIsStyleChangeoverModalOpen(false);
         } catch (error) {
             console.error('Error submitting style changeover:', error);
@@ -201,9 +233,29 @@ const RecordEvents: React.FC<RecordEventsProps> = ({
         }
     };
 
+    // Handler for Machine Downtime Submission
     const handleMachineSubmit = async (data: any): Promise<void> => {
         try {
             console.log("Machine downtime data submitted", data);
+            // Ensure productionLineId is included
+            data.productionLineId = lineId;
+            await addDoc(collection(db, 'machineDowntimes'), {
+                ...data,
+                createdAt: Timestamp.now(),
+                status: 'Open',
+                mechanicAcknowledged: false,
+                mechanicId: null,
+                mechanicName: null,
+                mechanicAcknowledgedAt: null,
+                resolvedAt: null,
+                updatedAt: Timestamp.now()
+            });
+
+            console.log('Machine Downtime Submitted'); // Debugging
+
+            // Removed onEventRecorded call for 'machine' to fix TypeScript error
+            // onEventRecorded('machine', 1); // Removed
+
             setIsMachineModalOpen(false);
         } catch (error) {
             console.error("Error logging machine downtime:", error);

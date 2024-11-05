@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    Box,
+    TextField,
+    Button,
+    Alert,
+    IconButton,
+    Select,
+    MenuItem,
+    Typography,
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import {
     updateDoc,
     doc,
     Timestamp,
@@ -11,7 +25,6 @@ import {
 import { db } from '../../../../firebase';
 import { SupportFunction } from '../../../../types';
 import { SupplyRecord } from '../types';
-import './SupplyUpdate.css';
 
 interface SupplyUpdateProps {
     selectedDowntime: SupplyRecord;
@@ -28,32 +41,39 @@ const SupplyUpdate: React.FC<SupplyUpdateProps> = ({
     const [error, setError] = useState<string>('');
     const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
     const [supervisors, setSupervisors] = useState<SupportFunction[]>([]);
+    const [duration, setDuration] = useState<string>('');
+
+    useEffect(() => {
+        // Calculate duration
+        const updateDuration = () => {
+            const now = new Date();
+            const start = selectedDowntime.startTime.toDate();
+            const diff = Math.floor((now.getTime() - start.getTime()) / 1000); // difference in seconds
+            const minutes = Math.floor(diff / 60);
+            const seconds = diff % 60;
+            setDuration(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+        };
+
+        updateDuration();
+        const intervalId = setInterval(updateDuration, 1000);
+
+        return () => clearInterval(intervalId);
+    }, [selectedDowntime.startTime]);
 
     useEffect(() => {
         const fetchSupervisors = async () => {
             try {
-                console.log('Starting supervisor fetch...');
-
                 const supportFunctionsRef = collection(db, 'supportFunctions');
                 const q = query(
                     supportFunctionsRef,
                     where('role', '==', 'Supervisor'),
-                    where('hasPassword', '==', true)  // Updated to match your document structure
+                    where('hasPassword', '==', true)
                 );
-
                 const querySnapshot = await getDocs(q);
-                console.log('Query snapshot received:', querySnapshot.size, 'documents');
-
-                const supervisorsList = querySnapshot.docs.map(doc => {
-                    const data = doc.data();
-                    console.log('Supervisor data:', data);
-                    return {
-                        id: doc.id,
-                        ...data
-                    } as SupportFunction;
-                });
-
-                console.log('Processed supervisors list:', supervisorsList);
+                const supervisorsList = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                } as SupportFunction));
                 setSupervisors(supervisorsList);
             } catch (err) {
                 console.error('Error in fetchSupervisors:', err);
@@ -76,9 +96,6 @@ const SupplyUpdate: React.FC<SupplyUpdateProps> = ({
         }
 
         try {
-            console.log('Verifying supervisor:', selectedSupervisorId);
-
-            // Updated query to match your document structure
             const supervisorQuery = query(
                 collection(db, 'supportFunctions'),
                 where('employeeNumber', '==', selectedSupervisorId),
@@ -88,10 +105,6 @@ const SupplyUpdate: React.FC<SupplyUpdateProps> = ({
             );
 
             const supervisorSnapshot = await getDocs(supervisorQuery);
-            console.log('Verification result:', {
-                empty: supervisorSnapshot.empty,
-                size: supervisorSnapshot.size
-            });
 
             if (supervisorSnapshot.empty) {
                 setError('Invalid supervisor credentials');
@@ -122,102 +135,173 @@ const SupplyUpdate: React.FC<SupplyUpdateProps> = ({
     };
 
     return (
-        <div className="modal-overlay">
-            <div className="modal-content">
-                <div className="supply-update">
-                    <div className="modal-header">
-                        <h2>Supply Downtime Details</h2>
-                        <button className="close-button" onClick={onClose}>×</button>
-                    </div>
+        <Dialog
+            open={true}
+            onClose={onClose}
+            maxWidth="sm"
+            fullWidth
+            PaperProps={{ sx: { borderRadius: 2, p: 1 } }}
+        >
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                Supply Downtime Details
+                <IconButton onClick={onClose} size="small">
+                    <CloseIcon />
+                </IconButton>
+            </DialogTitle>
 
-                    <div className="details-grid">
-                        <div className="detail-item">
-                            <span className="label">Reason:</span>
-                            <span className="value">{selectedDowntime.reason}</span>
-                        </div>
-                        <div className="detail-item">
-                            <span className="label">Comments:</span>
-                            <span className="value">{selectedDowntime.comments}</span>
-                        </div>
-                        <div className="detail-item">
-                            <span className="label">Start Time:</span>
-                            <span className="value">
-                                {selectedDowntime.startTime.toDate().toLocaleTimeString()}
-                            </span>
-                        </div>
-                    </div>
+            <DialogContent>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {/* Details Section */}
+                    <Box sx={{
+                        bgcolor: 'grey.50',
+                        p: 2,
+                        borderRadius: 1,
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: 2
+                    }}>
+                        <Box>
+                            <Typography color="text.secondary" variant="body2">
+                                Reason
+                            </Typography>
+                            <Typography>{selectedDowntime.reason}</Typography>
+                        </Box>
 
-                    <div className="resolution-form">
-                        <label className="form-label">Additional Comments:</label>
-                        <textarea
-                            value={additionalComments}
-                            onChange={(e) => setAdditionalComments(e.target.value)}
-                            className="form-textarea"
-                            placeholder="Enter any additional comments..."
-                            rows={4}
-                        />
-                    </div>
+                        <Box>
+                            <Typography color="text.secondary" variant="body2">
+                                Duration
+                            </Typography>
+                            <Typography>{duration}</Typography>
+                        </Box>
 
-                    <div className="action-buttons">
-                        <button onClick={handleResolveClick} className="resolve-button">
+                        <Box sx={{ gridColumn: '1 / -1' }}>
+                            <Typography color="text.secondary" variant="body2">
+                                Initial Comments
+                            </Typography>
+                            <Typography>{selectedDowntime.comments}</Typography>
+                        </Box>
+                    </Box>
+
+                    {/* Comments Section */}
+                    <TextField
+                        multiline
+                        rows={2}
+                        value={additionalComments}
+                        onChange={(e) => setAdditionalComments(e.target.value)}
+                        placeholder="Add resolution comments"
+                        fullWidth
+                        variant="outlined"
+                        sx={{
+                            '& .MuiOutlinedInput-root': {
+                                '& fieldset': {
+                                    borderRadius: 1
+                                },
+                                '& textarea': {
+                                    p: 1.5
+                                }
+                            }
+                        }}
+                    />
+
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 1 }}>
+                        <Button
+                            onClick={handleResolveClick}
+                            variant="contained"
+                            sx={{
+                                minWidth: 200,
+                                py: 1.5,
+                                textTransform: 'none',
+                                fontSize: '1rem'
+                            }}
+                        >
                             Resolve Downtime
-                        </button>
-                    </div>
-                </div>
-            </div>
+                        </Button>
+                    </Box>
+                </Box>
+            </DialogContent>
 
+            {/* Supervisor Verification Modal */}
             {showPasswordModal && (
-                <div className="modal-overlay">
-                    <div className="modal-content password-modal">
-                        <div className="modal-header">
-                            <h3>Supervisor Verification</h3>
-                            <button className="close-button" onClick={handleClose}>×</button>
-                        </div>
-                        {error && <div className="error-message">{error}</div>}
+                <Dialog
+                    open={true}
+                    onClose={handleClose}
+                    maxWidth="xs"
+                    fullWidth
+                    PaperProps={{ sx: { borderRadius: 2, p: 1 } }}
+                >
+                    <DialogTitle sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                    }}>
+                        Supervisor Verification
+                        <IconButton onClick={handleClose} size="small">
+                            <CloseIcon />
+                        </IconButton>
+                    </DialogTitle>
 
-                        <div className="form-group">
-                            <label className="form-label">Select Supervisor:</label>
-                            <select
+                    <DialogContent>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
+                            {error && <Alert severity="error">{error}</Alert>}
+
+                            <Select
                                 value={selectedSupervisorId}
                                 onChange={(e) => setSelectedSupervisorId(e.target.value)}
-                                className="form-input"
-                                required
+                                displayEmpty
+                                fullWidth
+                                sx={{
+                                    borderRadius: 1,
+                                    '& .MuiSelect-select': { py: 1.5 }
+                                }}
                             >
-                                <option value="">Select Supervisor</option>
+                                <MenuItem value="" disabled>
+                                    Select supervisor
+                                </MenuItem>
                                 {supervisors.map((supervisor) => (
-                                    <option
+                                    <MenuItem
                                         key={supervisor.id}
                                         value={supervisor.employeeNumber}
                                     >
                                         {`${supervisor.name} ${supervisor.surname}`}
-                                    </option>
+                                    </MenuItem>
                                 ))}
-                            </select>
-                        </div>
+                            </Select>
 
-                        <div className="form-group">
-                            <label className="form-label">Password:</label>
-                            <input
+                            <TextField
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="form-input"
-                                placeholder="Enter supervisor password"
+                                placeholder="Enter password"
+                                fullWidth
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        borderRadius: 1,
+                                        '& input': { py: 1.5, px: 1.5 }
+                                    }
+                                }}
                             />
-                        </div>
 
-                        <div className="action-buttons">
-                            <button onClick={handlePasswordSubmit} className="confirm-button">
-                                Confirm
-                            </button>
-                            <button onClick={handleClose} className="cancel-button">
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', pt: 2 }}>
+                                <Button
+                                    onClick={handleClose}
+                                    variant="outlined"
+                                    sx={{ minWidth: 100, textTransform: 'none' }}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    onClick={handlePasswordSubmit}
+                                    variant="contained"
+                                    sx={{ minWidth: 100, textTransform: 'none' }}
+                                >
+                                    Confirm
+                                </Button>
+                            </Box>
+                        </Box>
+                    </DialogContent>
+                </Dialog>
             )}
-        </div>
+        </Dialog>
     );
 };
 

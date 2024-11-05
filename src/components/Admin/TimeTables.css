@@ -1,173 +1,241 @@
-/* src/components/Admin/TimeTables.css */
+/* TimeTables.css */
 
 .timetables-container {
-    display: flex;
-    height: 100vh;
-    width: 100%;
     padding: 20px;
+    font-family: Arial, sans-serif;
 }
 
 .toolbar {
-    width: 200px;
-    background-color: #f0f0f0;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    margin-right: 20px;
-}
-
-.toolbar h2 {
-    font-size: 1.2rem;
-    margin-bottom: 15px;
-}
-
-.toolbar button {
-    background-color: #003366;
-    color: white;
-    border: none;
-    padding: 10px 15px;
-    margin-bottom: 10px;
-    width: 100%;
-    cursor: pointer;
-    border-radius: 5px;
-    transition: background-color 0.3s ease;
-}
-
-.toolbar button:hover {
-    background-color: #002244;
-}
-
-.content-area {
-    flex-grow: 1;
-    background-color: #f2f2f2;
-    padding: 20px;
-    overflow-y: auto;
-}
-
-.bounded-box {
-    margin-bottom: 20px;
-}
-
-.break-item, .time-table-item {
-    background-color: #e0e0e0;
-    padding: 10px;
-    border-radius: 5px;
-    margin-bottom: 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
-.break-item button, .time-table-item button {
-    background-color: #dc3545;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    cursor: pointer;
-    border-radius: 3px;
-    transition: background-color 0.3s ease;
+.toolbar h2 {
+    margin: 0;
 }
 
-.break-item button:hover, .time-table-item button:hover {
-    background-color: #c82333;
+.toolbar button {
+    padding: 10px 15px;
+    background-color: #007bff;
+    border: none;
+    color: white;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-left: 10px;
+}
+
+.toolbar button:hover {
+    background-color: #0056b3;
+}
+
+.content-area {
+    margin-top: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.bounded-box {
+    flex: 1;
+    min-width: 300px;
+}
+
+.list-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.list-table th,
+.list-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+
+.list-table th {
+    background-color: #f2f2f2;
+    text-align: left;
+}
+
+.list-table td {
+    vertical-align: top;
+}
+
+.list-table button {
+    padding: 5px 10px;
+    background-color: #28a745;
+    border: none;
+    color: white;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.list-table button:hover {
+    background-color: #218838;
 }
 
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
     display: flex;
-    align-items: center;
     justify-content: center;
-    z-index: 1000;
+    align-items: center;
 }
 
-.modal-content {
-    background-color: white;
+.modal-content.modal-wide {
+    background-color: #fff;
     padding: 20px;
-    border-radius: 10px;
-    width: 600px; /* Adjusted width */
+    width: 90%;
+    max-width: 800px;
     max-height: 90vh;
     overflow-y: auto;
-    position: relative;
+    border-radius: 5px;
 }
 
-.modal-wide {
-    width: 700px; /* Increased the modal width further */
+.modal-content h2 {
+    margin-top: 0;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    font-weight: bold;
+}
+
+.form-group input[type='text'],
+.form-group input[type='time'],
+.form-group input[type='number'],
+.form-group select {
+    width: 100%;
+    padding: 5px;
+    margin-top: 5px;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+}
+
+.checkbox-group input {
+    margin-right: 5px;
+}
+
+.schedule-item {
+    border: 1px solid #ccc;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 5px;
+}
+
+.schedule-item h4 {
+    margin-top: 0;
 }
 
 .time-slots-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 15px;
 }
 
-.time-slots-table th, .time-slots-table td {
+.time-slots-table th,
+.time-slots-table td {
     border: 1px solid #ddd;
-    padding: 8px 12px;
-    text-align: center;
+    padding: 8px;
 }
 
 .time-slots-table th {
-    background-color: #003366;
+    background-color: #f2f2f2;
+    text-align: left;
+}
+
+.add-button,
+.save-button {
+    padding: 5px 10px;
+    background-color: #17a2b8;
+    border: none;
     color: white;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+.add-button:hover,
+.save-button:hover {
+    background-color: #138496;
+}
+
+.remove-button {
+    padding: 5px 10px;
+    background-color: #dc3545;
+    border: none;
+    color: white;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.remove-button:hover {
+    background-color: #c82333;
+}
+
+.days-of-week {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.day-checkbox {
+    display: flex;
+    align-items: center;
+}
+
+.day-checkbox input {
+    margin-right: 5px;
 }
 
 .modal-buttons {
-    display: flex;
-    justify-content: space-between;
     margin-top: 20px;
-    gap: 10px; /* Added gap to evenly space the buttons */
+    text-align: right;
 }
 
 .modal-buttons button {
-    padding: 8px 16px; /* Reduced padding to make buttons smaller */
-    margin: 0;
-    border-radius: 5px;
+    margin-left: 10px;
+    padding: 10px 15px;
     border: none;
     cursor: pointer;
-    flex: 1; /* Added to evenly distribute space between buttons */
-    transition: background-color 0.3s ease;
+    border-radius: 4px;
 }
 
-.modal-buttons .delete-btn {
+.modal-buttons button:first-child {
+    background-color: #007bff;
+    color: white;
+}
+
+.modal-buttons button:first-child:hover {
+    background-color: #0056b3;
+}
+
+.modal-buttons button:nth-child(2) {
     background-color: #dc3545;
     color: white;
 }
 
-.modal-buttons .delete-btn:hover {
+.modal-buttons button:nth-child(2):hover {
     background-color: #c82333;
 }
 
-.modal-buttons .cancel-btn {
+.modal-buttons button:last-child {
     background-color: #6c757d;
     color: white;
 }
 
-.modal-buttons .cancel-btn:hover {
+.modal-buttons button:last-child:hover {
     background-color: #5a6268;
-}
-
-.modal-buttons .save-btn {
-    background-color: #28a745;
-    color: white;
-}
-
-.modal-buttons .save-btn:hover {
-    background-color: #218838;
-}
-
-.overtime-label {
-    background-color: #28a745;
-    color: white;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    margin-left: 10px;
 }
 
 .error-message {

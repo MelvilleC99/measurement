@@ -1,3 +1,4 @@
+// Updated LateUpdate component
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where, updateDoc, doc, Timestamp, addDoc } from 'firebase/firestore';
 import { db } from '../../../../firebase';
@@ -14,14 +15,14 @@ interface LateUpdateProps {
     supervisorId: string;
 }
 
-interface LateRecord extends Omit<LateFormData, 'date'> {
+interface LateRecord {
     id: string;
     date: Date;
     employeeId: string;
     employeeNumber: string;
     name: string;
     surname: string;
-    status: 'open'
+    status: 'late';
     updatedAt: Timestamp;
     updatedBy?: string;
     comments?: string;
@@ -77,30 +78,30 @@ const LateUpdate: React.FC<LateUpdateProps> = ({
         return records.map(record => ({
             id: record.id,
             title: record.name,
-            subtitle: record.surname,
-            status: 'Late',
+            subtitle: 'Late',
             metadata: {
-                employeeNumber: record.employeeNumber
+                employeeNumber: record.employeeNumber,
+                name: record.name,
+                surname: record.surname
             }
         }));
     };
 
     const renderLateRecordItem = (item: ListItemData) => {
         const {
-            title = '',
-            subtitle = '',
-            status = '',
-            metadata = {}
+            metadata: {
+                employeeNumber = 'N/A',
+                name = 'N/A',
+                surname = 'N/A'
+            } = {}
         } = item;
-
-        const employeeNumber = metadata.employeeNumber || '';
 
         return (
             <div className="list-row">
-                <div className="name-cell">{title}</div>
-                <div className="surname-cell">{subtitle}</div>
-                <div className="employee-number-cell">{employeeNumber}</div>
-                <div className="status-cell">{status}</div>
+                <div className="list-cell"><strong>Employee #:</strong> {employeeNumber}</div>
+                <div className="list-cell"><strong>Name:</strong> {name}</div>
+                <div className="list-cell"><strong>Surname:</strong> {surname}</div>
+                <div className="list-cell"><strong>Status:</strong> Late</div>
             </div>
         );
     };
