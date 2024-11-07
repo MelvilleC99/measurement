@@ -28,7 +28,7 @@ import {
     TableRow,
     Chip,
 } from '@mui/material';
-import { Add, Delete, Edit, Close } from '@mui/icons-material';
+import { Add, Delete, Edit, Close, Visibility } from '@mui/icons-material';
 import {
     collection,
     addDoc,
@@ -86,6 +86,7 @@ const TimeTables: React.FC = () => {
     const [breakDuration, setBreakDuration] = useState<number | ''>('');
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
+    const [isViewMode, setIsViewMode] = useState<boolean>(false);
 
     const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -99,7 +100,8 @@ const TimeTables: React.FC = () => {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const timeTablesSnapshot = await getDocs(collection(db, 'timeTables'));
+            // Changed collection name to 'timeTable'
+            const timeTablesSnapshot = await getDocs(collection(db, 'timeTable'));
             const breaksSnapshot = await getDocs(collection(db, 'breaks'));
             const timeTablesData = timeTablesSnapshot.docs.map(doc => ({
                 id: doc.id,
@@ -252,10 +254,11 @@ const TimeTables: React.FC = () => {
 
         try {
             if (selectedTimeTable) {
-                const timeTableDoc = doc(db, 'timeTables', selectedTimeTable.id);
+                // Changed collection name to 'timeTable'
+                const timeTableDoc = doc(db, 'timeTable', selectedTimeTable.id);
                 await updateDoc(timeTableDoc, newTimeTable);
             } else {
-                await addDoc(collection(db, 'timeTables'), {
+                await addDoc(collection(db, 'timeTable'), {
                     ...newTimeTable,
                     createdAt: Timestamp.now(),
                 });
@@ -281,7 +284,8 @@ const TimeTables: React.FC = () => {
         if (selectedTimeTable) {
             if (window.confirm(`Are you sure you want to delete the time table "${selectedTimeTable.name}"?`)) {
                 try {
-                    await deleteDoc(doc(db, 'timeTables', selectedTimeTable.id));
+                    // Changed collection name to 'timeTable'
+                    await deleteDoc(doc(db, 'timeTable', selectedTimeTable.id));
                     fetchData();
                     setIsTimeTableModalOpen(false);
                     setError('');
@@ -293,7 +297,7 @@ const TimeTables: React.FC = () => {
         }
     };
 
-    const openTimeTableModal = (timeTable?: TimeTable) => {
+    const openTimeTableModal = (timeTable?: TimeTable, viewMode = false) => {
         if (timeTable) {
             setSelectedTimeTable(timeTable);
             setTimeTableName(timeTable.name);
@@ -307,6 +311,7 @@ const TimeTables: React.FC = () => {
             setIsOvertime(false);
             setSchedules([]);
         }
+        setIsViewMode(viewMode);
         setCurrentSchedule(null);
         setEditingScheduleIndex(null);
         setIsTimeTableModalOpen(true);
@@ -430,6 +435,9 @@ const TimeTables: React.FC = () => {
                                             <TableCell>{tt.description}</TableCell>
                                             <TableCell>{tt.isOvertime ? 'Yes' : 'No'}</TableCell>
                                             <TableCell align="right">
+                                                <IconButton onClick={() => openTimeTableModal(tt, true)}>
+                                                    <Visibility />
+                                                </IconButton>
                                                 <IconButton onClick={() => openTimeTableModal(tt)}>
                                                     <Edit />
                                                 </IconButton>
@@ -504,7 +512,11 @@ const TimeTables: React.FC = () => {
                 fullWidth
             >
                 <DialogTitle>
-                    {selectedTimeTable ? `Edit Time Table: ${selectedTimeTable.name}` : 'Create Time Table'}
+                    {selectedTimeTable
+                        ? isViewMode
+                            ? `View Time Table: ${selectedTimeTable.name}`
+                            : `Edit Time Table: ${selectedTimeTable.name}`
+                        : 'Create Time Table'}
                     <IconButton
                         aria-label="close"
                         onClick={() => setIsTimeTableModalOpen(false)}
@@ -528,6 +540,7 @@ const TimeTables: React.FC = () => {
                                 fullWidth
                                 size="small"
                                 InputLabelProps={{ shrink: true }}
+                                disabled={isViewMode}
                             />
                         </Grid>
                         <Grid item xs={12} md={6}>
@@ -538,6 +551,7 @@ const TimeTables: React.FC = () => {
                                 fullWidth
                                 size="small"
                                 InputLabelProps={{ shrink: true }}
+                                disabled={isViewMode}
                             />
                         </Grid>
                         <Grid item xs={12}>
@@ -547,6 +561,7 @@ const TimeTables: React.FC = () => {
                                         checked={isOvertime}
                                         onChange={(e) => setIsOvertime(e.target.checked)}
                                         color="primary"
+                                        disabled={isViewMode}
                                     />
                                 }
                                 label="Is Overtime Time Table"
@@ -568,20 +583,22 @@ const TimeTables: React.FC = () => {
                                     >
                                         <Grid container alignItems="center" justifyContent="space-between">
                                             <Typography variant="subtitle1">Schedule {index + 1}</Typography>
-                                            <Box>
-                                                <IconButton onClick={() => handleEditSchedule(index)}>
-                                                    <Edit />
-                                                </IconButton>
-                                                <IconButton
-                                                    onClick={() => {
-                                                        const updatedSchedules = [...schedules];
-                                                        updatedSchedules.splice(index, 1);
-                                                        setSchedules(updatedSchedules);
-                                                    }}
-                                                >
-                                                    <Delete />
-                                                </IconButton>
-                                            </Box>
+                                            {!isViewMode && (
+                                                <Box>
+                                                    <IconButton onClick={() => handleEditSchedule(index)}>
+                                                        <Edit />
+                                                    </IconButton>
+                                                    <IconButton
+                                                        onClick={() => {
+                                                            const updatedSchedules = [...schedules];
+                                                            updatedSchedules.splice(index, 1);
+                                                            setSchedules(updatedSchedules);
+                                                        }}
+                                                    >
+                                                        <Delete />
+                                                    </IconButton>
+                                                </Box>
+                                            )}
                                         </Grid>
                                         <Typography variant="body2" sx={{ mb: 1 }}>
                                             Applies to: {schedule.daysOfWeek.join(', ')}
@@ -592,11 +609,10 @@ const TimeTables: React.FC = () => {
                                                     <TableCell sx={{ color: '#fff' }}>From</TableCell>
                                                     <TableCell sx={{ color: '#fff' }}>To</TableCell>
                                                     <TableCell sx={{ color: '#fff' }}>Break</TableCell>
-                                                    <TableCell sx={{ color: '#fff' }}>Action</TableCell>
                                                 </TableRow>
                                             </TableHead>
                                             <TableBody>
-                                                {schedule.slots.map((slot, slotIndex) => (
+                                                {schedule.slots.map((slot) => (
                                                     <TableRow key={slot.id}>
                                                         <TableCell>{slot.startTime}</TableCell>
                                                         <TableCell>{slot.endTime}</TableCell>
@@ -604,9 +620,6 @@ const TimeTables: React.FC = () => {
                                                             {slot.breakId
                                                                 ? breaks.find((b) => b.id === slot.breakId)?.name || 'N/A'
                                                                 : 'None'}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {/* Optionally, add actions here */}
                                                         </TableCell>
                                                     </TableRow>
                                                 ))}
@@ -618,7 +631,7 @@ const TimeTables: React.FC = () => {
                         )}
 
                         {/* Current Schedule */}
-                        {currentSchedule ? (
+                        {currentSchedule && !isViewMode ? (
                             <Box sx={{ mt: 2 }}>
                                 <Typography variant="h6">
                                     {editingScheduleIndex !== null ? 'Edit Schedule' : 'Define Schedule'}
@@ -647,6 +660,7 @@ const TimeTables: React.FC = () => {
                                                             onChange={(e) => handleTimeSlotChange(slotIndex, 'startTime', e.target.value)}
                                                             size="small"
                                                             fullWidth
+                                                            InputLabelProps={{ shrink: true }}
                                                         />
                                                     </TableCell>
                                                     <TableCell>
@@ -656,6 +670,7 @@ const TimeTables: React.FC = () => {
                                                             onChange={(e) => handleTimeSlotChange(slotIndex, 'endTime', e.target.value)}
                                                             size="small"
                                                             fullWidth
+                                                            InputLabelProps={{ shrink: true }}
                                                         />
                                                     </TableCell>
                                                     <TableCell>
@@ -732,34 +747,38 @@ const TimeTables: React.FC = () => {
                                 </Box>
                             </Box>
                         ) : (
-                            <Box sx={{ mt: 2 }}>
-                                <Button variant="outlined" startIcon={<Add />} onClick={handleAddSchedule}>
-                                    Add New Schedule
-                                </Button>
-                            </Box>
+                            !isViewMode && (
+                                <Box sx={{ mt: 2 }}>
+                                    <Button variant="outlined" startIcon={<Add />} onClick={handleAddSchedule}>
+                                        Add New Schedule
+                                    </Button>
+                                </Box>
+                            )
                         )}
                     </Box>
 
-                    <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
-                        {selectedTimeTable && (
+                    {!isViewMode && (
+                        <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+                            {selectedTimeTable && (
+                                <Button
+                                    variant="contained"
+                                    color="secondary"
+                                    onClick={handleDeleteTimeTable}
+                                    startIcon={<Delete />}
+                                    sx={{ mr: 2 }}
+                                >
+                                    Delete
+                                </Button>
+                            )}
                             <Button
                                 variant="contained"
-                                color="secondary"
-                                onClick={handleDeleteTimeTable}
-                                startIcon={<Delete />}
-                                sx={{ mr: 2 }}
+                                color="primary"
+                                onClick={handleSaveTimeTable}
                             >
-                                Delete
+                                Save Time Table
                             </Button>
-                        )}
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={handleSaveTimeTable}
-                        >
-                            Save Time Table
-                        </Button>
-                    </Box>
+                        </Box>
+                    )}
                 </DialogContent>
             </Dialog>
 

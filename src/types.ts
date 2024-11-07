@@ -6,6 +6,14 @@ import { Timestamp } from 'firebase/firestore';
 // Entity Interfaces
 // ------------------------
 
+export interface TimeTableAssignment {
+    id: string; // Unique ID for the assignment
+    timeTableId: string;
+    timeTableName: string; // For easier display
+    fromDate: string;
+    toDate: string;
+}
+
 export interface ProductionLine {
     id: string;
     name: string;
@@ -14,8 +22,7 @@ export interface ProductionLine {
     currentStyle?: string;
     createdAt: Timestamp;
     updatedAt: Timestamp;
-    assignedTimeTable: string;
-
+    timeTableAssignments: TimeTableAssignment[]; // Updated property
 }
 
 export interface Style {
@@ -29,7 +36,7 @@ export interface Style {
     createdAt: Timestamp;
     updatedAt: Timestamp;
     unitsProduced: number;
-    customer: string;     // New field for customer
+    customer: string; // New field for customer
     smv: number;
     status: string;
 }
@@ -49,26 +56,40 @@ export interface SupportFunction {
 
 export interface TimeSlot {
     id: string;
-    startTime: string; // Format 'HH:mm'
-    endTime: string;   // Format 'HH:mm'
-    breakId: string | null;
+    startTime: string;
+    endTime: string;
+    breakId?: string;
 }
 
-export interface Break {
+export interface Schedule {
     id: string;
-    breakType: 'Lunch' | 'Tea';
-    startTime: string; // Format 'HH:mm'
-    endTime: string;   // Format 'HH:mm'
-    duration: number;  // Duration in minutes
+    slots: TimeSlot[];
+    daysOfWeek: string[]; // Days this schedule applies to
 }
 
 export interface TimeTable {
     id: string;
     name: string;
-    lineId: string;
-    slots: TimeSlot[];
-    createdAt: Timestamp;
-    updatedAt: Timestamp;
+    description: string;
+    isOvertime: boolean;
+    schedules: Schedule[];
+}
+
+export interface Break {
+    id: string;
+    name: string;
+    description: string;
+    duration: number; // Break duration in minutes
+}
+
+export interface OvertimeSchedule {
+    id: string;
+    timeTableId: string;
+    productionLineIds: string[];
+    startDate: string; // in 'YYYY-MM-DD' format
+    endDate: string;   // in 'YYYY-MM-DD' format
+    isOvertime: boolean;
+    createdAt: string; // ISO string
 }
 
 export interface Employee {
@@ -87,11 +108,10 @@ export interface SessionData {
     startTime: Timestamp;
     endTime?: Timestamp;
     isActive: boolean;
-    styleId: string ;
+    styleId: string;
     target: number;
     timeTableId: string;
-
-
+    isOvertime?: boolean;
 }
 
 export interface ScheduledStyle {
@@ -105,6 +125,7 @@ export interface ScheduledStyle {
     deliveryDate: string;
     status: string;
 }
+
 // ------------------------
 // Helper Functions
 // ------------------------

@@ -1,11 +1,33 @@
-// Updated LateUpdate component
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, updateDoc, doc, Timestamp, addDoc } from 'firebase/firestore';
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    Box,
+    TextField,
+    Button,
+    Alert,
+    IconButton,
+    Select,
+    MenuItem,
+    Typography,
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import {
+    collection,
+    getDocs,
+    query,
+    where,
+    updateDoc,
+    doc,
+    Timestamp,
+    addDoc,
+    getDoc
+} from 'firebase/firestore';
 import { db } from '../../../../firebase';
-import { LateFormData } from '../types';
-import StandardList, { ListItemData } from '../../../StandardDesign/list/StandardList';
-import StandardCard from '../../../StandardDesign/card/StandardCard';
-import './LateUpdate.css';
+import { SupportFunction } from '../../../../types';
+import LateList from '../../../StandardDesign/list/LateList';
+import type { LateListItemData } from '../../../StandardDesign/list/LateList';
 
 interface LateUpdateProps {
     onClose: () => void;
@@ -39,16 +61,39 @@ const LateUpdate: React.FC<LateUpdateProps> = ({
                                                }) => {
     const [lateRecords, setLateRecords] = useState<LateRecord[]>([]);
     const [selectedRecord, setSelectedRecord] = useState<LateRecord | null>(null);
-    const [supervisorPassword, setSupervisorPassword] = useState<string>('');
-    const [comments, setComments] = useState<string>('');
-    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
-    const [selectedStatus, setSelectedStatus] = useState<'present' | 'absent' | null>(null);
+    const [additionalComments, setAdditionalComments] = useState<string>('');
+    const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>('');
+    const [password, setPassword] = useState<string>('');
     const [error, setError] = useState<string>('');
+    const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
+    const [supervisors, setSupervisors] = useState<SupportFunction[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [selectedStatus, setSelectedStatus] = useState<'present' | 'absent' | null>(null);
 
     useEffect(() => {
         fetchLateRecords();
+        fetchSupervisors();
     }, [sessionId]);
+
+    const fetchSupervisors = async () => {
+        try {
+            const supportFunctionsRef = collection(db, 'supportFunctions');
+            const q = query(
+                supportFunctionsRef,
+                where('role', '==', 'Supervisor'),
+                where('hasPassword', '==', true)
+            );
+            const querySnapshot = await getDocs(q);
+            const supervisorsList = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as SupportFunction));
+            setSupervisors(supervisorsList);
+        } catch (err) {
+            console.error('Error in fetchSupervisors:', err);
+            setError('Failed to fetch supervisors');
+        }
+    };
 
     const fetchLateRecords = async () => {
         try {
@@ -58,12 +103,54 @@ const LateUpdate: React.FC<LateUpdateProps> = ({
                 where('sessionId', '==', sessionId),
                 where('status', '==', 'late')
             );
-            const snapshot = await getDocs(lateQuery);
-            const records: LateRecord[] = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                date: doc.data().date.toDate()
-            } as LateRecord));
+            const attendanceSnapshot = await getDocs(lateQuery);
+
+            // Get all employee IDs
+            const employeeIds = attendanceSnapshot.docs.map(doc => doc.data().employeeId);
+
+            if (employeeIds.length === 0) {
+                setLateRecords([]);
+                return;
+            }
+
+            // Get employee details from supportFunctions using document IDs
+            const employees = await Promise.all(
+                employeeIds.map(id => getDoc(doc(db, 'supportFunctions', id)))
+            );
+
+            // Create a map of employee details
+            const employeeMap = new Map();
+            employees.forEach(employeeDoc => {
+                if (employeeDoc.exists()) {
+                    const data = employeeDoc.data();
+                    employeeMap.set(employeeDoc.id, {
+                        employeeNumber: data.employeeNumber,
+                        name: data.name,
+                        surname: data.surname
+                    });
+                }
+            });
+
+            // Combine attendance and employee data
+            const records: LateRecord[] = attendanceSnapshot.docs.map(doc => {
+                const attendanceData = doc.data();
+                const employeeData = employeeMap.get(attendanceData.employeeId) || {};
+
+                return {
+                    id: doc.id,
+                    employeeId: attendanceData.employeeId,
+                    employeeNumber: employeeData.employeeNumber || 'Unknown',
+                    name: employeeData.name || 'Unknown',
+                    surname: employeeData.surname || 'Unknown',
+                    date: attendanceData.date.toDate(),
+                    status: 'late',
+                    time: attendanceData.time,
+                    reason: attendanceData.reason,
+                    updatedAt: attendanceData.updatedAt,
+                    updatedBy: attendanceData.updatedBy,
+                    comments: attendanceData.comments
+                } as LateRecord;
+            });
 
             setLateRecords(records);
         } catch (err) {
@@ -74,130 +161,86 @@ const LateUpdate: React.FC<LateUpdateProps> = ({
         }
     };
 
-    const formatLateRecordsForList = (records: LateRecord[]): ListItemData[] => {
+    const formatLateRecords = (records: LateRecord[]): LateListItemData[] => {
         return records.map(record => ({
             id: record.id,
-            title: record.name,
-            subtitle: 'Late',
-            metadata: {
-                employeeNumber: record.employeeNumber,
-                name: record.name,
-                surname: record.surname
-            }
+            employeeNumber: record.employeeNumber,
+            name: record.name,
+            surname: record.surname,
+            status: 'Late'
         }));
     };
 
-    const renderLateRecordItem = (item: ListItemData) => {
-        const {
-            metadata: {
-                employeeNumber = 'N/A',
-                name = 'N/A',
-                surname = 'N/A'
-            } = {}
-        } = item;
-
-        return (
-            <div className="list-row">
-                <div className="list-cell"><strong>Employee #:</strong> {employeeNumber}</div>
-                <div className="list-cell"><strong>Name:</strong> {name}</div>
-                <div className="list-cell"><strong>Surname:</strong> {surname}</div>
-                <div className="list-cell"><strong>Status:</strong> Late</div>
-            </div>
-        );
-    };
-
-    const handleListItemClick = (item: ListItemData) => {
+    const handleListItemClick = (item: LateListItemData) => {
         const record = lateRecords.find(r => r.id === item.id);
         if (record) {
             setSelectedRecord(record);
-            setComments('');
-            setSelectedStatus(null);
+            setAdditionalComments('');
             setError('');
-        }
-    };
-
-    const verifySupervisor = async (): Promise<boolean> => {
-        try {
-            const supervisorSnapshot = await getDocs(query(
-                collection(db, 'supportFunctions'),
-                where('id', '==', supervisorId),
-                where('password', '==', supervisorPassword),
-                where('role', '==', 'Supervisor')
-            ));
-
-            return !supervisorSnapshot.empty;
-        } catch (err) {
-            console.error('Error verifying supervisor:', err);
-            return false;
+            setShowPasswordModal(false);
         }
     };
 
     const handleStatusUpdate = (status: 'present' | 'absent') => {
-        if (!selectedRecord) {
-            setError('No record selected');
+        setSelectedStatus(status);
+        setShowPasswordModal(true);
+        setError('');
+    };
+
+    const handlePasswordSubmit = async () => {
+        if (!selectedRecord || !selectedStatus) return;
+
+        if (!selectedSupervisorId || !password) {
+            setError('Please select a supervisor and enter password');
             return;
         }
-        setSelectedStatus(status);
-        setIsConfirmModalOpen(true);
-    };
-
-    const addAbsentRecord = async () => {
-        if (!selectedRecord) return;
 
         try {
-            const absentData = {
-                employeeId: selectedRecord.employeeId,
-                reason: selectedRecord.reason || '',
-                startDate: selectedRecord.date,
-                endDate: selectedRecord.date,
-                productionLineId: lineId,
-                supervisorId,
-                createdAt: Timestamp.now(),
-                updatedAt: Timestamp.now(),
-                status: 'open',
-                employeeNumber: selectedRecord.employeeNumber,
-                name: selectedRecord.name,
-                surname: selectedRecord.surname,
-                comments: comments || ''
-            };
+            const supervisorQuery = query(
+                collection(db, 'supportFunctions'),
+                where('employeeNumber', '==', selectedSupervisorId),
+                where('password', '==', password),
+                where('role', '==', 'Supervisor'),
+                where('hasPassword', '==', true)
+            );
 
-            await addDoc(collection(db, 'absent'), absentData);
-        } catch (err) {
-            console.error('Error creating absent record:', err);
-            throw err;
-        }
-    };
+            const supervisorSnapshot = await getDocs(supervisorQuery);
 
-    const handleConfirm = async () => {
-        try {
-            if (!selectedRecord || !selectedStatus) return;
-
-            const isSupervisorVerified = await verifySupervisor();
-            if (!isSupervisorVerified) {
-                setError('Invalid supervisor password');
+            if (supervisorSnapshot.empty) {
+                setError('Invalid supervisor credentials');
                 return;
             }
 
-            const recordRef = doc(db, 'attendance', selectedRecord.id);
-            const updateData = {
+            await updateDoc(doc(db, 'attendance', selectedRecord.id), {
                 status: selectedStatus,
-                comments: comments || `Marked as ${selectedStatus}`,
-                updatedAt: Timestamp.now(),
-                updatedBy: supervisorId
-            };
-
-            await updateDoc(recordRef, updateData);
+                supervisorId: selectedSupervisorId,
+                comments: additionalComments || `Marked as ${selectedStatus}`,
+                updatedAt: Timestamp.now()
+            });
 
             if (selectedStatus === 'absent') {
-                await addAbsentRecord();
+                await addDoc(collection(db, 'absent'), {
+                    employeeId: selectedRecord.employeeId,
+                    reason: selectedRecord.reason || '',
+                    startDate: selectedRecord.date,
+                    endDate: selectedRecord.date,
+                    productionLineId: lineId,
+                    supervisorId: selectedSupervisorId,
+                    createdAt: Timestamp.now(),
+                    updatedAt: Timestamp.now(),
+                    status: 'Open',
+                    employeeNumber: selectedRecord.employeeNumber,
+                    name: selectedRecord.name,
+                    surname: selectedRecord.surname,
+                    comments: additionalComments || ''
+                });
             }
 
             setSelectedRecord(null);
-            setSupervisorPassword('');
-            setComments('');
-            setIsConfirmModalOpen(false);
-            setSelectedStatus(null);
-
+            setPassword('');
+            setSelectedSupervisorId('');
+            setAdditionalComments('');
+            setShowPasswordModal(false);
             await fetchLateRecords();
             onUpdate();
         } catch (err) {
@@ -206,116 +249,241 @@ const LateUpdate: React.FC<LateUpdateProps> = ({
         }
     };
 
-    const getStatusDisplayText = (status: 'present' | 'absent' | null): string => {
-        if (!status) return '';
-        return status.charAt(0).toUpperCase() + status.slice(1);
+    const handleClose = () => {
+        setShowPasswordModal(false);
+        setPassword('');
+        setSelectedSupervisorId('');
+        setError('');
     };
 
     if (isLoading) {
         return (
-            <div className="modal-overlay">
-                <StandardCard title="Loading">
-                    <div className="loading-state">Loading...</div>
-                </StandardCard>
-            </div>
+            <Dialog open={true} maxWidth="md" fullWidth>
+                <DialogContent>
+                    <Box display="flex" justifyContent="center" p={3}>
+                        <div className="loading-spinner">Loading...</div>
+                    </Box>
+                </DialogContent>
+            </Dialog>
         );
     }
 
     return (
-        <div className="modal-overlay">
-            <StandardCard
-                title={selectedRecord ? 'Update Late Record' : 'Update Late Records'}
-                onClose={selectedRecord && !isConfirmModalOpen ? () => setSelectedRecord(null) : onClose}
-            >
-                {error && (
-                    <div className="error-message">
-                        <span>{error}</span>
-                        <button onClick={() => setError('')}>×</button>
-                    </div>
-                )}
+        <Dialog
+            open={true}
+            onClose={onClose}
+            maxWidth="md"
+            fullWidth
+            PaperProps={{
+                sx: {
+                    borderRadius: 2,
+                    width: '100%',
+                    maxWidth: '800px',
+                    m: 2
+                }
+            }}
+        >
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="h6" component="h2">
+                    {selectedRecord ? 'Update Late Record' : 'Update Late Records'}
+                </Typography>
+                <IconButton onClick={onClose} size="small">
+                    <CloseIcon />
+                </IconButton>
+            </DialogTitle>
 
-                {!selectedRecord ? (
-                    <StandardList
-                        items={formatLateRecordsForList(lateRecords)}
-                        onItemClick={handleListItemClick}
-                        renderItemContent={renderLateRecordItem}
-                        emptyMessage="No late records to display"
-                    />
-                ) : (
-                    <div className="selected-item-view">
-                        {!isConfirmModalOpen ? (
-                            <>
-                                <div className="details-grid">
-                                    <p><strong>Name:</strong> {selectedRecord.name} {selectedRecord.surname}</p>
-                                    <p><strong>Employee #:</strong> {selectedRecord.employeeNumber}</p>
-                                    <p><strong>Date:</strong> {selectedRecord.date.toLocaleDateString()}</p>
-                                    <p><strong>Time:</strong> {selectedRecord.time}</p>
-                                    {selectedRecord.reason && (
-                                        <p><strong>Reason:</strong> {selectedRecord.reason}</p>
-                                    )}
-                                </div>
-                                <div className="action-buttons">
-                                    <button
-                                        onClick={() => handleStatusUpdate('present')}
-                                        className="btn-present"
+            <DialogContent>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+                    {!selectedRecord ? (
+                        <LateList
+                            items={formatLateRecords(lateRecords)}
+                            onItemClick={handleListItemClick}
+                            emptyMessage="No late records to display"
+                        />
+                    ) : (
+                        <>
+                            <Box sx={{
+                                bgcolor: 'grey.50',
+                                p: 2,
+                                borderRadius: 1,
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: 2
+                            }}>
+                                <Box>
+                                    <Typography color="text.secondary" variant="body2">
+                                        Employee
+                                    </Typography>
+                                    <Typography>{selectedRecord.name} {selectedRecord.surname}</Typography>
+                                </Box>
+
+                                <Box>
+                                    <Typography color="text.secondary" variant="body2">
+                                        Employee #
+                                    </Typography>
+                                    <Typography>{selectedRecord.employeeNumber}</Typography>
+                                </Box>
+
+                                <Box>
+                                    <Typography color="text.secondary" variant="body2">
+                                        Date
+                                    </Typography>
+                                    <Typography>{selectedRecord.date.toLocaleDateString()}</Typography>
+                                </Box>
+
+                                <Box>
+                                    <Typography color="text.secondary" variant="body2">
+                                        Time
+                                    </Typography>
+                                    <Typography>{selectedRecord.time}</Typography>
+                                </Box>
+
+                                {selectedRecord.reason && (
+                                    <Box sx={{ gridColumn: '1 / -1' }}>
+                                        <Typography color="text.secondary" variant="body2">
+                                            Reason
+                                        </Typography>
+                                        <Typography>{selectedRecord.reason}</Typography>
+                                    </Box>
+                                )}
+                            </Box>
+
+                            <TextField
+                                multiline
+                                rows={2}
+                                value={additionalComments}
+                                onChange={(e) => setAdditionalComments(e.target.value)}
+                                placeholder="Add resolution comments"
+                                fullWidth
+                                variant="outlined"
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        '& fieldset': {
+                                            borderRadius: 1
+                                        },
+                                        '& textarea': {
+                                            p: 1.5
+                                        }
+                                    }
+                                }}
+                            />
+
+                            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', pt: 1 }}>
+                                <Button
+                                    onClick={() => handleStatusUpdate('present')}
+                                    variant="contained"
+                                    color="primary"
+                                    sx={{
+                                        minWidth: 160,
+                                        py: 1.5,
+                                        textTransform: 'none',
+                                        fontSize: '1rem'
+                                    }}
+                                >
+                                    Mark as Present
+                                </Button>
+                                <Button
+                                    onClick={() => handleStatusUpdate('absent')}
+                                    variant="contained"
+                                    color="error"
+                                    sx={{
+                                        minWidth: 160,
+                                        py: 1.5,
+                                        textTransform: 'none',
+                                        fontSize: '1rem'
+                                    }}
+                                >
+                                    Mark as Absent
+                                </Button>
+                            </Box>
+                        </>
+                    )}
+                </Box>
+            </DialogContent>
+
+            {/* Supervisor Verification Modal */}
+            {showPasswordModal && (
+                <Dialog
+                    open={true}
+                    onClose={handleClose}
+                    maxWidth="xs"
+                    fullWidth
+                    PaperProps={{ sx: { borderRadius: 2, p: 1 } }}
+                >
+                    <DialogTitle sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                    }}>
+                        Supervisor Verification
+                        <IconButton onClick={handleClose} size="small">
+                            <CloseIcon />
+                        </IconButton>
+                    </DialogTitle>
+
+                    <DialogContent>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
+                            {error && <Alert severity="error">{error}</Alert>}
+
+                            <Select
+                                value={selectedSupervisorId}
+                                onChange={(e) => setSelectedSupervisorId(e.target.value)}
+                                displayEmpty
+                                fullWidth
+                                sx={{
+                                    borderRadius: 1,
+                                    '& .MuiSelect-select': { py: 1.5 }
+                                }}
+                            >
+                                <MenuItem value="" disabled>
+                                    Select supervisor
+                                </MenuItem>
+                                {supervisors.map((supervisor) => (
+                                    <MenuItem
+                                        key={supervisor.id}
+                                        value={supervisor.employeeNumber}
                                     >
-                                        Mark as Present
-                                    </button>
-                                    <button
-                                        onClick={() => handleStatusUpdate('absent')}
-                                        className="btn-absent"
-                                    >
-                                        Mark as Absent
-                                    </button>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div className="details-grid">
-                                    <h3>
-                                        Confirm Status Update: {getStatusDisplayText(selectedStatus)}
-                                    </h3>
-                                    <div className="confirmation-inputs">
-                                        <input
-                                            type="password"
-                                            value={supervisorPassword}
-                                            onChange={(e) => setSupervisorPassword(e.target.value)}
-                                            placeholder="Enter Supervisor Password"
-                                            className="supervisor-password-input"
-                                            autoFocus
-                                        />
-                                        <textarea
-                                            value={comments}
-                                            onChange={(e) => setComments(e.target.value)}
-                                            placeholder="Add comments (optional)"
-                                            className="comments-input"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="action-buttons">
-                                    <button
-                                        onClick={handleConfirm}
-                                        className="btn-confirm"
-                                    >
-                                        Confirm
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setIsConfirmModalOpen(false);
-                                            setSupervisorPassword('');
-                                            setComments('');
-                                        }}
-                                        className="btn-cancel"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                )}
-            </StandardCard>
-        </div>
+                                        {`${supervisor.name} ${supervisor.surname}`}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+
+                            <TextField
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="Enter password"
+                                fullWidth
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        borderRadius: 1,
+                                        '& input': { py: 1.5, px: 1.5 }
+                                    }
+                                }}
+                            />
+                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', pt: 2 }}>
+                                <Button
+                                    onClick={handleClose}
+                                    variant="outlined"
+                                    sx={{ minWidth: 100, textTransform: 'none' }}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    onClick={handlePasswordSubmit}
+                                    variant="contained"
+                                    sx={{ minWidth: 100, textTransform: 'none' }}
+                                >
+                                    Confirm
+                                </Button>
+                            </Box>
+                        </Box>
+                    </DialogContent>
+                </Dialog>
+            )}
+        </Dialog>
     );
 };
 

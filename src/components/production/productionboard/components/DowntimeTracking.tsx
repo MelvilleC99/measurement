@@ -1,4 +1,5 @@
 // DowntimeTracking.tsx
+
 import React, { useState, useEffect } from 'react';
 import {
     collection,
@@ -13,6 +14,8 @@ import MachineUpdate from '../../../production/downtime/machine/MachineUpdate';
 import SupplyUpdate from '../../../production/downtime/supply/SupplyUpdate';
 import StyleChangeUpdate from '../../downtime/stylechange/StyleChangeUpdate';
 import { SupplyRecord, StyleChangeoverRecord } from '../../downtime/types';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, IconButton, Box } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import './DowntimeTracking.css';
 
 interface DowntimeTrackingProps {
@@ -59,6 +62,7 @@ const DowntimeTracking: React.FC<DowntimeTrackingProps> = ({ sessionId, lineId, 
     const [error, setError] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
     const [showMachineModal, setShowMachineModal] = useState(false);
+    const [currentTime, setCurrentTime] = useState<Date>(new Date());
 
     // Fetch mechanics
     useEffect(() => {
@@ -168,16 +172,27 @@ const DowntimeTracking: React.FC<DowntimeTrackingProps> = ({ sessionId, lineId, 
         };
     }, [sessionId, lineId]);
 
+    // Set up a global timer to update currentTime every second
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, []);
+
+    const formatElapsedTime = (startTime: Date): string => {
+        const elapsed = Math.floor((currentTime.getTime() - startTime.getTime()) / 1000);
+        const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+        const seconds = (elapsed % 60).toString().padStart(2, '0');
+        return `${minutes}:${seconds}`;
+    };
+
     const handleSelectMachineDowntime = (downtimeId: string) => {
-        console.log('1. Clicking machine downtime:', downtimeId);
         const selectedDowntime = activeMachineDowntimes.find(downtime => downtime.id === downtimeId);
-        console.log('2. Found downtime:', selectedDowntime);
         if (selectedDowntime) {
-            console.log('3. User Role:', userRole);
-            console.log('4. Mechanic Acknowledged:', selectedDowntime.mechanicAcknowledged);
             setSelectedMachineDowntime(selectedDowntime);
             setShowMachineModal(true);
-            console.log('5. Modal should show now');
         }
     };
 
@@ -206,7 +221,6 @@ const DowntimeTracking: React.FC<DowntimeTrackingProps> = ({ sessionId, lineId, 
         setError('');
     };
 
-
     const refreshMachineDowntimes = async () => {
         setSelectedMachineDowntime(null);
         setShowMachineModal(false);
@@ -217,7 +231,6 @@ const DowntimeTracking: React.FC<DowntimeTrackingProps> = ({ sessionId, lineId, 
     return (
         <div className="downtime-tracking">
             <div className="active-downtimes">
-                <h2>Active Downtimes</h2>
                 {error && (
                     <div className="error-message">
                         {error}
@@ -236,22 +249,13 @@ const DowntimeTracking: React.FC<DowntimeTrackingProps> = ({ sessionId, lineId, 
                                 className={`downtime-card clickable ${downtime.mechanicAcknowledged ? 'acknowledged' : ''}`}
                                 onClick={() => handleSelectMachineDowntime(downtime.id)}
                             >
-                                <div className="card-header">
-                                    <h3>Machine Downtime</h3>
-                                    <span className="status">
-                                        {downtime.mechanicAcknowledged ? 'Acknowledged' : 'Open'}
-                                    </span>
-                                    <span className="time">
-                                        {downtime.createdAt?.toDate().toLocaleTimeString() || 'Unknown'}
-                                    </span>
+                                <div className="card-header banner">
+                                    <span>Machine Downtime</span>
                                 </div>
                                 <div className="card-body">
-                                    <p><strong>Reason:</strong> {downtime.reason}</p>
-                                    <p><strong>Machine:</strong> {downtime.machineNumber}</p>
-                                    <p><strong>Comments:</strong> {downtime.comments}</p>
-                                    {downtime.mechanicName && (
-                                        <p><strong>Assigned to:</strong> {downtime.mechanicName}</p>
-                                    )}
+                                    <div className="timer">
+                                        {downtime.createdAt ? formatElapsedTime(downtime.createdAt.toDate()) : '00:00'}
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -263,15 +267,13 @@ const DowntimeTracking: React.FC<DowntimeTrackingProps> = ({ sessionId, lineId, 
                                 className="downtime-card clickable"
                                 onClick={() => handleSelectSupplyDowntime(downtime)}
                             >
-                                <div className="card-header">
-                                    <h3>Supply Downtime</h3>
-                                    <span className="time">
-                                        {downtime.startTime.toDate().toLocaleTimeString()}
-                                    </span>
+                                <div className="card-header banner">
+                                    <span>Supply Downtime</span>
                                 </div>
                                 <div className="card-body">
-                                    <p><strong>Reason:</strong> {downtime.reason}</p>
-                                    <p><strong>Comments:</strong> {downtime.comments}</p>
+                                    <div className="timer">
+                                        {downtime.startTime ? formatElapsedTime(downtime.startTime.toDate()) : '00:00'}
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -283,36 +285,44 @@ const DowntimeTracking: React.FC<DowntimeTrackingProps> = ({ sessionId, lineId, 
                                 className="downtime-card clickable"
                                 onClick={() => handleSelectStyleChangeover(changeover)}
                             >
-                                <div className="card-header">
-                                    <h3>Style Changeover</h3>
-                                    <span className="time">
-                                        {changeover.createdAt.toDate().toLocaleTimeString()}
-                                    </span>
+                                <div className="card-header banner">
+                                    <span>Style Changeover</span>
                                 </div>
                                 <div className="card-body">
-                                    <p><strong>Current Style:</strong> {changeover.currentStyle}</p>
-                                    <p><strong>Next Style:</strong> {changeover.nextStyle}</p>
-                                    <p><strong>Target Time:</strong> {changeover.target} minutes</p>
+                                    <div className="timer">
+                                        {changeover.createdAt ? formatElapsedTime(changeover.createdAt.toDate()) : '00:00'}
+                                    </div>
                                 </div>
                             </div>
                         ))}
 
-                        {activeMachineDowntimes.length === 0 &&
+                        {(activeMachineDowntimes.length === 0 &&
                             activeSupplyDowntimes.length === 0 &&
-                            activeStyleChangeovers.length === 0 && (
-                                <div className="no-downtimes-message">
-                                    No active downtimes
-                                </div>
-                            )}
+                            activeStyleChangeovers.length === 0) && (
+                            <div className="no-downtimes-message">
+                                No active downtimes
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
 
             {/* Machine Downtime Update Modal */}
             {showMachineModal && selectedMachineDowntime && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <button className="close-button" onClick={handleClose}>✕</button>
+                <Dialog
+                    open={true}
+                    onClose={handleClose}
+                    maxWidth="sm"
+                    fullWidth
+                    PaperProps={{ sx: { borderRadius: 2, padding: 0, maxWidth: 600, margin: '0 auto' } }}
+                >
+                    <DialogTitle sx={{ padding: 2 }}>
+                        Machine Downtime Update
+                        <IconButton onClick={handleClose} size="small" sx={{ position: 'absolute', right: 8, top: 8 }}>
+                            <CloseIcon />
+                        </IconButton>
+                    </DialogTitle>
+                    <DialogContent sx={{ padding: 2 }}>
                         <MachineUpdate
                             userRole={userRole}
                             userId={userId}
@@ -321,35 +331,57 @@ const DowntimeTracking: React.FC<DowntimeTrackingProps> = ({ sessionId, lineId, 
                             onClose={handleClose}
                             onAcknowledgeReceipt={refreshMachineDowntimes}
                         />
-                    </div>
-                </div>
+                    </DialogContent>
+                </Dialog>
             )}
 
             {/* Supply Downtime Update Modal */}
             {selectedSupplyDowntime && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <button className="close-button" onClick={handleClose}>✕</button>
+                <Dialog
+                    open={true}
+                    onClose={handleClose}
+                    maxWidth="sm"
+                    fullWidth
+                    PaperProps={{ sx: { borderRadius: 2, padding: 0, maxWidth: 600, margin: '0 auto' } }}
+                >
+                    <DialogTitle sx={{ padding: 2 }}>
+                        Supply Downtime Update
+                        <IconButton onClick={handleClose} size="small" sx={{ position: 'absolute', right: 8, top: 8 }}>
+                            <CloseIcon />
+                        </IconButton>
+                    </DialogTitle>
+                    <DialogContent sx={{ padding: 2 }}>
                         <SupplyUpdate
                             selectedDowntime={selectedSupplyDowntime}
                             onClose={handleClose}
                         />
-                    </div>
-                </div>
+                    </DialogContent>
+                </Dialog>
             )}
 
             {/* Style Changeover Update Modal */}
             {showStyleUpdateModal && selectedStyleChangeover && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <button className="close-button" onClick={handleClose}>✕</button>
+                <Dialog
+                    open={true}
+                    onClose={handleClose}
+                    maxWidth="sm"
+                    fullWidth
+                    PaperProps={{ sx: { borderRadius: 2, padding: 0, maxWidth: 600, margin: '0 auto' } }}
+                >
+                    <DialogTitle sx={{ padding: 2 }}>
+                        Style Changeover Update
+                        <IconButton onClick={handleClose} size="small" sx={{ position: 'absolute', right: 8, top: 8 }}>
+                            <CloseIcon />
+                        </IconButton>
+                    </DialogTitle>
+                    <DialogContent sx={{ padding: 2 }}>
                         <StyleChangeUpdate
                             userRole="Supervisor"
                             userId={selectedStyleChangeover.supervisorId || ''}
                             selectedChangeover={selectedStyleChangeover}
                         />
-                    </div>
-                </div>
+                    </DialogContent>
+                </Dialog>
             )}
         </div>
     );

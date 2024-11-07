@@ -1,3 +1,5 @@
+// src/components/production/productionboard/components/ProductionTracking.tsx
+
 import React, { useState, useEffect } from 'react';
 import {
     collection,
@@ -8,6 +10,7 @@ import {
     query,
     where,
     onSnapshot,
+    Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../../../../firebase';
 import {
@@ -16,6 +19,7 @@ import {
     Break,
     SessionData,
     TimeSlot,
+    Schedule,
 } from '../../../../types';
 import './ProductionTracking.css';
 
@@ -33,8 +37,15 @@ interface CurrentSlot {
     id: string;
     startTime: string;
     endTime: string;
-    breakId: string | null;
+    breakId?: string;
     isActive: boolean;
+}
+
+interface StyleDetails {
+    outputs: number[];
+    balance: number;
+    unitsProduced: number;
+    unitsInOrder: number;
 }
 
 const ProductionTracking: React.FC<ProductionTrackingProps> = ({
@@ -48,13 +59,14 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
     const [assignedTimeTable, setAssignedTimeTable] = useState<TimeTable | null>(
         null
     );
+    const [activeSlots, setActiveSlots] = useState<TimeSlot[]>([]);
     const [manualSlot, setManualSlot] = useState<string>('current');
     const [currentTimeSlot, setCurrentTimeSlot] = useState<CurrentSlot | null>(
         null
     );
-    const [currentTime, setCurrentTime] = useState(new Date());
-    const [styleDetails, setStyleDetails] = useState({
-        outputs: [] as number[],
+    const [currentTime, setCurrentTime] = useState<Date>(new Date());
+    const [styleDetails, setStyleDetails] = useState<StyleDetails>({
+        outputs: [],
         balance: 0,
         unitsProduced: 0,
         unitsInOrder: 0,
@@ -93,7 +105,8 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                 return;
             }
 
-            const timeTableDocRef = doc(db, 'timeTables', sessionData.timeTableId);
+            // Fetch the time table from the 'timeTable' collection
+            const timeTableDocRef = doc(db, 'timeTable', sessionData.timeTableId);
             const timeTableSnap = await getDoc(timeTableDocRef);
 
             if (!timeTableSnap.exists()) {
@@ -102,14 +115,32 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
             }
 
             const timeTableData = timeTableSnap.data() as TimeTable;
+
+            // Determine the current day of the week
+            const currentDay = new Date()
+                .toLocaleDateString('en-US', { weekday: 'long' })
+                .toLowerCase();
+
+            // Find the schedule that applies to the current day
+            const applicableSchedule = timeTableData.schedules.find(
+                (schedule: Schedule) =>
+                    schedule.daysOfWeek
+                        .map((day: string) => day.toLowerCase())
+                        .includes(currentDay)
+            );
+
+            if (!applicableSchedule) {
+                setError('No schedule applies to the current day.');
+                return;
+            }
+
+            // Assign the time table and active slots
             setAssignedTimeTable({
+                ...timeTableData,
                 id: timeTableSnap.id,
-                name: timeTableData.name,
-                lineId: timeTableData.lineId || '',
-                slots: timeTableData.slots || [],
-                createdAt: timeTableData.createdAt || Timestamp.now(),
-                updatedAt: timeTableData.updatedAt || Timestamp.now(),
             });
+
+            setActiveSlots(applicableSchedule.slots || []);
 
             console.log('Time table assigned:', timeTableData.name);
         };
@@ -120,6 +151,9 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
     // Initialize production details based on session data
     useEffect(() => {
         if (assignedTimeTable && sessionData) {
+            let productionUnsubscribe: Unsubscribe | null = null;
+            let styleUnsubscribe: Unsubscribe | null = null;
+
             const fetchProductionData = async () => {
                 try {
                     // Fetch the style document to get unitsProduced and unitsInOrder
@@ -131,18 +165,28 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                         const unitsInOrder = style.unitsInOrder || 0;
                         const balance = unitsInOrder - totalUnitsProduced;
 
-                        // Fetch production records for the current session
+                        // Initialize outputs array based on activeSlots
+                        const initialOutputs = activeSlots.map(() => 0);
+
+                        setStyleDetails({
+                            outputs: initialOutputs,
+                            balance,
+                            unitsProduced: totalUnitsProduced,
+                            unitsInOrder,
+                        });
+
+                        // Listen to 'production' collection for real-time updates
                         const productionQuery = query(
                             collection(db, 'production'),
                             where('sessionId', '==', sessionData.sessionId)
                         );
 
-                        const unsubscribe = onSnapshot(productionQuery, (snapshot) => {
-                            const outputs = Array(assignedTimeTable.slots.length).fill(0);
+                        productionUnsubscribe = onSnapshot(productionQuery, (snapshot) => {
+                            const outputs = Array(activeSlots.length).fill(0);
 
                             snapshot.docs.forEach((doc) => {
                                 const data = doc.data();
-                                const slotIndex = assignedTimeTable.slots.findIndex(
+                                const slotIndex = activeSlots.findIndex(
                                     (slot) => slot.id === data.slotId
                                 );
                                 if (slotIndex !== -1) {
@@ -150,15 +194,40 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                                 }
                             });
 
-                            setStyleDetails({
+                            // Update outputs
+                            setStyleDetails((prevDetails) => ({
+                                ...prevDetails,
                                 outputs,
-                                balance,
-                                unitsProduced: totalUnitsProduced,
-                                unitsInOrder,
-                            });
+                                // balance is handled by the 'styles' listener
+                            }));
+
+                            console.log('Outputs updated:', outputs);
                         });
 
-                        return unsubscribe;
+                        // Listen to 'styles' document for real-time updates
+                        styleUnsubscribe = onSnapshot(styleDocRef, (docSnap) => {
+                            if (docSnap.exists()) {
+                                const style = docSnap.data() as Style;
+                                const updatedUnitsProduced = style.unitsProduced || 0;
+                                const updatedUnitsInOrder = style.unitsInOrder || 0;
+                                const updatedBalance = updatedUnitsInOrder - updatedUnitsProduced;
+
+                                setStyleDetails((prevDetails) => ({
+                                    ...prevDetails,
+                                    unitsProduced: updatedUnitsProduced,
+                                    unitsInOrder: updatedUnitsInOrder,
+                                    balance: updatedBalance,
+                                }));
+
+                                console.log('Style details updated:', {
+                                    unitsProduced: updatedUnitsProduced,
+                                    unitsInOrder: updatedUnitsInOrder,
+                                    balance: updatedBalance,
+                                });
+                            }
+                        });
+
+                        console.log('Production and Style listeners attached successfully');
                     } else {
                         setError('Style not found');
                     }
@@ -169,8 +238,17 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
             };
 
             fetchProductionData();
+
+            return () => {
+                if (productionUnsubscribe) {
+                    productionUnsubscribe();
+                }
+                if (styleUnsubscribe) {
+                    styleUnsubscribe();
+                }
+            };
         }
-    }, [assignedTimeTable, sessionData]);
+    }, [assignedTimeTable, sessionData, activeSlots]);
 
     // Update current time and active slot
     useEffect(() => {
@@ -178,15 +256,16 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
             const now = new Date();
             setCurrentTime(now);
 
-            if (assignedTimeTable && manualSlot === 'current') {
+            if (activeSlots && manualSlot === 'current') {
                 const currentTimeStr = now.toLocaleTimeString('en-GB', {
                     hour: '2-digit',
                     minute: '2-digit',
                     hour12: false,
                 });
 
-                const activeSlot = assignedTimeTable.slots.find(
-                    (slot) => currentTimeStr >= slot.startTime && currentTimeStr < slot.endTime
+                const activeSlot = activeSlots.find(
+                    (slot) =>
+                        currentTimeStr >= slot.startTime && currentTimeStr < slot.endTime
                 );
 
                 if (activeSlot) {
@@ -203,7 +282,7 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [assignedTimeTable, manualSlot]);
+    }, [activeSlots, manualSlot]);
 
     // Handle adding a production unit
     const handleAddOutput = async () => {
@@ -228,23 +307,24 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
             const assignedTimeTableId = assignedTimeTable.id;
             const unitProduced = 1;
 
-            await onUnitProduced(selectedSlotId, target, assignedTimeTableId, unitProduced);
+            await onUnitProduced(
+                selectedSlotId,
+                target,
+                assignedTimeTableId,
+                unitProduced
+            );
 
-            // Update the local state
-            setStyleDetails((prev) => {
-                const slotIndex = assignedTimeTable.slots.findIndex(
-                    (slot) => slot.id === selectedSlotId
-                );
-                const newOutputs = [...prev.outputs];
-                newOutputs[slotIndex] = (newOutputs[slotIndex] || 0) + unitProduced;
+            // **Removed Local State Update to Prevent Conflicts**
+            /*
+            setStyleDetails((prev) => ({
+                ...prev,
+                outputs: newOutputs,
+                unitsProduced: prev.unitsProduced + unitProduced,
+                balance: prev.balance - unitProduced,
+            }));
+            */
 
-                return {
-                    ...prev,
-                    outputs: newOutputs,
-                    unitsProduced: prev.unitsProduced + unitProduced,
-                    balance: prev.balance - unitProduced,
-                };
-            });
+            console.log('Production unit recorded successfully');
         } catch (error) {
             console.error('Error recording production:', error);
             setError('Failed to record production.');
@@ -267,17 +347,19 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
     };
 
     const calculateCumulativeEfficiency = (upToIndex: number): string => {
-        if (!assignedTimeTable) return 'N/A';
+        if (!activeSlots) return 'N/A';
 
         let totalOutput = 0;
         let totalTarget = 0;
 
         for (let i = 0; i <= upToIndex; i++) {
             totalOutput += styleDetails.outputs[i] || 0;
-            totalTarget += calculateTargetPerSlot(assignedTimeTable.slots[i]);
+            totalTarget += calculateTargetPerSlot(activeSlots[i]);
         }
 
-        return totalTarget === 0 ? 'N/A' : `${((totalOutput / totalTarget) * 100).toFixed(1)}%`;
+        return totalTarget === 0
+            ? 'N/A'
+            : `${((totalOutput / totalTarget) * 100).toFixed(1)}%`;
     };
 
     return (
@@ -290,7 +372,7 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                         onChange={(e) => setManualSlot(e.target.value)}
                     >
                         <option value="current">Current Time Slot</option>
-                        {assignedTimeTable?.slots.map((slot, index) => (
+                        {activeSlots?.map((slot, index) => (
                             <option key={slot.id} value={slot.id}>
                                 Hour {index + 1} ({slot.startTime} - {slot.endTime})
                             </option>
@@ -324,7 +406,7 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                         </tr>
                         </thead>
                         <tbody>
-                        {assignedTimeTable?.slots.map((slot, index) => {
+                        {activeSlots?.map((slot, index) => {
                             const target = calculateTargetPerSlot(slot);
                             const output = styleDetails.outputs[index] || 0;
                             const isCurrentSlot =
@@ -333,14 +415,17 @@ const ProductionTracking: React.FC<ProductionTrackingProps> = ({
                             const breakInfo = breaks.find((b) => b.id === slot.breakId);
 
                             return (
-                                <tr key={slot.id} className={isCurrentSlot ? 'current-slot' : ''}>
+                                <tr
+                                    key={slot.id}
+                                    className={isCurrentSlot ? 'current-slot' : ''}
+                                >
                                     <td>{index + 1}</td>
                                     <td>
                                         {slot.startTime} - {slot.endTime}
                                         {breakInfo && (
                                             <span className="break-indicator">
-                          ({breakInfo.breakType} - {breakInfo.duration}min)
-                        </span>
+                                                    ({breakInfo.name} - {breakInfo.duration}min)
+                                                </span>
                                         )}
                                     </td>
                                     <td>{target}</td>

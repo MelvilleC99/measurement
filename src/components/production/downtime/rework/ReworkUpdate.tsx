@@ -6,6 +6,21 @@ import { RejectFormData } from '../types';
 import StandardList, { ListItemData } from '../../../StandardDesign/list/StandardList';
 import StandardCard from '../../../StandardDesign/card/StandardCard';
 import './ReworkUpdate.css';
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    Box,
+    TextField,
+    Button,
+    Alert,
+    IconButton,
+    Select,
+    MenuItem,
+    Typography,
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import { SupportFunction } from '../../../../types';
 
 const ReworkUpdate: React.FC<ReworkUpdateProps> = ({
                                                        onClose,
@@ -20,11 +35,33 @@ const ReworkUpdate: React.FC<ReworkUpdateProps> = ({
     const [error, setError] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
-    const [actionType, setActionType] = useState<'complete' | 'reject'>('complete');
+    const [actionType, setActionType] = useState<'perfect' | 'reject' | null>(null);
+    const [qcs, setQcs] = useState<SupportFunction[]>([]);
 
     useEffect(() => {
         fetchReworks();
+        fetchQCs();
     }, [sessionId]);
+
+    const fetchQCs = async () => {
+        try {
+            const supportFunctionsRef = collection(db, 'supportFunctions');
+            const q = query(
+                supportFunctionsRef,
+                where('role', '==', 'QC'),
+                where('hasPassword', '==', true)
+            );
+            const querySnapshot = await getDocs(q);
+            const qcsList = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as SupportFunction));
+            setQcs(qcsList);
+        } catch (err) {
+            console.error('Error in fetchQCs:', err);
+            setError('Failed to fetch QCs');
+        }
+    };
 
     const fetchReworks = async () => {
         try {
@@ -32,7 +69,7 @@ const ReworkUpdate: React.FC<ReworkUpdateProps> = ({
             const reworksQuery = query(
                 collection(db, 'reworks'),
                 where('sessionId', '==', sessionId),
-                where('status', '==', 'open')
+                where('status', '==', 'Open')
             );
 
             const snapshot = await getDocs(reworksQuery);
@@ -95,42 +132,52 @@ const ReworkUpdate: React.FC<ReworkUpdateProps> = ({
         const rework = reworks.find(r => r.id === item.id);
         if (rework) {
             setSelectedRework(rework);
-            setIsConfirmModalOpen(false);
+            setIsConfirmModalOpen(true);
             setError('');
         }
     };
 
-    const handleAction = (type: 'complete' | 'reject') => {
+    const handleAction = (type: 'perfect' | 'reject') => {
         if (!selectedRework) {
             setError('No rework selected');
             return;
         }
         setActionType(type);
-        setIsConfirmModalOpen(true);
         setError('');
     };
 
-    const handleConfirm = async () => {
-        if (!selectedRework) return;
-
+    const verifyQC = async (): Promise<boolean> => {
         try {
             const qcSnapshot = await getDocs(query(
                 collection(db, 'supportFunctions'),
-                where('employeeNumber', '==', selectedRework.qcId),
+                where('employeeNumber', '==', selectedRework?.qcId),
                 where('password', '==', qcPassword),
-                where('role', '==', 'QC')
+                where('role', '==', 'QC'),
+                where('hasPassword', '==', true)
             ));
 
-            if (qcSnapshot.empty) {
+            return !qcSnapshot.empty;
+        } catch (err) {
+            console.error('Error verifying QC:', err);
+            return false;
+        }
+    };
+
+    const handleConfirm = async () => {
+        if (!selectedRework || !actionType) return;
+
+        try {
+            const isQCVerified = await verifyQC();
+            if (!isQCVerified) {
                 setError('Invalid QC credentials');
                 return;
             }
 
             const timestamp = serverTimestamp();
 
-            if (actionType === 'complete') {
+            if (actionType === 'perfect') {
                 await updateDoc(doc(db, 'reworks', selectedRework.id), {
-                    status: 'closed',
+                    status: 'perfect',
                     closedAt: timestamp,
                     closedBy: selectedRework.qcId,
                     updatedAt: timestamp
@@ -173,6 +220,7 @@ const ReworkUpdate: React.FC<ReworkUpdateProps> = ({
             setSelectedRework(null);
             setQcPassword('');
             setIsConfirmModalOpen(false);
+            setActionType(null);
             setError('');
         } catch (err) {
             console.error('Error updating rework:', err);
@@ -211,73 +259,130 @@ const ReworkUpdate: React.FC<ReworkUpdateProps> = ({
                         emptyMessage="No active reworks to display"
                     />
                 ) : (
-                    <div className="selected-item-view">
-                        {!isConfirmModalOpen ? (
-                            <>
-                                <div className="details-grid">
-                                    <p><strong>Reference #:</strong> {selectedRework.itemId}</p>
-                                    <p><strong>Style Number:</strong> {selectedRework.styleNumber}</p>
-                                    <p><strong>Reason:</strong> {selectedRework.reason}</p>
-                                    <p><strong>Count:</strong> {selectedRework.count}</p>
+                    <Dialog
+                        open={isConfirmModalOpen}
+                        onClose={() => {
+                            setIsConfirmModalOpen(false);
+                            setSelectedRework(null);
+                        }}
+                        maxWidth="sm"
+                        fullWidth
+                        PaperProps={{ sx: { borderRadius: 2, p: 2 } }}
+                    >
+                        <DialogTitle sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                        }}>
+                            Rework Details
+                            <IconButton onClick={() => {
+                                setIsConfirmModalOpen(false);
+                                setSelectedRework(null);
+                            }} size="small">
+                                <CloseIcon />
+                            </IconButton>
+                        </DialogTitle>
+
+                        <DialogContent>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
+                                {error && <Alert severity="error">{error}</Alert>}
+
+                                <Box sx={{ bgcolor: 'grey.50', p: 2, borderRadius: 1 }}>
+                                    <Typography variant="body2" color="text.secondary">Reference #</Typography>
+                                    <Typography>{selectedRework.itemId}</Typography>
+                                    <Typography variant="body2" color="text.secondary">Style Number</Typography>
+                                    <Typography>{selectedRework.styleNumber}</Typography>
+                                    <Typography variant="body2" color="text.secondary">Reason</Typography>
+                                    <Typography>{selectedRework.reason}</Typography>
+                                    <Typography variant="body2" color="text.secondary">Count</Typography>
+                                    <Typography>{selectedRework.count}</Typography>
                                     {selectedRework.operation && (
-                                        <p><strong>Operation:</strong> {selectedRework.operation}</p>
+                                        <>
+                                            <Typography variant="body2" color="text.secondary">Operation</Typography>
+                                            <Typography>{selectedRework.operation}</Typography>
+                                        </>
                                     )}
-                                    {selectedRework.comments && (
-                                        <p><strong>Comments:</strong> {selectedRework.comments}</p>
-                                    )}
-                                </div>
-                                <div className="action-buttons">
-                                    <button
-                                        onClick={() => handleAction('complete')}
-                                        className="btn-complete"
+                                </Box>
+
+                                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                                    <Button
+                                        onClick={() => handleAction('perfect')}
+                                        variant={actionType === 'perfect' ? "contained" : "outlined"}
+                                        sx={{ minWidth: 150, textTransform: 'none' }}
                                     >
-                                        Mark as Complete
-                                    </button>
-                                    <button
+                                        Mark as Perfect
+                                    </Button>
+                                    <Button
                                         onClick={() => handleAction('reject')}
-                                        className="btn-reject"
+                                        variant={actionType === 'reject' ? "contained" : "outlined"}
+                                        sx={{ minWidth: 150, textTransform: 'none' }}
                                     >
                                         Convert to Reject
-                                    </button>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div className="details-grid">
-                                    <h3>
-                                        Confirm {actionType === 'complete' ? 'Complete' : 'Convert to Reject'}
-                                    </h3>
-                                    <div className="confirmation-inputs">
-                                        <input
-                                            type="password"
-                                            value={qcPassword}
-                                            onChange={(e) => setQcPassword(e.target.value)}
-                                            placeholder="Enter QC Password"
-                                            className="qc-password-input"
-                                            autoFocus
-                                        />
-                                    </div>
-                                </div>
-                                <div className="action-buttons">
-                                    <button
+                                    </Button>
+                                </Box>
+
+                                <Select
+                                    value={selectedRework?.qcId || ''}
+                                    onChange={(e) => setSelectedRework({ ...selectedRework, qcId: e.target.value })}
+                                    displayEmpty
+                                    placeholder="Select QC"
+                                    fullWidth
+                                    sx={{
+                                        borderRadius: 1,
+                                        '& .MuiSelect-select': { py: 1.5 },
+                                        boxShadow: '0 0 5px rgba(0,0,0,0.2)'
+                                    }}
+                                >
+                                    <MenuItem value="" disabled>
+                                        <Typography color="text.secondary">Select QC</Typography>
+                                    </MenuItem>
+                                    {qcs.map((qc) => (
+                                        <MenuItem
+                                            key={qc.id}
+                                            value={qc.employeeNumber}
+                                        >
+                                            {`${qc.name} ${qc.surname}`}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+
+                                <TextField
+                                    type="password"
+                                    value={qcPassword}
+                                    onChange={(e) => setQcPassword(e.target.value)}
+                                    placeholder="Enter QC password"
+                                    fullWidth
+                                    sx={{
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: 1,
+                                            '& input': { py: 1.5, px: 1.5 }
+                                        }
+                                    }}
+                                />
+
+                                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', pt: 2 }}>
+                                    <Button
                                         onClick={handleConfirm}
-                                        className="btn-confirm"
+                                        variant="contained"
+                                        disabled={!selectedRework?.qcId || !qcPassword || !actionType}
+                                        sx={{ minWidth: 100, textTransform: 'none' }}
                                     >
                                         Confirm
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         onClick={() => {
                                             setIsConfirmModalOpen(false);
-                                            setQcPassword('');
+                                            setSelectedRework(null);
                                         }}
-                                        className="btn-cancel"
+                                        variant="outlined"
+                                        sx={{ minWidth: 100, textTransform: 'none' }}
                                     >
                                         Cancel
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
+                                    </Button>
+                                </Box>
+                            </Box>
+                        </DialogContent>
+                    </Dialog>
                 )}
             </StandardCard>
         </div>

@@ -5,6 +5,21 @@ import { RejectUpdateProps, RejectRecord } from '../types';
 import StandardList, { ListItemData } from '../../../StandardDesign/list/StandardList';
 import StandardCard from '../../../StandardDesign/card/StandardCard';
 import './RejectUpdate.css';
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    Box,
+    TextField,
+    Button,
+    Alert,
+    IconButton,
+    Select,
+    MenuItem,
+    Typography,
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import { SupportFunction } from '../../../../types';
 
 interface RejectItem extends RejectRecord {
     refNumber?: string;
@@ -24,9 +39,11 @@ const RejectUpdate: React.FC<RejectUpdateProps> = ({
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
     const [actionType, setActionType] = useState<'perfect' | 'close' | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [qcs, setQcs] = useState<SupportFunction[]>([]);
 
     useEffect(() => {
         fetchRejects();
+        fetchQCs();
     }, [sessionId]);
 
     const fetchRejects = async () => {
@@ -36,7 +53,7 @@ const RejectUpdate: React.FC<RejectUpdateProps> = ({
                 query(
                     collection(db, 'rejects'),
                     where('sessionId', '==', sessionId),
-                    where('status', '==', 'open')
+                    where('status', '==', 'Open')
                 )
             );
 
@@ -55,6 +72,26 @@ const RejectUpdate: React.FC<RejectUpdateProps> = ({
         }
     };
 
+    const fetchQCs = async () => {
+        try {
+            const supportFunctionsRef = collection(db, 'supportFunctions');
+            const q = query(
+                supportFunctionsRef,
+                where('role', '==', 'QC'),
+                where('hasPassword', '==', true)
+            );
+            const querySnapshot = await getDocs(q);
+            const qcsList = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as SupportFunction));
+            setQcs(qcsList);
+        } catch (err) {
+            console.error('Error in fetchQCs:', err);
+            setError('Failed to fetch QCs');
+        }
+    };
+
     const formatRejectsForList = (rejects: RejectItem[]): ListItemData[] => {
         return rejects.map(reject => ({
             id: reject.id,
@@ -62,17 +99,28 @@ const RejectUpdate: React.FC<RejectUpdateProps> = ({
             subtitle: reject.reason,
             status: reject.status,
             metadata: {
+                styleNumber: reject.styleNumber,
                 count: reject.count,
                 operation: reject.operation
             }
         }));
     };
 
+    const renderRejectItem = (item: ListItemData) => (
+        <div className="list-row">
+            <div className="ref-cell">{item.title}</div>
+            <div className="style-cell">{item.metadata?.styleNumber}</div>
+            <div className="reason-cell">{item.subtitle}</div>
+            <div className="operation-cell">{item.metadata?.operation || '-'}</div>
+            <div className="count-cell">{item.metadata?.count}</div>
+        </div>
+    );
+
     const handleListItemClick = (item: ListItemData) => {
         const reject = rejects.find(r => r.id === item.id);
         if (reject) {
             setSelectedReject(reject);
-            setIsConfirmModalOpen(false);
+            setIsConfirmModalOpen(true);
             setError('');
         }
     };
@@ -83,7 +131,6 @@ const RejectUpdate: React.FC<RejectUpdateProps> = ({
             return;
         }
         setActionType(type);
-        setIsConfirmModalOpen(true);
         setError('');
     };
 
@@ -94,7 +141,8 @@ const RejectUpdate: React.FC<RejectUpdateProps> = ({
                     collection(db, 'supportFunctions'),
                     where('employeeNumber', '==', selectedReject?.qcId),
                     where('password', '==', qcPassword),
-                    where('role', '==', 'QC')
+                    where('role', '==', 'QC'),
+                    where('hasPassword', '==', true)
                 )
             );
 
@@ -170,84 +218,134 @@ const RejectUpdate: React.FC<RejectUpdateProps> = ({
                     <StandardList
                         items={formatRejectsForList(rejects)}
                         onItemClick={handleListItemClick}
-                        renderItemContent={(item) => (
-                            <div className="list-row">
-                                <div className="ref-cell">{item.title}</div>
-                                <div className="style-cell">{item.metadata?.styleNumber}</div>
-                                <div className="reason-cell">{item.subtitle}</div>
-                                <div className="operation-cell">{item.metadata?.operation || '-'}</div>
-                                <div className="count-cell">{item.metadata?.count}</div>
-                            </div>
-                        )}
+                        renderItemContent={renderRejectItem}
                         emptyMessage="No active rejects to display"
                     />
                 ) : (
-                    <div className="selected-item-view">
-                        {!isConfirmModalOpen ? (
-                            <>
-                                <div className="details-grid">
-                                    <p><strong>Reference #:</strong> {selectedReject.refNumber}</p>
-                                    <p><strong>Reason:</strong> {selectedReject.reason}</p>
-                                    <p><strong>Count:</strong> {selectedReject.count}</p>
+                    <Dialog
+                        open={isConfirmModalOpen}
+                        onClose={() => {
+                            setIsConfirmModalOpen(false);
+                            setSelectedReject(null);
+                        }}
+                        maxWidth="sm"
+                        fullWidth
+                        PaperProps={{ sx: { borderRadius: 2, p: 2 } }}
+                    >
+                        <DialogTitle sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                        }}>
+                            Reject Details
+                            <IconButton onClick={() => {
+                                setIsConfirmModalOpen(false);
+                                setSelectedReject(null);
+                            }} size="small">
+                                <CloseIcon />
+                            </IconButton>
+                        </DialogTitle>
+
+                        <DialogContent>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
+                                {error && <Alert severity="error">{error}</Alert>}
+
+                                <Box sx={{ bgcolor: 'grey.50', p: 2, borderRadius: 1 }}>
+                                    <Typography variant="body2" color="text.secondary">Reference #</Typography>
+                                    <Typography>{selectedReject.refNumber}</Typography>
+                                    <Typography variant="body2" color="text.secondary">Style Number</Typography>
+                                    <Typography>{selectedReject.styleNumber}</Typography>
+                                    <Typography variant="body2" color="text.secondary">Reason</Typography>
+                                    <Typography>{selectedReject.reason}</Typography>
+                                    <Typography variant="body2" color="text.secondary">Count</Typography>
+                                    <Typography>{selectedReject.count}</Typography>
                                     {selectedReject.operation && (
-                                        <p><strong>Operation:</strong> {selectedReject.operation}</p>
+                                        <>
+                                            <Typography variant="body2" color="text.secondary">Operation</Typography>
+                                            <Typography>{selectedReject.operation}</Typography>
+                                        </>
                                     )}
-                                    {selectedReject.comments && (
-                                        <p><strong>Comments:</strong> {selectedReject.comments}</p>
-                                    )}
-                                </div>
-                                <div className="action-buttons">
-                                    <button
+                                </Box>
+
+                                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                                    <Button
                                         onClick={() => handleAction('perfect')}
-                                        className="btn-complete"
+                                        variant={actionType === 'perfect' ? "contained" : "outlined"}
+                                        sx={{ minWidth: 150, textTransform: 'none' }}
                                     >
-                                        Mark as Perfect
-                                    </button>
-                                    <button
+                                        Convert to Perfect
+                                    </Button>
+                                    <Button
                                         onClick={() => handleAction('close')}
-                                        className="btn-reject"
+                                        variant={actionType === 'close' ? "contained" : "outlined"}
+                                        sx={{ minWidth: 150, textTransform: 'none' }}
                                     >
-                                        Close (End of Style)
-                                    </button>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div className="details-grid">
-                                    <h3>
-                                        Confirm {actionType === 'perfect' ? 'Perfect' : 'Close'}
-                                    </h3>
-                                    <div className="confirmation-inputs">
-                                        <input
-                                            type="password"
-                                            value={qcPassword}
-                                            onChange={(e) => setQcPassword(e.target.value)}
-                                            placeholder="Enter QC Password"
-                                            className="qc-password-input"
-                                            autoFocus
-                                        />
-                                    </div>
-                                </div>
-                                <div className="action-buttons">
-                                    <button
+                                        Close Style
+                                    </Button>
+                                </Box>
+
+                                <Select
+                                    value={selectedReject?.qcId || ''}
+                                    onChange={(e) => setSelectedReject({ ...selectedReject, qcId: e.target.value })}
+                                    displayEmpty
+                                    placeholder="Select QC"
+                                    fullWidth
+                                    sx={{
+                                        borderRadius: 1,
+                                        '& .MuiSelect-select': { py: 1.5 },
+                                        boxShadow: '0 0 5px rgba(0,0,0,0.2)'
+                                    }}
+                                >
+                                    <MenuItem value="" disabled>
+                                        <Typography color="text.secondary">Select QC</Typography>
+                                    </MenuItem>
+                                    {qcs.map((qc) => (
+                                        <MenuItem
+                                            key={qc.id}
+                                            value={qc.employeeNumber}
+                                        >
+                                            {`${qc.name} ${qc.surname}`}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+
+                                <TextField
+                                    type="password"
+                                    value={qcPassword}
+                                    onChange={(e) => setQcPassword(e.target.value)}
+                                    placeholder="Enter QC password"
+                                    fullWidth
+                                    sx={{
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: 1,
+                                            '& input': { py: 1.5, px: 1.5 }
+                                        }
+                                    }}
+                                />
+
+                                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', pt: 2 }}>
+                                    <Button
                                         onClick={handleConfirm}
-                                        className="btn-confirm"
+                                        variant="contained"
+                                        disabled={!selectedReject?.qcId || !qcPassword || !actionType}
+                                        sx={{ minWidth: 100, textTransform: 'none' }}
                                     >
                                         Confirm
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         onClick={() => {
                                             setIsConfirmModalOpen(false);
-                                            setQcPassword('');
+                                            setSelectedReject(null);
                                         }}
-                                        className="btn-cancel"
+                                        variant="outlined"
+                                        sx={{ minWidth: 100, textTransform: 'none' }}
                                     >
                                         Cancel
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
+                                    </Button>
+                                </Box>
+                            </Box>
+                        </DialogContent>
+                    </Dialog>
                 )}
             </StandardCard>
         </div>

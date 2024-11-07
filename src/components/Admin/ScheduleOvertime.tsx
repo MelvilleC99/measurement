@@ -1,7 +1,4 @@
-// src/components/Admin/ScheduleOvertime.tsx
-
 import React, { useState, useEffect } from 'react';
-import './ScheduleOvertime.css';
 import {
     Grid,
     Paper,
@@ -23,37 +20,33 @@ import {
     TextField,
 } from '@mui/material';
 import { db } from '../../firebase';
-import { collection, getDocs, addDoc, doc, arrayUnion, writeBatch } from 'firebase/firestore';
-
-interface TimeTable {
-    id: string;
-    name: string;
-    description: string;
-    isOvertime: boolean;
-    slots: TimeSlot[];
-}
-
-interface TimeSlot {
-    id: string;
-    type: 'work' | 'break';
-    startTime: string;
-    endTime: string;
-}
-
-interface ProductionLine {
-    id: string;
-    name: string;
-}
+import {
+    collection,
+    getDocs,
+    addDoc,
+    doc,
+    arrayUnion,
+    writeBatch,
+} from 'firebase/firestore';
+import { TimeTable, TimeSlot, ProductionLine, OvertimeSchedule } from '../../types';
+import './ScheduleOvertime.css';
 
 const ScheduleOvertime: React.FC = () => {
     const [timeTables, setTimeTables] = useState<TimeTable[]>([]);
     const [productionLines, setProductionLines] = useState<ProductionLine[]>([]);
     const [selectedTimeTable, setSelectedTimeTable] = useState<string>('');
     const [selectedProductionLines, setSelectedProductionLines] = useState<string[]>([]);
-    const [selectedPeriod, setSelectedPeriod] = useState<[Date | null, Date | null]>([null, null]);
+    const [selectedPeriod, setSelectedPeriod] = useState<[Date | null, Date | null]>([
+        null,
+        null,
+    ]);
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const [viewTimeTable, setViewTimeTable] = useState<TimeTable | null>(null);
-    const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    const [snackbar, setSnackbar] = useState<{
+        open: boolean;
+        message: string;
+        severity: 'success' | 'error';
+    }>({
         open: false,
         message: '',
         severity: 'success',
@@ -67,18 +60,19 @@ const ScheduleOvertime: React.FC = () => {
 
     const fetchTimeTables = async () => {
         try {
-            const timeTablesSnapshot = await getDocs(collection(db, 'timeTables'));
-            const timeTablesData: TimeTable[] = timeTablesSnapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    name: data.name || '',
-                    description: data.description || '',
-                    isOvertime: data.isOvertime || false,
-                    slots: data.slots || [],
-                } as TimeTable;
-            })
-                .filter(tt => tt.isOvertime)
+            const timeTablesSnapshot = await getDocs(collection(db, 'timeTable')); // Updated collection name
+            const timeTablesData: TimeTable[] = timeTablesSnapshot.docs
+                .map((doc) => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        name: data.name || '',
+                        description: data.description || '',
+                        isOvertime: data.isOvertime || false,
+                        schedules: data.schedules || [],
+                    } as TimeTable;
+                })
+                .filter((tt) => tt.isOvertime)
                 .sort((a, b) => a.name.localeCompare(b.name));
             setTimeTables(timeTablesData);
         } catch (error) {
@@ -94,9 +88,16 @@ const ScheduleOvertime: React.FC = () => {
     const fetchProductionLines = async () => {
         try {
             const linesSnapshot = await getDocs(collection(db, 'productionLines'));
-            const linesData: ProductionLine[] = linesSnapshot.docs.map(doc => ({
+            const linesData: ProductionLine[] = linesSnapshot.docs.map((doc) => ({
                 id: doc.id,
                 name: doc.data().name || '',
+                description: doc.data().description || '',
+                active: doc.data().active || false,
+                currentStyle: doc.data().currentStyle || null,
+                createdAt: doc.data().createdAt,
+                updatedAt: doc.data().updatedAt,
+                timeTableAssignments: doc.data().timeTableAssignments || [],
+                overtimeScheduleIds: doc.data().overtimeScheduleIds || [],
             }));
             setProductionLines(linesData);
         } catch (error) {
@@ -110,7 +111,12 @@ const ScheduleOvertime: React.FC = () => {
     };
 
     const handleScheduleOvertime = async () => {
-        if (!selectedTimeTable || selectedProductionLines.length === 0 || !selectedPeriod[0] || !selectedPeriod[1]) {
+        if (
+            !selectedTimeTable ||
+            selectedProductionLines.length === 0 ||
+            !selectedPeriod[0] ||
+            !selectedPeriod[1]
+        ) {
             setSnackbar({
                 open: true,
                 message: 'Please fill out all required fields.',
@@ -125,7 +131,7 @@ const ScheduleOvertime: React.FC = () => {
 
         setIsSubmitting(true);
 
-        const overtimeSchedule = {
+        const overtimeSchedule: Omit<OvertimeSchedule, 'id'> = {
             timeTableId: selectedTimeTable,
             productionLineIds: selectedProductionLines,
             startDate: startDateStr,
@@ -140,7 +146,7 @@ const ScheduleOvertime: React.FC = () => {
 
             // Update each ProductionLine with the new overtime schedule reference using a batch
             const batch = writeBatch(db);
-            selectedProductionLines.forEach(lineId => {
+            selectedProductionLines.forEach((lineId) => {
                 const lineRef = doc(db, 'productionLines', lineId);
                 batch.update(lineRef, {
                     overtimeScheduleIds: arrayUnion(overtimeScheduleId),
@@ -172,12 +178,12 @@ const ScheduleOvertime: React.FC = () => {
     };
 
     const handleViewTimeTable = (timeTableId: string) => {
-        const timeTable = timeTables.find(tt => tt.id === timeTableId) || null;
+        const timeTable = timeTables.find((tt) => tt.id === timeTableId) || null;
         setViewTimeTable(timeTable);
     };
 
     const handleCloseSnackbar = () => {
-        setSnackbar(prev => ({...prev, open: false}));
+        setSnackbar((prev) => ({ ...prev, open: false }));
     };
 
     return (
@@ -201,7 +207,7 @@ const ScheduleOvertime: React.FC = () => {
                                     onChange={(e) => setSelectedTimeTable(e.target.value)}
                                     className="select-dropdown"
                                 >
-                                    {timeTables.map(tt => (
+                                    {timeTables.map((tt) => (
                                         <MenuItem key={tt.id} value={tt.id}>
                                             {tt.name} - {tt.description}
                                         </MenuItem>
@@ -215,7 +221,9 @@ const ScheduleOvertime: React.FC = () => {
                             <Button
                                 variant="outlined"
                                 color="primary"
-                                onClick={() => selectedTimeTable && handleViewTimeTable(selectedTimeTable)}
+                                onClick={() =>
+                                    selectedTimeTable && handleViewTimeTable(selectedTimeTable)
+                                }
                                 disabled={!selectedTimeTable}
                                 className="view-button"
                             >
@@ -226,26 +234,34 @@ const ScheduleOvertime: React.FC = () => {
                         {/* Select Production Lines */}
                         <Grid item xs={12}>
                             <FormControl fullWidth required className="form-control">
-                                <InputLabel id="production-lines-label">Select Production Lines</InputLabel>
+                                <InputLabel id="production-lines-label">
+                                    Select Production Lines
+                                </InputLabel>
                                 <Select
                                     labelId="production-lines-label"
                                     id="productionLines"
                                     multiple
                                     value={selectedProductionLines}
-                                    onChange={(e) => setSelectedProductionLines(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
+                                    onChange={(e) =>
+                                        setSelectedProductionLines(
+                                            typeof e.target.value === 'string'
+                                                ? e.target.value.split(',')
+                                                : e.target.value
+                                        )
+                                    }
                                     label="Select Production Lines"
                                     className="select-dropdown"
                                     renderValue={(selected) => {
                                         const selectedNames = productionLines
-                                            .filter(line => selected.includes(line.id))
-                                            .map(line => line.name)
+                                            .filter((line) => selected.includes(line.id))
+                                            .map((line) => line.name)
                                             .join(', ');
                                         return selectedNames;
                                     }}
                                 >
-                                    {productionLines.map(line => (
+                                    {productionLines.map((line) => (
                                         <MenuItem key={line.id} value={line.id}>
-                                            <Checkbox checked={selectedProductionLines.indexOf(line.id) > -1}/>
+                                            <Checkbox checked={selectedProductionLines.indexOf(line.id) > -1} />
                                             <Typography variant="body1">{line.name}</Typography>
                                         </MenuItem>
                                     ))}
@@ -266,7 +282,11 @@ const ScheduleOvertime: React.FC = () => {
                                     InputLabelProps={{
                                         shrink: true,
                                     }}
-                                    value={selectedPeriod[0] ? selectedPeriod[0].toISOString().split('T')[0] : ''}
+                                    value={
+                                        selectedPeriod[0]
+                                            ? selectedPeriod[0].toISOString().split('T')[0]
+                                            : ''
+                                    }
                                     onChange={(e) => {
                                         const newStart = e.target.value ? new Date(e.target.value) : null;
                                         setSelectedPeriod([newStart, selectedPeriod[1]]);
@@ -283,7 +303,11 @@ const ScheduleOvertime: React.FC = () => {
                                     InputLabelProps={{
                                         shrink: true,
                                     }}
-                                    value={selectedPeriod[1] ? selectedPeriod[1].toISOString().split('T')[0] : ''}
+                                    value={
+                                        selectedPeriod[1]
+                                            ? selectedPeriod[1].toISOString().split('T')[0]
+                                            : ''
+                                    }
                                     onChange={(e) => {
                                         const newEnd = e.target.value ? new Date(e.target.value) : null;
                                         setSelectedPeriod([selectedPeriod[0], newEnd]);
@@ -301,7 +325,7 @@ const ScheduleOvertime: React.FC = () => {
                                 onClick={handleScheduleOvertime}
                                 disabled={isSubmitting}
                                 size="large"
-                                startIcon={isSubmitting ? <CircularProgress size={20}/> : null}
+                                startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
                                 className="submit-button"
                             >
                                 {isSubmitting ? 'Scheduling...' : 'Schedule Overtime'}
@@ -327,27 +351,34 @@ const ScheduleOvertime: React.FC = () => {
                             <Typography variant="body1" gutterBottom>
                                 {viewTimeTable.description}
                             </Typography>
-                            <Typography variant="subtitle1">Time Slots:</Typography>
-                            <table className="time-slots-table">
-                                <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Type</th>
-                                    <th>Start Time</th>
-                                    <th>End Time</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {viewTimeTable.slots.map((slot, index) => (
-                                    <tr key={slot.id}>
-                                        <td>{index + 1}</td>
-                                        <td>{slot.type === 'work' ? 'Work' : 'Break'}</td>
-                                        <td>{slot.startTime}</td>
-                                        <td>{slot.endTime}</td>
-                                    </tr>
-                                ))}
-                                </tbody>
-                            </table>
+                            <Typography variant="subtitle1">Schedules:</Typography>
+                            {viewTimeTable.schedules.map((schedule, scheduleIndex) => (
+                                <div key={schedule.id}>
+                                    <Typography variant="subtitle2">
+                                        Schedule {scheduleIndex + 1} - Days: {schedule.daysOfWeek.join(', ')}
+                                    </Typography>
+                                    <table className="time-slots-table">
+                                        <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Start Time</th>
+                                            <th>End Time</th>
+                                            <th>Break</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        {schedule.slots.map((slot, index) => (
+                                            <tr key={slot.id}>
+                                                <td>{index + 1}</td>
+                                                <td>{slot.startTime}</td>
+                                                <td>{slot.endTime}</td>
+                                                <td>{slot.breakId ? 'Yes' : 'No'}</td>
+                                            </tr>
+                                        ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ))}
                         </>
                     )}
                 </DialogContent>
@@ -363,13 +394,18 @@ const ScheduleOvertime: React.FC = () => {
                 open={snackbar.open}
                 autoHideDuration={6000}
                 onClose={handleCloseSnackbar}
-                anchorOrigin={{vertical: 'bottom', horizontal: 'center'}}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             >
-                <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{width: '100%'}}>
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={snackbar.severity}
+                    sx={{ width: '100%' }}
+                >
                     {snackbar.message}
                 </Alert>
             </Snackbar>
         </Grid>
     );
-}
-    export default ScheduleOvertime;
+};
+
+export default ScheduleOvertime;

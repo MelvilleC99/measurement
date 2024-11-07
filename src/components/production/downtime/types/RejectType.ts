@@ -19,6 +19,7 @@ export interface RejectFormData {
     status: string;
     createdAt?: Date;
     updatedAt?: Date;
+
 }
 
 // ------------------------

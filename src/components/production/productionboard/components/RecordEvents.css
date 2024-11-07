@@ -52,15 +52,15 @@
 
 /* Specific button colors to make them distinguishable */
 .output-button.reject {
-    background-color: #dc2626 !important; /* Bright Red for Reject */
+    background-color: #0c4c88 !important; /* Bright Red for Reject */
 }
 
 .output-button.rework {
-    background-color: #f97316 !important; /* Bright Orange for Rework */
+    background-color: #0c4c88 !important; /* Bright Orange for Rework */
 }
 
 .output-button.hr {
-    background-color: #579a67 !important; /* Bright Green for HR */
+    background-color: #0c4c88 !important; /* Bright Green for HR */
 }
 
 .output-button.downtime {

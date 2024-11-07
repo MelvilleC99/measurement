@@ -1,3 +1,5 @@
+/* src/components/Admin/ProductionLines.css */
+
 .admin-dashboard-content {
     flex-grow: 1;
     background-color: #f8f9fa;
@@ -29,6 +31,7 @@
 .content-section {
     display: flex;
     justify-content: space-between;
+    margin-bottom: 20px;
 }
 
 .add-line-section {
@@ -82,4 +85,8 @@
     padding: 5px 10px;
     border-radius: 3px;
     cursor: pointer;
+}
+
+.edit-button:hover {
+    background-color: darkred;
 }

@@ -35,22 +35,22 @@
 }
 
 .counter-reject {
-    background-color: #f87171;
+    background-color: #c61313;
     color: white;
 }
 
 .counter-rework {
-    background-color: #fcd34d;
+    background-color: #ffad11;
     color: white;
 }
 
 .counter-late {
-    background-color: #60a5fa;
-    color: white;
+    background-color: #165acd;
+    color: #ffffff;
 }
 
 .counter-absent {
-    background-color: #a78bfa;
+    background-color: #165acd;
     color: white;
 }
 

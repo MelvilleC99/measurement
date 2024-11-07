@@ -73,7 +73,7 @@ const MetricsCounter: React.FC<MetricsCounterProps> = ({
             const rejectsQuery = query(
                 collection(db, 'rejects'),
                 where('sessionId', '==', sessionId),
-                where('status', '==', 'open')
+                where('status', '==', 'Open')
             );
             const snapshot = await getDocs(rejectsQuery);
             return snapshot.size;
@@ -88,7 +88,7 @@ const MetricsCounter: React.FC<MetricsCounterProps> = ({
             const reworksQuery = query(
                 collection(db, 'reworks'),
                 where('sessionId', '==', sessionId),
-                where('status', '==', 'open')
+                where('status', '==', 'Open')
             );
             const snapshot = await getDocs(reworksQuery);
             return snapshot.size;
@@ -117,9 +117,10 @@ const MetricsCounter: React.FC<MetricsCounterProps> = ({
     const fetchAbsentCount = async (): Promise<number> => {
         try {
             const absentQuery = query(
-                collection(db, 'absent'),
+                collection(db, 'attendance'), // Changed from 'absent' to 'attendance'
                 where('sessionId', '==', sessionId),
-                where('returned', '==', false)
+                where('type', '==', 'absent'), // Added filter for 'type'
+                where('status', '==', 'absent') // Added filter for 'status'
             );
             const snapshot = await getDocs(absentQuery);
             return snapshot.size;

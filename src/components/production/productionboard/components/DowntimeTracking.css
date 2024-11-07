@@ -1,9 +1,11 @@
+/* DowntimeTracking.css */
+
 .downtime-tracking {
     height: 100%;
     background-color: white;
     display: flex;
     flex-direction: column;
-    padding: 1rem;
+    padding: 0.5rem; /* Reduced padding to allow more space for two cards */
 }
 
 .active-downtimes {
@@ -13,8 +15,8 @@
 }
 
 .active-downtimes h2 {
-    font-size: 1.25rem;
-    font-weight: 600;
+    font-size: 1.5rem; /* Increased font size for better visibility */
+    font-weight: 700;
     color: #374151;
     margin-bottom: 1rem;
     text-align: center;
@@ -22,9 +24,9 @@
 
 .downtimes-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1rem;
-    padding: 0.5rem;
+    grid-template-columns: repeat(2, 1fr); /* Fixed two columns */
+    gap: 0.75rem; /* Slightly reduced gap between cards */
+    padding: 0.25rem; /* Reduced padding around the grid */
     overflow-y: auto;
     flex: 1;
 }
@@ -32,14 +34,13 @@
 .downtime-card {
     background-color: white;
     border-radius: 10px;
-    padding: 1rem;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     border: 1px solid #ced4da;
     cursor: pointer;
-    height: auto;
-    min-height: 140px;
-    max-height: 200px;
+    display: flex;
+    flex-direction: column;
+    height: 150px; /* Fixed height to ensure consistency */
     overflow: hidden;
 }
 
@@ -53,60 +54,43 @@
     background-color: #f8f9fa;
 }
 
-.card-header {
+.card-header.banner {
+    background-color: #cd1313; /* Blue banner */
+    color: white;
+    padding: 0.5rem 1rem;
     display: flex;
-    justify-content: space-between;
+    justify-content: center; /* Center the type text */
     align-items: center;
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-.card-header h3 {
-    margin: 0;
-    font-size: 1.1rem;
-    color: #495057;
+    font-size: 1rem;
     font-weight: 600;
-}
-
-.time {
-    font-size: 0.9rem;
-    color: #6c757d;
+    width: 100%; /* Ensure the banner spans the full width of the card */
 }
 
 .card-body {
-    overflow-y: auto;
-    padding-right: 0.5rem;
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: transparent; /* Removed grey background for the timer */
 }
 
-.card-body p {
-    margin: 0 0 0.5rem 0;
-    font-size: 0.9rem;
-    color: #495057;
-    line-height: 1.4;
-}
-
-.card-body p:last-child {
-    margin-bottom: 0;
-}
-
-.card-body strong {
-    color: #343a40;
-    font-weight: 600;
-    margin-right: 0.25rem;
+.timer {
+    font-size: 2.5rem; /* Large font for the timer */
+    font-weight: bold;
+    color: #111827; /* Dark text for readability */
 }
 
 .loading-state {
     text-align: center;
-    font-size: 1.2rem;
+    font-size: 1.5rem;
     color: #6c757d;
     padding: 2rem;
     font-weight: bold;
 }
 
-.no-downtimes {
+.no-downtimes-message {
     text-align: center;
-    font-size: 1.2rem;
+    font-size: 1.5rem;
     color: #6c757d;
     padding: 2rem;
     font-weight: bold;
@@ -125,6 +109,7 @@
     align-items: center;
     gap: 1rem;
     z-index: 1000;
+    border-radius: 4px;
 }
 
 .error-dismiss-button {
@@ -133,6 +118,12 @@
     color: #dc3545;
     cursor: pointer;
     padding: 0.25rem;
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.error-dismiss-button:hover {
+    color: #a71d2a;
 }
 
 /* Modal styles */
@@ -182,4 +173,15 @@
 
 .close-button:hover {
     background-color: #c82333;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .downtimes-grid {
+        grid-template-columns: 1fr; /* Single column on smaller screens */
+    }
+
+    .downtime-card {
+        height: 120px; /* Slightly reduced height for smaller screens */
+    }
 }

@@ -1,8 +1,21 @@
 // Machine.tsx
 import React, { useState, useEffect } from 'react';
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
+    Select,
+    MenuItem,
+    Button,
+    Alert,
+    Box,
+    IconButton
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import { collection, addDoc, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../../../../firebase';
-import './Machine.css';
 
 interface MachineProps {
     onClose: () => void;
@@ -24,13 +37,19 @@ interface MachineItem {
     assetNumber: string;
 }
 
-const Machine: React.FC<MachineProps> = ({ onClose, onSubmit, productionLineId, supervisorId }) => {
+const Machine: React.FC<MachineProps> = ({
+                                             onClose,
+                                             onSubmit,
+                                             productionLineId,
+                                             supervisorId
+                                         }) => {
     const [reason, setReason] = useState<string>('');
     const [machineNumber, setMachineNumber] = useState<string>('');
     const [comments, setComments] = useState<string>('');
     const [reasonsList, setReasonsList] = useState<string[]>([]);
     const [machinesList, setMachinesList] = useState<MachineItem[]>([]);
     const [error, setError] = useState<string>('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         const fetchReasonsAndMachines = async () => {
@@ -58,9 +77,11 @@ const Machine: React.FC<MachineProps> = ({ onClose, onSubmit, productionLineId, 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setIsSubmitting(true);
 
         if (!reason || !machineNumber) {
             setError('Please fill in all required fields.');
+            setIsSubmitting(false);
             return;
         }
 
@@ -73,9 +94,6 @@ const Machine: React.FC<MachineProps> = ({ onClose, onSubmit, productionLineId, 
                 supervisorId,
             };
 
-            console.log('Submitting Machine Downtime:', machineFormData); // Debugging
-
-            // Create machine downtime document
             const docRef = await addDoc(collection(db, 'machineDowntimes'), {
                 ...machineFormData,
                 createdAt: Timestamp.now(),
@@ -88,67 +106,115 @@ const Machine: React.FC<MachineProps> = ({ onClose, onSubmit, productionLineId, 
                 updatedAt: Timestamp.now()
             });
 
-            console.log('Downtime Document Created with ID:', docRef.id); // Debugging
-
             await onSubmit(machineFormData);
             onClose();
         } catch (err) {
             console.error('Error logging downtime:', err);
             setError('Failed to log downtime.');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="modal-overlay">
-            <div className="modal-content">
-                <h2>Machine Downtime</h2>
-                {error && <p className="error-message">{error}</p>}
-                <form onSubmit={handleSubmit} className="machine-log-form">
-                    <label>
-                        Reason:
-                        <select value={reason} onChange={(e) => setReason(e.target.value)} required>
-                            <option value="">Select Reason</option>
-                            {reasonsList.map((r, index) => (
-                                <option key={index} value={r}>
-                                    {r}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                    <label>
-                        Machine Number:
-                        <select
+        <Dialog
+            open={true}
+            onClose={onClose}
+            maxWidth="sm"
+            fullWidth
+            PaperProps={{ sx: { borderRadius: 2, p: 1 } }}
+        >
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                Machine Downtime
+                <IconButton onClick={onClose} size="small">
+                    <CloseIcon />
+                </IconButton>
+            </DialogTitle>
+
+            <form onSubmit={handleSubmit}>
+                <DialogContent>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {error && <Alert severity="error">{error}</Alert>}
+
+                        <Select
                             value={machineNumber}
                             onChange={(e) => setMachineNumber(e.target.value)}
+                            displayEmpty
                             required
+                            sx={{
+                                borderRadius: 1,
+                                '& .MuiSelect-select': { py: 1.5 }
+                            }}
                         >
-                            <option value="">Select Machine</option>
+                            <MenuItem value="" disabled>
+                                Select machine
+                            </MenuItem>
                             {machinesList.map((machine) => (
-                                <option key={machine.id} value={machine.assetNumber}>
+                                <MenuItem key={machine.id} value={machine.assetNumber}>
                                     {machine.assetNumber}
-                                </option>
+                                </MenuItem>
                             ))}
-                        </select>
-                    </label>
-                    <label>
-                        Comments:
-                        <textarea
+                        </Select>
+
+                        <Select
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                            displayEmpty
+                            required
+                            sx={{
+                                borderRadius: 1,
+                                '& .MuiSelect-select': { py: 1.5 }
+                            }}
+                        >
+                            <MenuItem value="" disabled>
+                                Select reason for downtime
+                            </MenuItem>
+                            {reasonsList.map((r, index) => (
+                                <MenuItem key={index} value={r}>{r}</MenuItem>
+                            ))}
+                        </Select>
+
+                        <TextField
+                            multiline
+                            rows={4}
                             value={comments}
                             onChange={(e) => setComments(e.target.value)}
-                            placeholder="Enter comments..."
+                            placeholder="Add comments"
+                            fullWidth
+                            variant="outlined"
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    '& fieldset': {
+                                        borderRadius: 1
+                                    },
+                                    '& textarea': {
+                                        p: 1.5
+                                    }
+                                }
+                            }}
                         />
-                    </label>
-                    <div className="form-buttons">
-                        <button type="submit" className="submit-button">
-                            Confirm
-                        </button>
-                        <button type="button" onClick={onClose} className="cancel-button">
-                            Cancel
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                    </Box>
+                </DialogContent>
+
+                <DialogActions sx={{ p: 2, gap: 1 }}>
+                    <Button
+                        onClick={onClose}
+                        variant="outlined"
+                        sx={{ minWidth: 100, textTransform: 'none' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        variant="contained"
+                        disabled={isSubmitting}
+                        sx={{ minWidth: 100, textTransform: 'none' }}
+                    >
+                        {isSubmitting ? "Logging..." : "Submit"}
+                    </Button>
+                </DialogActions>
+            </form>
+        </Dialog>
     );
 };
 

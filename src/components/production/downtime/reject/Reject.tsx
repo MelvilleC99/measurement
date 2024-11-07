@@ -1,5 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
+    Select,
+    MenuItem,
+    Button,
+    Alert,
+    Box,
+    IconButton,
+    Typography
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../../firebase';
 import { RejectFormData } from '../types';
 import { SupportFunction } from '../../../../types';
@@ -30,9 +45,9 @@ const Reject: React.FC<RejectProps> = ({
     const [qcPassword, setQcPassword] = useState<string>('');
     const [reasonsList, setReasonsList] = useState<string[]>([]);
     const [operationsList, setOperationsList] = useState<{ id: string; name: string; }[]>([]);
-    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const [styleNumber, setStyleNumber] = useState<string>('');
 
     useEffect(() => {
@@ -40,11 +55,24 @@ const Reject: React.FC<RejectProps> = ({
             try {
                 setIsLoading(true);
 
-                // Get current style number
-                const lineDoc = await getDoc(doc(db, 'productionLines', productionLineId));
-                setStyleNumber(lineDoc.data()?.currentStyle || '');
+                // Fetch active session to get the current styleId
+                const sessionDoc = await getDoc(doc(db, 'activeSessions', sessionId));
+                const styleId = sessionDoc.data()?.styleId;
 
-                // Get reject reasons
+                if (!styleId) {
+                    throw new Error('Style ID not found in the active session');
+                }
+
+                // Fetch the specific style details
+                const styleDoc = await getDoc(doc(db, 'styles', styleId));
+                const styleNumber = styleDoc.data()?.styleNumber || '';
+                setStyleNumber(styleNumber);
+
+                if (!styleNumber) {
+                    throw new Error('Style number not found');
+                }
+
+                // Fetch reject reasons
                 const reasonsQuery = query(
                     collection(db, 'downtimeCategories'),
                     where('name', '==', 'Reject')
@@ -55,22 +83,25 @@ const Reject: React.FC<RejectProps> = ({
                 );
                 setReasonsList(fetchedReasons);
 
-                // Get operations
+                // Fetch operations based on productCategory from productHierarchy
+                const productCategory = styleDoc.data()?.productCategory;
+                if (!productCategory) {
+                    throw new Error('Product category not found in the style');
+                }
+
                 const operationsSnapshot = await getDocs(collection(db, 'productHierarchy'));
                 const fetchedOperations: { id: string; name: string; }[] = [];
 
                 operationsSnapshot.docs.forEach(doc => {
                     const data = doc.data();
-                    if (data.subCategories && Array.isArray(data.subCategories)) {
+                    if (data.name === productCategory && data.subCategories) {
                         data.subCategories.forEach((subCategory: any) => {
-                            if (subCategory.operations && Array.isArray(subCategory.operations)) {
+                            if (subCategory.operations) {
                                 subCategory.operations.forEach((operation: any) => {
-                                    if (operation.name) {
-                                        fetchedOperations.push({
-                                            id: `${doc.id}-${operation.name}`,
-                                            name: operation.name
-                                        });
-                                    }
+                                    fetchedOperations.push({
+                                        id: `${doc.id}-${operation.name}`,
+                                        name: operation.name
+                                    });
                                 });
                             }
                         });
@@ -87,18 +118,25 @@ const Reject: React.FC<RejectProps> = ({
         };
 
         fetchData();
-    }, [productionLineId]);
+    }, [sessionId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
-        if (!reason || !selectedQc || count < 1 || !qcPassword) {
-            setError('Please fill in all required fields');
+        if (isSubmitting) return;
+
+        // Ensure count is a valid number
+        const validatedCount = parseInt(count.toString(), 10);
+        if (isNaN(validatedCount) || validatedCount < 1) {
+            setError('Count must be a valid number greater than zero');
             return;
         }
 
+        setIsSubmitting(true);
+
         try {
+            // Verify QC credentials
             const qcSnapshot = await getDocs(query(
                 collection(db, 'supportFunctions'),
                 where('employeeNumber', '==', selectedQc),
@@ -108,209 +146,189 @@ const Reject: React.FC<RejectProps> = ({
 
             if (qcSnapshot.empty) {
                 setError('Invalid QC credentials');
+                setIsSubmitting(false);
                 return;
             }
 
-            setIsConfirmModalOpen(true);
-        } catch (err) {
-            console.error('Error verifying QC:', err);
-            setError('Failed to verify QC credentials');
-        }
-    };
-
-    const handleConfirm = async () => {
-        try {
             const rejectData: RejectFormData = {
                 reason,
                 operation,
                 comments,
                 qcId: selectedQc,
-                count,
-                recordedAsProduced: false,
+                count: validatedCount,
                 productionLineId,
                 supervisorId,
                 sessionId,
                 styleNumber,
-                status: 'open',
+                status: 'Open',
+                recordedAsProduced: false // Added missing field
             };
-
-            await addDoc(collection(db, 'rejects'), {
-                ...rejectData,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-            });
 
             await onSubmit(rejectData);
 
+            // Reset form and close
             setReason('');
             setOperation('');
             setComments('');
             setSelectedQc('');
             setQcPassword('');
             setCount(1);
-            setIsConfirmModalOpen(false);
             onClose();
         } catch (err) {
             console.error('Error submitting reject:', err);
-            setError('Failed to submit reject');
-            setIsConfirmModalOpen(false);
+            setError('Failed to submit reject.');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     if (isLoading) {
         return (
-            <div className="modal-overlay">
-                <div className="modal-content">
-                    <div className="loading-spinner">Loading...</div>
-                </div>
-            </div>
+            <Dialog open={true} maxWidth="sm" fullWidth>
+                <DialogContent>
+                    <Box display="flex" justifyContent="center" p={3}>
+                        <div className="loading-spinner">Loading...</div>
+                    </Box>
+                </DialogContent>
+            </Dialog>
         );
     }
 
     return (
-        <>
-            <div className="modal-overlay">
-                <div className="modal-content">
-                    {/* Header */}
-                    <div className="modal-header">
-                        <h2>Log Reject</h2>
-                        <button
-                            onClick={onClose}
-                            className="close-button"
-                            aria-label="Close"
+        <Dialog
+            open={true}
+            onClose={onClose}
+            maxWidth="sm"
+            fullWidth
+            PaperProps={{
+                sx: {
+                    borderRadius: 2,
+                    width: '100%',
+                    maxWidth: '500px',
+                    m: 2
+                }
+            }}
+        >
+            <DialogTitle sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                pb: 1
+            }}>
+                <Typography variant="h6" component="h2">
+                    Log Reject
+                </Typography>
+                <IconButton onClick={onClose} size="small" aria-label="close">
+                    <CloseIcon />
+                </IconButton>
+            </DialogTitle>
+
+            <Box sx={{ px: 3, py: 1 }}>
+                <Typography variant="subtitle2" color="text.secondary">
+                    Current Style: {styleNumber}
+                </Typography>
+            </Box>
+
+            <form onSubmit={handleSubmit}>
+                <DialogContent>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+                        <Select
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                            displayEmpty
+                            required
+                            sx={{ '& .MuiSelect-select': { py: 1.5 } }}
                         >
-                            ×
-                        </button>
-                    </div>
+                            <MenuItem value="" disabled>
+                                Select reason for rejection *
+                            </MenuItem>
+                            {reasonsList.map((r, index) => (
+                                <MenuItem key={index} value={r}>{r}</MenuItem>
+                            ))}
+                        </Select>
 
-                    <div className="style-banner">
-                        <span>Current Style: {styleNumber}</span>
-                    </div>
+                        <Select
+                            value={operation}
+                            onChange={(e) => setOperation(e.target.value)}
+                            displayEmpty
+                            sx={{ '& .MuiSelect-select': { py: 1.5 } }}
+                        >
+                            <MenuItem value="" disabled>
+                                Select operation (optional)
+                            </MenuItem>
+                            {operationsList.map((op) => (
+                                <MenuItem key={op.id} value={op.name}>{op.name}</MenuItem>
+                            ))}
+                        </Select>
 
-                    {error && (
-                        <div className="error-message">
-                            {error}
-                            <button onClick={() => setError('')} className="error-dismiss">×</button>
-                        </div>
-                    )}
+                        <TextField
+                            type="number"
+                            label="Count *"
+                            value={count}
+                            onChange={(e) => setCount(parseInt(e.target.value) || 1)}
+                            required
+                            fullWidth
+                            inputProps={{ min: 1 }}
+                        />
 
-                    <form onSubmit={handleSubmit} className="compact-form">
-                        <div className="form-group">
-                            <select
-                                value={reason}
-                                onChange={(e) => setReason(e.target.value)}
-                                required
-                                className="form-select"
-                            >
-                                <option value="">Select Reason *</option>
-                                {reasonsList.map((r, index) => (
-                                    <option key={index} value={r}>{r}</option>
-                                ))}
-                            </select>
-                        </div>
+                        <Select
+                            value={selectedQc}
+                            onChange={(e) => setSelectedQc(e.target.value)}
+                            displayEmpty
+                            required
+                            sx={{ '& .MuiSelect-select': { py: 1.5 } }}
+                        >
+                            <MenuItem value="" disabled>
+                                Select Quality Controller *
+                            </MenuItem>
+                            {qcs.map((qc) => (
+                                <MenuItem key={qc.id} value={qc.employeeNumber || qc.id}>
+                                    {qc.name} {qc.surname}
+                                </MenuItem>
+                            ))}
+                        </Select>
 
-                        <div className="form-group">
-                            <select
-                                value={operation}
-                                onChange={(e) => setOperation(e.target.value)}
-                                className="form-select"
-                            >
-                                <option value="">Select Operation *</option>
-                                {operationsList.map((op) => (
-                                    <option key={op.id} value={op.name}>
-                                        {op.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                        <TextField
+                            type="password"
+                            label="QC Password *"
+                            value={qcPassword}
+                            onChange={(e) => setQcPassword(e.target.value)}
+                            required
+                            fullWidth
+                        />
 
-                        <div className="form-group">
-                            <input
-                                type="number"
-                                min="1"
-                                value={count}
-                                onChange={(e) => setCount(parseInt(e.target.value) || 1)}
-                                required
-                                className="form-input"
-                                placeholder="Enter Count *"
-                            />
-                        </div>
+                        <TextField
+                            multiline
+                            rows={4}
+                            value={comments}
+                            onChange={(e) => setComments(e.target.value)}
+                            placeholder="Add comments (optional)"
+                            fullWidth
+                        />
+                    </Box>
+                </DialogContent>
 
-                        <div className="form-group">
-                            <select
-                                value={selectedQc}
-                                onChange={(e) => setSelectedQc(e.target.value)}
-                                required
-                                className="form-select"
-                            >
-                                <option value="">Select QC *</option>
-                                {qcs.map((qc) => (
-                                    <option key={qc.id} value={qc.employeeNumber || qc.id}>
-                                        {qc.name} {qc.surname}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="form-group">
-                            <input
-                                type="password"
-                                value={qcPassword}
-                                onChange={(e) => setQcPassword(e.target.value)}
-                                required
-                                className="form-input"
-                                placeholder="QC Password *"
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <textarea
-                                value={comments}
-                                onChange={(e) => setComments(e.target.value)}
-                                placeholder="Comments (optional)"
-                                rows={3}
-                                className="form-textarea"
-                            />
-                        </div>
-
-                        <div className="form-buttons">
-                            <button type="button" onClick={onClose} className="cancel-button">
-                                Cancel
-                            </button>
-                            <button type="submit" className="submit-button">
-                                Submit Reject
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            {/* Confirmation Modal */}
-            {isConfirmModalOpen && (
-                <div className="confirmation-modal">
-                    <div className="confirmation-content">
-                        <h3>Confirm Reject</h3>
-                        <div className="confirmation-details">
-                            <p><strong>Style:</strong> {styleNumber}</p>
-                            <p><strong>Reason:</strong> {reason}</p>
-                            <p><strong>Operation:</strong> {operation}</p>
-                            <p><strong>Count:</strong> {count}</p>
-                        </div>
-                        <div className="confirmation-buttons">
-                            <button
-                                onClick={() => setIsConfirmModalOpen(false)}
-                                className="cancel-button"
-                            >
-                                Cancel
-                            </button>
-                            <button onClick={handleConfirm} className="submit-button">
-                                Confirm
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
+                <DialogActions sx={{ p: 2.5, gap: 1 }}>
+                    <Button
+                        onClick={onClose}
+                        variant="outlined"
+                        sx={{ minWidth: 100, textTransform: 'none' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        variant="contained"
+                        disabled={isSubmitting}
+                        sx={{ minWidth: 100, textTransform: 'none' }}
+                    >
+                        {isSubmitting ? "Submitting..." : "Submit"}
+                    </Button>
+                </DialogActions>
+            </form>
+        </Dialog>
     );
 };
 

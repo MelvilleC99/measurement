@@ -1,3 +1,5 @@
+// src/components/ProductionSchedule.tsx
+
 import React, { useState, useEffect } from 'react';
 import './ProductionSchedule.css';
 import { db } from '../../firebase';
@@ -7,6 +9,7 @@ import {
     updateDoc,
     deleteDoc,
     doc,
+    addDoc,
 } from 'firebase/firestore';
 import { ScheduledStyle, Style, ProductionLine } from '../../types';
 
@@ -32,15 +35,18 @@ const ProductionSchedule: React.FC = () => {
     const fetchProductionLines = async () => {
         try {
             const linesSnapshot = await getDocs(collection(db, 'productionLines'));
+            // @ts-ignore
             const linesList: ProductionLine[] = linesSnapshot.docs.map((doc) => {
                 const data = doc.data();
                 return {
                     id: doc.id,
                     name: data.name,
+                    description: data.description,
                     active: data.active || false,
-                    assignedTimeTable: data.assignedTimeTable || '', // Include assignedTimeTable
+                    currentStyle: data.currentStyle,
                     createdAt: data.createdAt,
                     updatedAt: data.updatedAt,
+                    assignedTimeTable: data.assignedTimeTable || '',
                 };
             });
             setProductionLines(linesList);
@@ -82,18 +88,15 @@ const ProductionSchedule: React.FC = () => {
                     styleName: data.styleName,
                     styleNumber: data.styleNumber,
                     description: data.description,
-                    productType: data.productType,
-                    productCategory: data.productCategory,
                     unitsInOrder: data.unitsInOrder,
-                    cost: data.cost,
                     deliveryDate: data.deliveryDate,
-                    status: data.status,
                     hourlyTarget: data.hourlyTarget || 0,
-                    unitsProduced: data.unitsProduced || 0,
                     createdAt: data.createdAt,
                     updatedAt: data.updatedAt,
+                    unitsProduced: data.unitsProduced || 0,
                     customer: data.customer || '',
                     smv: data.smv || 0,
+                    status: data.status,
                 };
             });
             setStyles(stylesList);
@@ -110,12 +113,18 @@ const ProductionSchedule: React.FC = () => {
 
     // Save the scheduled style to Firestore
     const handleSaveStyleToLine = async () => {
-        if (!selectedLine || !onLineDate || !offLineDate || !expectedDeliveryDate || !selectedStyle) {
+        if (
+            !selectedLine ||
+            !onLineDate ||
+            !offLineDate ||
+            !expectedDeliveryDate ||
+            !selectedStyle
+        ) {
             alert('Please fill out all fields.');
             return;
         }
 
-        const updatedFields: Partial<ScheduledStyle> = {
+        const updatedFields: Omit<ScheduledStyle, 'id'> = {
             styleName: selectedStyle.styleName,
             styleNumber: selectedStyle.styleNumber,
             lineId: selectedLine,
@@ -127,7 +136,13 @@ const ProductionSchedule: React.FC = () => {
         };
 
         try {
-            await updateDoc(doc(db, 'scheduledStyles', selectedStyle.id), updatedFields);
+            if (selectedStyle.status === 'unscheduled') {
+                // Add new scheduled style
+                await addDoc(collection(db, 'scheduledStyles'), updatedFields);
+            } else {
+                // Update existing scheduled style
+                await updateDoc(doc(db, 'scheduledStyles', selectedStyle.id), updatedFields);
+            }
             fetchScheduledStyles();
             closeModal();
         } catch (error) {
@@ -153,7 +168,7 @@ const ProductionSchedule: React.FC = () => {
         setOffLineDate(style.offLineDate);
         setExpectedDeliveryDate(style.expectedDeliveryDate);
         setShowStyleSelector(false); // Now switching to "edit" mode
-        openModal();
+        setIsModalOpen(true);
     };
 
     // Handle selecting a new style to schedule
@@ -161,7 +176,7 @@ const ProductionSchedule: React.FC = () => {
         const selected = styles.find((style) => style.id === styleId);
         if (selected) {
             const newScheduledStyle: ScheduledStyle = {
-                id: selected.id,
+                id: '', // Will be set by Firestore when adding a new document
                 styleName: selected.styleName,
                 styleNumber: selected.styleNumber,
                 lineId: '',
@@ -225,7 +240,10 @@ const ProductionSchedule: React.FC = () => {
                         {showStyleSelector ? (
                             <>
                                 <h2>Select Style to Schedule</h2>
-                                <select onChange={(e) => handleSelectStyle(e.target.value)} defaultValue="">
+                                <select
+                                    onChange={(e) => handleSelectStyle(e.target.value)}
+                                    defaultValue=""
+                                >
                                     <option value="" disabled>
                                         Select a Style
                                     </option>
@@ -293,8 +311,12 @@ const ProductionSchedule: React.FC = () => {
 
                                 <div className="modal-buttons">
                                     <button onClick={handleSaveStyleToLine}>Save</button>
-                                    {selectedStyle?.status === 'scheduled' && (
-                                        <button onClick={() => handleDeleteStyle(selectedStyle.id)}>Remove</button>
+                                    {selectedStyle?.status === 'scheduled' && selectedStyle.id && (
+                                        <button
+                                            onClick={() => handleDeleteStyle(selectedStyle.id)}
+                                        >
+                                            Remove
+                                        </button>
                                     )}
                                     <button onClick={closeModal}>Cancel</button>
                                 </div>

@@ -1,3 +1,6 @@
+/* Existing Styles */
+
+/* Container for the entire board */
 .board-container {
     display: flex;
     flex-direction: column;
@@ -7,6 +10,7 @@
     overflow: hidden;
 }
 
+/* Content within the board */
 .board-content {
     display: flex;
     flex-direction: column;
@@ -14,11 +18,11 @@
     width: 100%;
 }
 
-/* Reduced header height */
+/* Heading Banner Styles */
 .heading-banner {
     display: flex;
     justify-content: space-between;
-    align-items: center; /* Changed to center alignment */
+    align-items: center; /* Center alignment */
     padding: 0.5rem 2rem; /* Reduced padding */
     background-color: white;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -76,7 +80,7 @@
     background-color: #c53030;
 }
 
-/* Main content layout */
+/* Main Content Layout */
 .main-grid {
     display: flex;
     flex: 1;
@@ -84,7 +88,7 @@
     overflow: hidden;
 }
 
-/* Left panel - Production Tracking */
+/* Left Panel - Production Tracking */
 .left-panel {
     width: 50%;
     background-color: white;
@@ -93,22 +97,48 @@
     flex-direction: column;
 }
 
-/* Right panel - Monitoring Panels */
+/* Right Panel - Monitoring Panels */
 .right-panel {
     width: 50%;
     display: flex;
     flex-direction: column;
+    height: 100%;
 }
 
-/* Individual monitoring panels */
+/* Individual Monitoring Panels */
 .monitoring-panel {
-    height: calc((100vh - 80px) / 3); /* Equal height divided by 3 */
     background-color: white;
     border-left: 1px solid #edf2f7;
     border-bottom: 1px solid #edf2f7;
     overflow: auto;
+    padding: 0.5rem; /* Reduced padding from 1rem to 0.5rem */
+    box-sizing: border-box;
 }
 
+/* Specific Adjustments */
+
+/* 1. Reduce height of the Metric Counter panel (first monitoring panel) */
+.right-panel .monitoring-panel:nth-child(1) {
+    height: 160px; /* Adjust this value as needed */
+    padding: 0.2rem; /* Reduced padding */
+    box-sizing: border-box;
+}
+
+/* 2. Increase height of the Active Downtime panel (second monitoring panel) */
+.right-panel .monitoring-panel:nth-child(2) {
+    height: calc((100vh - 80px) / 3 + 50px); /* Adds 50px to its original height */
+    padding: 0.2rem; /* Reduced padding */
+    box-sizing: border-box;
+}
+
+/* 3. Adjust the Record Events panel (third monitoring panel) to balance the layout */
+.right-panel .monitoring-panel:nth-child(3) {
+    height: calc((120vh - 80px) / 3 - 50px); /* Corrected from (140vh - 80px)/3 -50px */
+    padding: 0.2rem; /* Reduced padding */
+    box-sizing: border-box;
+}
+
+/* Error Message Styling */
 .error-message {
     position: fixed;
     bottom: 1rem;
@@ -126,11 +156,36 @@
 .error-message button {
     background: none;
     border: none;
-    color: #666;
+    color: #667;
     cursor: pointer;
-    padding: 0.25rem;
 }
 
 .error-message button:hover {
     color: #333;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .main-grid {
+        flex-direction: column;
+    }
+    .left-panel, .right-panel {
+        width: 100%;
+        height: 50%; /* Adjust as needed */
+    }
+    /* Further reduce heights on smaller screens */
+    .right-panel .monitoring-panel:nth-child(1) {
+        height: 80px;
+        padding: 0.25rem; /* Further reduced padding */
+    }
+
+    .right-panel .monitoring-panel:nth-child(2) {
+        height: calc((100vh - 80px) / 3 + 30px);
+        padding: 0.5rem;
+    }
+
+    .right-panel .monitoring-panel:nth-child(3) {
+        height: calc((100vh - 80px) / 3 - 30px);
+        padding: 0.5rem;
+    }
 }

@@ -1,7 +1,5 @@
-// src/components/production/productionboard/components/Overtime.tsx
-
 import React, { useState } from 'react';
-// import './Overtime.css'; // Removed to prevent import errors
+import './Overtime.css';
 
 interface OvertimeProps {
     onConfirm: (newTarget: number) => void;

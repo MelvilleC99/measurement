@@ -8,11 +8,16 @@ import {
     updateDoc,
     doc,
     Timestamp,
-    and,
     getDoc as getSingleDoc,
 } from 'firebase/firestore';
 import { db } from '../../../../firebase';
-import { ProductionLine, SupportFunction, Style, SessionData } from '../../../../types';
+import {
+    ProductionLine,
+    SupportFunction,
+    Style,
+    SessionData,
+    TimeTableAssignment,
+} from '../../../../types';
 import './LoginManager.css';
 
 interface LoginManagerProps {
@@ -20,103 +25,68 @@ interface LoginManagerProps {
 }
 
 const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
-    // Step tracking
-    const [currentStep, setCurrentStep] = useState<'login' | 'sessionOptions' | 'confirm'>('login');
-
-    // Initial login data
     const [productionLines, setProductionLines] = useState<ProductionLine[]>([]);
     const [supervisors, setSupervisors] = useState<SupportFunction[]>([]);
     const [styles, setStyles] = useState<Style[]>([]);
-    const [selectedLineId, setSelectedLineId] = useState<string>('');
-    const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>('');
-    const [password, setPassword] = useState<string>('');
-
-    // Confirmation data
-    const [selectedStyleId, setSelectedStyleId] = useState<string>('');
-    const [target, setTarget] = useState<number>(0);
-
-    // Loading and error states
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string>('');
-
-    // Active session data
+    const [selectedLineId, setSelectedLineId] = useState('');
+    const [selectedSupervisorId, setSelectedSupervisorId] = useState('');
+    const [password, setPassword] = useState('');
+    const [selectedStyleId, setSelectedStyleId] = useState('');
+    const [target, setTarget] = useState(0);
+    const [currentStep, setCurrentStep] = useState<'login' | 'sessionOptions' | 'confirm'>('login');
     const [activeSession, setActiveSession] = useState<SessionData | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
     // Fetch initial data
     useEffect(() => {
         const fetchData = async () => {
             try {
-                setLoading(true);
-                const [linesSnap, supervisorsSnap, stylesSnap] = await Promise.all([
-                    getDocs(collection(db, 'productionLines')),
-                    getDocs(query(collection(db, 'supportFunctions'), where('role', '==', 'Supervisor'))),
-                    getDocs(collection(db, 'styles')),
-                ]);
+                const linesSnapshot = await getDocs(collection(db, 'productionLines'));
+                const supervisorsSnapshot = await getDocs(
+                    query(collection(db, 'supportFunctions'), where('role', '==', 'Supervisor'))
+                );
+                const stylesSnapshot = await getDocs(collection(db, 'styles'));
 
-                const lines = linesSnap.docs.map((doc) => ({
+                const linesData = linesSnapshot.docs.map((doc) => ({
                     id: doc.id,
-                    name: doc.data().name,
-                    active: doc.data().active || false,
-                    assignedTimeTable: doc.data().assignedTimeTable || '',
-                    createdAt: doc.data().createdAt,
-                    updatedAt: doc.data().updatedAt,
+                    ...doc.data(),
                 })) as ProductionLine[];
-                setProductionLines(lines);
 
-                const sups = supervisorsSnap.docs.map((doc) => ({
+                const supervisorsData = supervisorsSnapshot.docs.map((doc) => ({
                     id: doc.id,
                     ...doc.data(),
                 })) as SupportFunction[];
-                setSupervisors(sups);
 
-                const loadedStyles = stylesSnap.docs.map((doc) => ({
+                const stylesData = stylesSnapshot.docs.map((doc) => ({
                     id: doc.id,
                     ...doc.data(),
                 })) as Style[];
-                setStyles(loadedStyles);
+
+                setProductionLines(linesData);
+                setSupervisors(supervisorsData);
+                setStyles(stylesData);
             } catch (err) {
                 console.error('Error fetching initial data:', err);
-                setError('Failed to load initial data');
-            } finally {
-                setLoading(false);
+                setError('Failed to load initial data.');
             }
         };
 
         fetchData();
     }, []);
 
-    // Handle initial login with fixed authentication
+    // Handle initial login
     const handleInitialLogin = async () => {
-        setError('');
         setLoading(true);
+        setError('');
 
         try {
-            const selectedSupervisor = supervisors.find((s) => s.id === selectedSupervisorId);
-            if (!selectedSupervisor) {
-                setError('Selected supervisor not found.');
-                setLoading(false);
-                return;
-            }
+            // Authenticate supervisor
+            const supervisorDoc = await getSingleDoc(doc(db, 'supportFunctions', selectedSupervisorId));
+            const supervisorData = supervisorDoc.data() as SupportFunction;
 
-            console.log(
-                `Attempting to log in supervisor: ${selectedSupervisor.name} ${selectedSupervisor.surname} (${selectedSupervisor.employeeNumber})`
-            );
-
-            // Modified query to check for employee number and password
-            const loginQuery = query(
-                collection(db, 'supportFunctions'),
-                and(
-                    where('employeeNumber', '==', selectedSupervisor.employeeNumber),
-                    where('password', '==', password),
-                    where('role', '==', 'Supervisor')
-                )
-            );
-
-            const loginSnap = await getDocs(loginQuery);
-
-            if (loginSnap.empty) {
-                setError('Invalid password. Please try again.');
-                setPassword(''); // Clear password for security
+            if (!supervisorData || supervisorData.password !== password) {
+                setError('Incorrect password.');
                 setLoading(false);
                 return;
             }
@@ -137,44 +107,27 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
                 const sessionDoc = sessionSnap.docs[0];
                 const sessionData = sessionDoc.data() as SessionData;
 
-                // Check if timeTableId is present, if not, fetch it from the production line
-                if (!sessionData.timeTableId) {
-                    const productionLineDocRef = doc(db, 'productionLines', selectedLineId);
-                    const productionLineSnap = await getSingleDoc(productionLineDocRef);
+                // Fetch the assigned TimeTable ID based on current date
+                const assignedTimeTableId = await getCurrentTimeTableId(selectedLineId);
 
-                    if (!productionLineSnap.exists()) {
-                        setError('Selected production line does not exist.');
-                        setLoading(false);
-                        return;
-                    }
-
-                    const productionLineData = productionLineSnap.data() as ProductionLine;
-                    const assignedTimeTableId = productionLineData.assignedTimeTable;
-
-                    if (!assignedTimeTableId) {
-                        setError('No TimeTable assigned to the selected production line.');
-                        setLoading(false);
-                        return;
-                    }
-
-                    sessionData.timeTableId = assignedTimeTableId;
-
-                    // Optionally, update the session in the database to include timeTableId
-                    await updateDoc(doc(db, 'activeSessions', sessionDoc.id), {
-                        timeTableId: assignedTimeTableId,
-                        updatedAt: Timestamp.now(),
-                    });
+                if (!assignedTimeTableId) {
+                    setError('No active TimeTable assigned to the production line for today.');
+                    setLoading(false);
+                    return;
                 }
 
+                sessionData.timeTableId = assignedTimeTableId;
+
+                // Optionally, update the session in the database to include timeTableId
+                await updateDoc(doc(db, 'activeSessions', sessionDoc.id), {
+                    timeTableId: assignedTimeTableId,
+                    updatedAt: Timestamp.now(),
+                });
+
                 setActiveSession({
+                    ...sessionData,
                     sessionId: sessionDoc.id,
-                    lineId: sessionData.lineId,
                     supervisorId: selectedSupervisorId,
-                    styleId: sessionData.styleId,
-                    target: sessionData.target,
-                    startTime: sessionData.startTime,
-                    isActive: sessionData.isActive,
-                    timeTableId: sessionData.timeTableId, // Ensure this is included
                 });
 
                 setCurrentStep('sessionOptions');
@@ -184,7 +137,7 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
                 setCurrentStep('confirm');
                 console.log('No active session found, proceeding to confirmation step');
             }
-        } catch (err: any) {
+        } catch (err) {
             console.error('Login error:', err);
             setError('Failed to authenticate. Please try again.');
         } finally {
@@ -192,96 +145,83 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
         }
     };
 
-    // Handle continuing an existing session
-    const handleContinueSession = () => {
-        if (activeSession) {
-            onLoginSuccess(activeSession);
-            console.log('Continuing existing session:', activeSession.sessionId);
-        } else {
-            setError('No active session to continue.');
-        }
-    };
-
-    // Handle starting a new session
-    const handleStartNewSession = async () => {
-        setError('');
-        setLoading(true);
-
+    // Fetch the current time table ID based on today's date
+    const getCurrentTimeTableId = async (lineId: string): Promise<string | null> => {
         try {
-            if (!activeSession) {
-                setError('No active session found to start a new one.');
-                setLoading(false);
-                return;
-            }
-
-            // Deactivate the existing session
-            await updateDoc(doc(db, 'activeSessions', activeSession.sessionId), {
-                isActive: false,
-                endTime: Timestamp.now(),
-                updatedAt: Timestamp.now(),
-            });
-
-            console.log('Deactivated existing session:', activeSession.sessionId);
-
-            // Clear the active session state
-            setActiveSession(null);
-
-            // Proceed to confirm style and target
-            setCurrentStep('confirm');
-            console.log('Proceeding to confirmation step for new session.');
-        } catch (err) {
-            console.error('Error deactivating existing session:', err);
-            setError('Failed to start a new session.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Handle confirmation and session creation
-    const handleConfirmAndStart = async () => {
-        setError('');
-        setLoading(true);
-
-        try {
-            const selectedStyle = styles.find((s) => s.id === selectedStyleId);
-            if (!selectedStyle) {
-                setError('Please select a valid style.');
-                setLoading(false);
-                return;
-            }
-
-            if (target <= 0) {
-                setError('Target must be a positive number.');
-                setLoading(false);
-                return;
-            }
-
-            // Fetch the assigned TimeTable for the selected line
-            const productionLineDocRef = doc(db, 'productionLines', selectedLineId);
+            const productionLineDocRef = doc(db, 'productionLines', lineId);
             const productionLineSnap = await getSingleDoc(productionLineDocRef);
 
             if (!productionLineSnap.exists()) {
                 setError('Selected production line does not exist.');
-                setLoading(false);
-                return;
+                return null;
             }
 
             const productionLineData = productionLineSnap.data() as ProductionLine;
-            const assignedTimeTableId = productionLineData.assignedTimeTable;
+            const timeTableAssignments = productionLineData.timeTableAssignments || [];
+
+            if (timeTableAssignments.length === 0) {
+                setError('No TimeTable assigned to the selected production line.');
+                return null;
+            }
+
+            const today = new Date().setHours(0, 0, 0, 0);
+
+            // Find the time table assignment that includes today's date
+            const activeAssignment = timeTableAssignments.find((assignment: TimeTableAssignment) => {
+                const fromDate = new Date(assignment.fromDate).setHours(0, 0, 0, 0);
+                const toDate = new Date(assignment.toDate).setHours(0, 0, 0, 0);
+                return today >= fromDate && today <= toDate;
+            });
+
+            if (!activeAssignment) {
+                setError('No active TimeTable assigned to the production line for today.');
+                return null;
+            }
+
+            return activeAssignment.timeTableId;
+        } catch (err) {
+            console.error('Error fetching production line data:', err);
+            setError('Failed to fetch production line data.');
+            return null;
+        }
+    };
+
+    // Continue existing session
+    const handleContinueSession = () => {
+        if (activeSession) {
+            onLoginSuccess(activeSession);
+            console.log('Continuing existing session:', activeSession.sessionId);
+        }
+    };
+
+    // Start new session
+    const handleStartNewSession = () => {
+        setCurrentStep('confirm');
+        console.log('Starting new session');
+    };
+
+    // Confirm style and target, and start session
+    const handleConfirmAndStart = async () => {
+        setLoading(true);
+        setError('');
+
+        try {
+            // Fetch the assigned TimeTable ID based on current date
+            const assignedTimeTableId = await getCurrentTimeTableId(selectedLineId);
 
             if (!assignedTimeTableId) {
-                setError('No TimeTable assigned to the selected production line.');
+                setError('No active TimeTable assigned to the production line for today.');
                 setLoading(false);
                 return;
             }
 
-            // Create a new session
+            // Create new session
             const sessionRef = await addDoc(collection(db, 'activeSessions'), {
                 lineId: selectedLineId,
                 supervisorId: selectedSupervisorId,
                 styleId: selectedStyleId,
                 target: target,
-                timeTableId: assignedTimeTableId, // Include timeTableId
+                timeTableId: assignedTimeTableId,
                 startTime: Timestamp.now(),
                 isActive: true,
                 createdAt: Timestamp.now(),
@@ -294,7 +234,7 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
                 supervisorId: selectedSupervisorId,
                 styleId: selectedStyleId,
                 target: target,
-                timeTableId: assignedTimeTableId, // Include timeTableId
+                timeTableId: assignedTimeTableId,
                 startTime: Timestamp.now(),
                 isActive: true,
             };
@@ -383,12 +323,22 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
             {currentStep === 'sessionOptions' && activeSession && (
                 <div className="session-options">
                     <h3>Active Session Detected</h3>
-                    <p>Would you like to continue with the existing session or start a new one?</p>
+                    <p>
+                        Would you like to continue with the existing session or start a new one?
+                    </p>
                     <div className="session-buttons">
-                        <button className="continue-button" onClick={handleContinueSession} disabled={loading}>
+                        <button
+                            className="continue-button"
+                            onClick={handleContinueSession}
+                            disabled={loading}
+                        >
                             Continue Existing Session
                         </button>
-                        <button className="new-session-button" onClick={handleStartNewSession} disabled={loading}>
+                        <button
+                            className="new-session-button"
+                            onClick={handleStartNewSession}
+                            disabled={loading}
+                        >
                             Start New Session
                         </button>
                     </div>
@@ -445,10 +395,8 @@ const LoginManager: React.FC<LoginManagerProps> = ({ onLoginSuccess }) => {
                                     className="cancel-button"
                                     onClick={() => {
                                         if (activeSession) {
-                                            // If starting a new session, allow canceling
                                             setCurrentStep('sessionOptions');
                                         } else {
-                                            // If no active session, go back to login
                                             setCurrentStep('login');
                                         }
                                     }}

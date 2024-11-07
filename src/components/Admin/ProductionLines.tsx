@@ -9,27 +9,34 @@ import {
     Timestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
+import {
+    ProductionLine,
+    TimeTableAssignment,
+    TimeTable,
+} from '../../types';
+import {
+    Button,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    TextField,
+    IconButton,
+    Typography,
+    Grid,
+    Paper,
+    List,
+    ListItem,
+    ListItemText,
+    ListItemSecondaryAction,
+    Divider,
+    Select,
+    MenuItem,
+    InputLabel,
+    FormControl,
+    Box,
+} from '@mui/material';
+import { Add, Edit, Delete, Close } from '@mui/icons-material';
 import './ProductionLines.css';
-
-interface TimeTableAssignment {
-    id: string; // Unique ID for the assignment
-    timeTableId: string;
-    timeTableName: string; // For easier display
-    fromDate: string;
-    toDate: string;
-}
-
-interface ProductionLine {
-    id: string;
-    name: string;
-    description: string;
-    timeTableAssignments: TimeTableAssignment[];
-}
-
-interface TimeTable {
-    id: string;
-    name: string;
-}
 
 const ProductionLines: React.FC = () => {
     const [lineName, setLineName] = useState('');
@@ -40,6 +47,7 @@ const ProductionLines: React.FC = () => {
     const [isEditMode, setIsEditMode] = useState(false);
     const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [error, setError] = useState<string>('');
 
     // Fetch existing production lines from Firebase
     const fetchProductionLines = async () => {
@@ -52,6 +60,10 @@ const ProductionLines: React.FC = () => {
                 name: data.name,
                 description: data.description,
                 timeTableAssignments: data.timeTableAssignments || [],
+                active: data.active,
+                currentStyle: data.currentStyle,
+                createdAt: data.createdAt,
+                updatedAt: data.updatedAt,
             } as ProductionLine;
         });
         setProductionLines(linesList);
@@ -59,11 +71,14 @@ const ProductionLines: React.FC = () => {
 
     // Fetch time tables from Firebase
     const fetchTimeTables = async () => {
-        const timeTablesCollection = collection(db, 'timeTables');
+        const timeTablesCollection = collection(db, 'timeTable');
         const timeTablesSnapshot = await getDocs(timeTablesCollection);
         const timeTablesList = timeTablesSnapshot.docs.map((doc) => ({
             id: doc.id,
             name: doc.data().name,
+            description: doc.data().description,
+            isOvertime: doc.data().isOvertime,
+            schedules: doc.data().schedules,
         } as TimeTable));
         setTimeTables(timeTablesList);
     };
@@ -78,7 +93,7 @@ const ProductionLines: React.FC = () => {
     const openModal = (line?: ProductionLine) => {
         if (line) {
             setLineName(line.name);
-            setLineDescription(line.description);
+            setLineDescription(line.description || '');
             setTimeTableAssignments(line.timeTableAssignments || []);
             setSelectedLineId(line.id);
             setIsEditMode(true);
@@ -87,6 +102,7 @@ const ProductionLines: React.FC = () => {
             setIsEditMode(false);
         }
         setIsModalOpen(true);
+        setError('');
     };
 
     // Reset form fields
@@ -95,42 +111,83 @@ const ProductionLines: React.FC = () => {
         setLineDescription('');
         setTimeTableAssignments([]);
         setSelectedLineId(null);
+        setError('');
     };
 
     // Add or update production line in Firebase
     const saveProductionLine = async () => {
-        if (!lineName || !lineDescription) {
-            alert('Please provide all required fields.');
+        if (!lineName.trim() || !lineDescription.trim()) {
+            setError('Please provide all required fields.');
             return;
+        }
+
+        if (timeTableAssignments.length === 0) {
+            setError('Please add at least one time table assignment.');
+            return;
+        }
+
+        // Validate all time table assignments
+        for (const assignment of timeTableAssignments) {
+            if (!assignment.timeTableId || !assignment.fromDate || !assignment.toDate) {
+                setError('Please fill out all fields for each time table assignment.');
+                return;
+            }
+            if (new Date(assignment.fromDate) > new Date(assignment.toDate)) {
+                setError('From Date cannot be after To Date in time table assignments.');
+                return;
+            }
+        }
+
+        // Check for overlapping date ranges
+        for (let i = 0; i < timeTableAssignments.length; i++) {
+            const assignmentA = timeTableAssignments[i];
+            for (let j = i + 1; j < timeTableAssignments.length; j++) {
+                const assignmentB = timeTableAssignments[j];
+                if (datesOverlap(assignmentA.fromDate, assignmentA.toDate, assignmentB.fromDate, assignmentB.toDate)) {
+                    setError('Time table assignments cannot have overlapping date ranges.');
+                    return;
+                }
+            }
         }
 
         const lineData = {
             name: lineName,
             description: lineDescription,
             timeTableAssignments: timeTableAssignments,
+            updatedAt: Timestamp.now(),
+            active: true,
+            currentStyle: null,
+            createdAt: isEditMode ? undefined : Timestamp.now(),
         };
 
-        if (isEditMode && selectedLineId) {
-            const lineDoc = doc(db, 'productionLines', selectedLineId);
-            await updateDoc(lineDoc, lineData);
-        } else {
-            await addDoc(collection(db, 'productionLines'), {
-                ...lineData,
-                createdAt: Timestamp.now(),
-            });
-        }
+        try {
+            if (isEditMode && selectedLineId) {
+                const lineDoc = doc(db, 'productionLines', selectedLineId);
+                await updateDoc(lineDoc, lineData);
+            } else {
+                await addDoc(collection(db, 'productionLines'), lineData);
+            }
 
-        resetForm();
-        setIsModalOpen(false);
-        fetchProductionLines();
+            resetForm();
+            setIsModalOpen(false);
+            fetchProductionLines();
+        } catch (err) {
+            console.error('Error saving production line:', err);
+            setError('Failed to save production line. Please try again.');
+        }
     };
 
     // Delete a production line from Firebase
     const deleteProductionLine = async (lineId: string) => {
         const confirmed = window.confirm('Are you sure you want to delete this production line?');
         if (confirmed) {
-            await deleteDoc(doc(db, 'productionLines', lineId));
-            fetchProductionLines();
+            try {
+                await deleteDoc(doc(db, 'productionLines', lineId));
+                fetchProductionLines();
+            } catch (err) {
+                console.error('Error deleting production line:', err);
+                setError('Failed to delete production line. Please try again.');
+            }
         }
     };
 
@@ -149,50 +206,30 @@ const ProductionLines: React.FC = () => {
     };
 
     // Update a time table assignment
-    const updateTimeTableAssignment = (index: number, field: string, value: string) => {
+    const updateTimeTableAssignment = (index: number, field: keyof TimeTableAssignment, value: string) => {
         const updatedAssignments = [...timeTableAssignments];
-        const assignment = updatedAssignments[index];
+        const assignment = { ...updatedAssignments[index] };
 
         if (field === 'timeTableId') {
             const selectedTimeTable = timeTables.find((tt) => tt.id === value);
             assignment.timeTableId = value;
             assignment.timeTableName = selectedTimeTable ? selectedTimeTable.name : '';
         } else {
-            (assignment as any)[field] = value;
+            assignment[field] = value;
         }
 
-        // Validate for overlapping date ranges
-        if (assignment.fromDate && assignment.toDate) {
-            const overlap = checkForOverlaps(assignment.id, assignment.fromDate, assignment.toDate);
-            if (overlap) {
-                alert('Time table assignments cannot have overlapping date ranges.');
-                return;
-            }
-        }
-
+        updatedAssignments[index] = assignment;
         setTimeTableAssignments(updatedAssignments);
     };
 
-    // Check for overlapping date ranges
-    const checkForOverlaps = (currentId: string, fromDate: string, toDate: string): boolean => {
-        const newFrom = new Date(fromDate);
-        const newTo = new Date(toDate);
+    // Check for overlapping date ranges between two assignments
+    const datesOverlap = (startA: string, endA: string, startB: string, endB: string): boolean => {
+        const startADate = new Date(startA);
+        const endADate = new Date(endA);
+        const startBDate = new Date(startB);
+        const endBDate = new Date(endB);
 
-        for (const assignment of timeTableAssignments) {
-            if (assignment.id === currentId) continue;
-
-            const existingFrom = new Date(assignment.fromDate);
-            const existingTo = new Date(assignment.toDate);
-
-            if (
-                (newFrom >= existingFrom && newFrom <= existingTo) ||
-                (newTo >= existingFrom && newTo <= existingTo) ||
-                (existingFrom >= newFrom && existingFrom <= newTo)
-            ) {
-                return true;
-            }
-        }
-        return false;
+        return startADate <= endBDate && endADate >= startBDate;
     };
 
     // Remove a time table assignment
@@ -206,112 +243,171 @@ const ProductionLines: React.FC = () => {
         <div className="admin-dashboard-content">
             <div className="production-lines-container">
                 <div className="header-banner">
-                    <h1 className="title">Production Lines</h1>
+                    <Typography variant="h4">Production Lines</Typography>
                 </div>
                 <div className="content-section">
-                    <div className="add-line-section">
-                        <button className="add-line-button" onClick={() => openModal()}>
-                            Add Production Line
-                        </button>
-                    </div>
-                    <div className="production-lines-list">
-                        <h2>Existing Lines</h2>
-                        <ul>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<Add />}
+                        onClick={() => openModal()}
+                    >
+                        Add Production Line
+                    </Button>
+                    <Paper sx={{ mt: 2 }}>
+                        <List>
                             {productionLines.map((line) => (
-                                <li key={line.id} className="line-item">
-                                    <span>{line.name}</span>
-                                    <button className="edit-button" onClick={() => openModal(line)}>Edit</button>
-                                </li>
+                                <React.Fragment key={line.id}>
+                                    <ListItem>
+                                        <ListItemText
+                                            primary={line.name}
+                                            secondary={line.description}
+                                        />
+                                        <ListItemSecondaryAction>
+                                            <IconButton edge="end" onClick={() => openModal(line)}>
+                                                <Edit />
+                                            </IconButton>
+                                        </ListItemSecondaryAction>
+                                    </ListItem>
+                                    <Divider />
+                                </React.Fragment>
                             ))}
-                        </ul>
-                    </div>
+                        </List>
+                    </Paper>
                 </div>
 
                 {/* Modal for adding or editing production line */}
-                {isModalOpen && (
-                    <div className="modal-overlay">
-                        <div className="modal-content modal-wide">
-                            <h2>{isEditMode ? 'Edit Production Line' : 'Add Production Line'}</h2>
-                            <label>
-                                Line Name:
-                                <input
-                                    type="text"
+                <Dialog
+                    open={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    maxWidth="md"
+                    fullWidth
+                >
+                    <DialogTitle>
+                        {isEditMode ? 'Edit Production Line' : 'Add Production Line'}
+                        <IconButton
+                            aria-label="close"
+                            onClick={() => setIsModalOpen(false)}
+                            sx={{ position: 'absolute', right: 8, top: 8 }}
+                        >
+                            <Close />
+                        </IconButton>
+                    </DialogTitle>
+                    <DialogContent>
+                        {error && <Typography color="error">{error}</Typography>}
+                        <Grid container spacing={2}>
+                            <Grid item xs={12}>
+                                <TextField
+                                    label="Line Name"
                                     value={lineName}
                                     onChange={(e) => setLineName(e.target.value)}
+                                    fullWidth
+                                    required
                                 />
-                            </label>
-                            <label>
-                                Description:
-                                <input
-                                    type="text"
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    label="Description"
                                     value={lineDescription}
                                     onChange={(e) => setLineDescription(e.target.value)}
+                                    fullWidth
+                                    required
                                 />
-                            </label>
+                            </Grid>
+                        </Grid>
 
-                            <h3>Time Table Assignments</h3>
-                            <button onClick={addTimeTableAssignment}>Add Time Table Assignment</button>
-                            {timeTableAssignments.map((assignment, index) => (
-                                <div key={assignment.id} className="assignment-item">
-                                    <label>
-                                        Time Table:
-                                        <select
-                                            value={assignment.timeTableId}
-                                            onChange={(e) =>
-                                                updateTimeTableAssignment(index, 'timeTableId', e.target.value)
-                                            }
-                                        >
-                                            <option value="">Select a Time Table</option>
-                                            {timeTables.map((tt) => (
-                                                <option key={tt.id} value={tt.id}>
-                                                    {tt.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </label>
-                                    <label>
-                                        From Date:
-                                        <input
+                        <Typography variant="h6" sx={{ mt: 4 }}>
+                            Time Table Assignments
+                        </Typography>
+                        <Button
+                            variant="outlined"
+                            startIcon={<Add />}
+                            onClick={addTimeTableAssignment}
+                            sx={{ mt: 1, mb: 2 }}
+                        >
+                            Add Time Table Assignment
+                        </Button>
+
+                        {timeTableAssignments.map((assignment, index) => (
+                            <Paper key={assignment.id} sx={{ p: 2, mb: 2 }}>
+                                <Grid container spacing={2} alignItems="center">
+                                    <Grid item xs={12} md={4}>
+                                        <FormControl fullWidth required>
+                                            <InputLabel>Time Table</InputLabel>
+                                            <Select
+                                                value={assignment.timeTableId}
+                                                onChange={(e) =>
+                                                    updateTimeTableAssignment(index, 'timeTableId', e.target.value)
+                                                }
+                                                label="Time Table"
+                                            >
+                                                <MenuItem value="">
+                                                    <em>Select a Time Table</em>
+                                                </MenuItem>
+                                                {timeTables.map((tt) => (
+                                                    <MenuItem key={tt.id} value={tt.id}>
+                                                        {tt.name}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
+                                    <Grid item xs={12} md={3}>
+                                        <TextField
+                                            label="From Date"
                                             type="date"
                                             value={assignment.fromDate}
                                             onChange={(e) =>
                                                 updateTimeTableAssignment(index, 'fromDate', e.target.value)
                                             }
+                                            InputLabelProps={{ shrink: true }}
+                                            fullWidth
+                                            required
                                         />
-                                    </label>
-                                    <label>
-                                        To Date:
-                                        <input
+                                    </Grid>
+                                    <Grid item xs={12} md={3}>
+                                        <TextField
+                                            label="To Date"
                                             type="date"
                                             value={assignment.toDate}
                                             onChange={(e) =>
                                                 updateTimeTableAssignment(index, 'toDate', e.target.value)
                                             }
+                                            InputLabelProps={{ shrink: true }}
+                                            fullWidth
+                                            required
                                         />
-                                    </label>
-                                    <button onClick={() => removeTimeTableAssignment(index)}>Remove</button>
-                                </div>
-                            ))}
+                                    </Grid>
+                                    <Grid item xs={12} md={2}>
+                                        <IconButton
+                                            color="error"
+                                            onClick={() => removeTimeTableAssignment(index)}
+                                        >
+                                            <Delete />
+                                        </IconButton>
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+                        ))}
 
-                            <div className="modal-buttons">
-                                <button className="save-btn" onClick={saveProductionLine}>
-                                    {isEditMode ? 'Save Changes' : 'Save'}
-                                </button>
-                                {isEditMode && (
-                                    <button
-                                        className="delete-btn"
-                                        onClick={() => deleteProductionLine(selectedLineId!)}
-                                    >
-                                        Delete
-                                    </button>
-                                )}
-                                <button className="cancel-btn" onClick={() => setIsModalOpen(false)}>
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                        <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+                            {isEditMode && selectedLineId && (
+                                <Button
+                                    variant="contained"
+                                    color="secondary"
+                                    onClick={() => deleteProductionLine(selectedLineId)}
+                                    startIcon={<Delete />}
+                                    sx={{ mr: 2 }}
+                                >
+                                    Delete
+                                </Button>
+                            )}
+                            <Button variant="contained" color="primary" onClick={saveProductionLine}>
+                                {isEditMode ? 'Save Changes' : 'Save'}
+                            </Button>
+                        </Box>
+                    </DialogContent>
+                </Dialog>
             </div>
         </div>
     );

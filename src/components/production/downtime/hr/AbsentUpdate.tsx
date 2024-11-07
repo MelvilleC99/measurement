@@ -1,8 +1,32 @@
-// AbsentUpdate.tsx
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, updateDoc, doc, Timestamp } from 'firebase/firestore';
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    Box,
+    TextField,
+    Button,
+    Alert,
+    IconButton,
+    Select,
+    MenuItem,
+    Typography,
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import {
+    collection,
+    getDocs,
+    query,
+    where,
+    updateDoc,
+    doc,
+    Timestamp,
+    getDoc
+} from 'firebase/firestore';
 import { db } from '../../../../firebase';
-import './AbsentUpdate.css';
+import { SupportFunction } from '../../../../types';
+import LateList from '../../../StandardDesign/list/LateList';
+import type { LateListItemData } from '../../../StandardDesign/list/LateList';
 
 interface AbsentUpdateProps {
     onClose: () => void;
@@ -14,21 +38,16 @@ interface AbsentUpdateProps {
 
 interface AbsentRecord {
     id: string;
+    date: Date;
     employeeId: string;
     employeeNumber: string;
     name: string;
     surname: string;
-    reason?: string;
-    startDate: Date;
-    endDate: Date;
-    returned: boolean;
-    returnDate?: Date;
-    productionLineId: string;
-    supervisorId: string;
-    comments?: string;
+    status: 'absent';
     updatedAt: Timestamp;
     updatedBy?: string;
-    sessionId: string;
+    comments?: string;
+    reason?: string;
 }
 
 const AbsentUpdate: React.FC<AbsentUpdateProps> = ({
@@ -40,46 +59,94 @@ const AbsentUpdate: React.FC<AbsentUpdateProps> = ({
                                                    }) => {
     const [absentRecords, setAbsentRecords] = useState<AbsentRecord[]>([]);
     const [selectedRecord, setSelectedRecord] = useState<AbsentRecord | null>(null);
-    const [supervisorPassword, setSupervisorPassword] = useState<string>('');
-    const [comments, setComments] = useState<string>('');
-    const [returnDate, setReturnDate] = useState<string>(new Date().toISOString().split('T')[0]);
-    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
+    const [additionalComments, setAdditionalComments] = useState<string>('');
+    const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>('');
+    const [password, setPassword] = useState<string>('');
     const [error, setError] = useState<string>('');
+    const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
+    const [supervisors, setSupervisors] = useState<SupportFunction[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
 
     useEffect(() => {
         fetchAbsentRecords();
+        fetchSupervisors();
     }, [sessionId]);
+
+    const fetchSupervisors = async () => {
+        try {
+            const supportFunctionsRef = collection(db, 'supportFunctions');
+            const q = query(
+                supportFunctionsRef,
+                where('role', '==', 'Supervisor'),
+                where('hasPassword', '==', true)
+            );
+            const querySnapshot = await getDocs(q);
+            const supervisorsList = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as SupportFunction));
+            setSupervisors(supervisorsList);
+        } catch (err) {
+            console.error('Error in fetchSupervisors:', err);
+            setError('Failed to fetch supervisors');
+        }
+    };
 
     const fetchAbsentRecords = async () => {
         try {
             setIsLoading(true);
             const absentQuery = query(
-                collection(db, 'absent'),
+                collection(db, 'attendance'), // Changed from 'absent' to 'attendance'
                 where('sessionId', '==', sessionId),
-                where('returned', '==', false)
+                where('type', '==', 'absent'), // Added filter for 'type'
+                where('status', '==', 'absent') // Added filter for 'status'
             );
-            const snapshot = await getDocs(absentQuery);
-            const records: AbsentRecord[] = snapshot.docs.map(doc => {
-                const data = doc.data();
+            const attendanceSnapshot = await getDocs(absentQuery);
+
+            // Get all employee IDs
+            const employeeIds = attendanceSnapshot.docs.map(doc => doc.data().employeeId);
+
+            if (employeeIds.length === 0) {
+                setAbsentRecords([]);
+                return;
+            }
+
+            // Get employee details from supportFunctions using document IDs
+            const employees = await Promise.all(
+                employeeIds.map(id => getDoc(doc(db, 'supportFunctions', id)))
+            );
+
+            // Create a map of employee details
+            const employeeMap = new Map();
+            employees.forEach(employeeDoc => {
+                if (employeeDoc.exists()) {
+                    const data = employeeDoc.data();
+                    employeeMap.set(employeeDoc.id, {
+                        employeeNumber: data.employeeNumber,
+                        name: data.name,
+                        surname: data.surname
+                    });
+                }
+            });
+
+            // Combine attendance and employee data
+            const records: AbsentRecord[] = attendanceSnapshot.docs.map(doc => {
+                const attendanceData = doc.data();
+                const employeeData = employeeMap.get(attendanceData.employeeId) || {};
+
                 return {
                     id: doc.id,
-                    employeeId: data.employeeId,
-                    employeeNumber: data.employeeNumber,
-                    name: data.name,
-                    surname: data.surname,
-                    reason: data.reason,
-                    startDate: data.startDate.toDate(),
-                    endDate: data.endDate.toDate(),
-                    returned: data.returned,
-                    returnDate: data.returnDate?.toDate(),
-                    productionLineId: data.productionLineId,
-                    supervisorId: data.supervisorId,
-                    comments: data.comments,
-                    updatedAt: data.updatedAt,
-                    updatedBy: data.updatedBy,
-                    sessionId: data.sessionId
-                };
+                    employeeId: attendanceData.employeeId,
+                    employeeNumber: employeeData.employeeNumber || 'Unknown',
+                    name: employeeData.name || 'Unknown',
+                    surname: employeeData.surname || 'Unknown',
+                    date: attendanceData.date.toDate(),
+                    status: 'absent',
+                    reason: attendanceData.reason,
+                    updatedAt: attendanceData.updatedAt,
+                    updatedBy: attendanceData.updatedBy,
+                    comments: attendanceData.comments
+                } as AbsentRecord;
             });
 
             setAbsentRecords(records);
@@ -91,79 +158,67 @@ const AbsentUpdate: React.FC<AbsentUpdateProps> = ({
         }
     };
 
-    const handleRecordSelect = (record: AbsentRecord) => {
-        setSelectedRecord(record);
-        setComments('');
-        setReturnDate(new Date().toISOString().split('T')[0]);
+    const formatAbsentRecords = (records: AbsentRecord[]): LateListItemData[] => {
+        return records.map(record => ({
+            id: record.id,
+            employeeNumber: record.employeeNumber,
+            name: record.name,
+            surname: record.surname,
+            status: 'Absent'
+        }));
     };
 
-    const validateDates = (returnDateStr: string, record: AbsentRecord): boolean => {
-        const returnDateObj = new Date(returnDateStr);
-        return returnDateObj >= record.startDate;
+    const handleListItemClick = (item: LateListItemData) => {
+        const record = absentRecords.find(r => r.id === item.id);
+        if (record) {
+            setSelectedRecord(record);
+            setAdditionalComments('');
+            setError('');
+            setShowPasswordModal(false);
+        }
     };
 
-    const verifySupervisor = async (): Promise<boolean> => {
+    const handleResolveClick = () => {
+        setShowPasswordModal(true);
+        setError('');
+    };
+
+    const handlePasswordSubmit = async () => {
+        if (!selectedRecord) return;
+
+        if (!selectedSupervisorId || !password) {
+            setError('Please select a supervisor and enter password');
+            return;
+        }
+
         try {
-            const supervisorSnapshot = await getDocs(query(
+            const supervisorQuery = query(
                 collection(db, 'supportFunctions'),
-                where('id', '==', supervisorId),
-                where('password', '==', supervisorPassword),
-                where('role', '==', 'Supervisor')
-            ));
+                where('employeeNumber', '==', selectedSupervisorId),
+                where('password', '==', password),
+                where('role', '==', 'Supervisor'),
+                where('hasPassword', '==', true)
+            );
 
-            return !supervisorSnapshot.empty;
-        } catch (err) {
-            console.error('Error verifying supervisor:', err);
-            return false;
-        }
-    };
+            const supervisorSnapshot = await getDocs(supervisorQuery);
 
-    const handleMarkReturned = () => {
-        if (!selectedRecord) {
-            setError('No record selected');
-            return;
-        }
-
-        if (!returnDate) {
-            setError('Please select a return date');
-            return;
-        }
-
-        if (!validateDates(returnDate, selectedRecord)) {
-            setError('Return date cannot be before start date');
-            return;
-        }
-
-        setIsConfirmModalOpen(true);
-    };
-
-    const handleConfirm = async () => {
-        try {
-            if (!selectedRecord || !returnDate) return;
-
-            const isSupervisorVerified = await verifySupervisor();
-            if (!isSupervisorVerified) {
-                setError('Invalid supervisor password');
+            if (supervisorSnapshot.empty) {
+                setError('Invalid supervisor credentials');
                 return;
             }
 
-            const recordRef = doc(db, 'absent', selectedRecord.id);
-            const updateData = {
-                returned: true,
-                returnDate: Timestamp.fromDate(new Date(returnDate)),
-                comments: comments || 'Marked as returned',
-                updatedAt: Timestamp.now(),
-                updatedBy: supervisorId
-            };
-
-            await updateDoc(recordRef, updateData);
+            await updateDoc(doc(db, 'attendance', selectedRecord.id), {
+                status: 'returned',
+                supervisorId: selectedSupervisorId,
+                comments: additionalComments || 'Marked as returned',
+                updatedAt: Timestamp.now()
+            });
 
             setSelectedRecord(null);
-            setSupervisorPassword('');
-            setComments('');
-            setReturnDate(new Date().toISOString().split('T')[0]);
-            setIsConfirmModalOpen(false);
-
+            setPassword('');
+            setSelectedSupervisorId('');
+            setAdditionalComments('');
+            setShowPasswordModal(false);
             await fetchAbsentRecords();
             onUpdate();
         } catch (err) {
@@ -172,182 +227,221 @@ const AbsentUpdate: React.FC<AbsentUpdateProps> = ({
         }
     };
 
-    const formatDate = (date: Date): string => {
-        return date.toLocaleDateString(undefined, {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
+    const handleClose = () => {
+        setShowPasswordModal(false);
+        setPassword('');
+        setSelectedSupervisorId('');
+        setError('');
     };
 
     if (isLoading) {
         return (
-            <div className="modal-overlay">
-                <div className="modal-content">
-                    <div className="loading-state">Loading...</div>
-                </div>
-            </div>
+            <Dialog open={true} maxWidth="md" fullWidth>
+                <DialogContent>
+                    <Box display="flex" justifyContent="center" p={3}>
+                        <div className="loading-spinner">Loading...</div>
+                    </Box>
+                </DialogContent>
+            </Dialog>
         );
     }
 
     return (
-        <div className="modal-overlay">
-            <div className="modal-content">
-                <div className="modal-header">
-                    <h2>Update Absent Records</h2>
-                    <button
-                        onClick={onClose}
-                        className="close-button"
-                        aria-label="Close"
-                    >
-                        ×
-                    </button>
-                </div>
+        <Dialog
+            open={true}
+            onClose={onClose}
+            maxWidth="md"
+            fullWidth
+            PaperProps={{
+                sx: {
+                    borderRadius: 2,
+                    width: '100%',
+                    maxWidth: '800px',
+                    m: 2
+                }
+            }}
+        >
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="h6" component="h2">
+                    {selectedRecord ? 'Update Absent Record' : 'Update Absent Records'}
+                </Typography>
+                <IconButton onClick={onClose} size="small">
+                    <CloseIcon />
+                </IconButton>
+            </DialogTitle>
 
-                {error && (
-                    <div className="error-message">
-                        {error}
-                        <button
-                            onClick={() => setError('')}
-                            className="error-dismiss"
-                            aria-label="Dismiss error"
-                        >
-                            ×
-                        </button>
-                    </div>
-                )}
+            <DialogContent>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-                {!selectedRecord ? (
-                    <div className="absent-records-list">
-                        {absentRecords.length === 0 ? (
-                            <div className="no-records">No absent records to display</div>
-                        ) : (
-                            absentRecords.map(record => (
-                                <div
-                                    key={record.id}
-                                    className="absent-record-item"
-                                    onClick={() => handleRecordSelect(record)}
-                                    role="button"
-                                    tabIndex={0}
+                    {!selectedRecord ? (
+                        <LateList
+                            items={formatAbsentRecords(absentRecords)}
+                            onItemClick={handleListItemClick}
+                            emptyMessage="No absent records to display"
+                        />
+                    ) : (
+                        <>
+                            <Box sx={{
+                                bgcolor: 'grey.50',
+                                p: 2,
+                                borderRadius: 1,
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: 2
+                            }}>
+                                <Box>
+                                    <Typography color="text.secondary" variant="body2">
+                                        Employee
+                                    </Typography>
+                                    <Typography>{selectedRecord.name} {selectedRecord.surname}</Typography>
+                                </Box>
+
+                                <Box>
+                                    <Typography color="text.secondary" variant="body2">
+                                        Employee #
+                                    </Typography>
+                                    <Typography>{selectedRecord.employeeNumber}</Typography>
+                                </Box>
+
+                                <Box>
+                                    <Typography color="text.secondary" variant="body2">
+                                        Date
+                                    </Typography>
+                                    <Typography>{selectedRecord.date.toLocaleDateString()}</Typography>
+                                </Box>
+
+                                {selectedRecord.reason && (
+                                    <Box sx={{ gridColumn: '1 / -1' }}>
+                                        <Typography color="text.secondary" variant="body2">
+                                            Reason
+                                        </Typography>
+                                        <Typography>{selectedRecord.reason}</Typography>
+                                    </Box>
+                                )}
+                            </Box>
+
+                            <TextField
+                                multiline
+                                rows={2}
+                                value={additionalComments}
+                                onChange={(e) => setAdditionalComments(e.target.value)}
+                                placeholder="Add resolution comments"
+                                fullWidth
+                                variant="outlined"
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        '& fieldset': {
+                                            borderRadius: 1
+                                        },
+                                        '& textarea': {
+                                            p: 1.5
+                                        }
+                                    }
+                                }}
+                            />
+
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 1 }}>
+                                <Button
+                                    onClick={handleResolveClick}
+                                    variant="contained"
+                                    sx={{
+                                        minWidth: 200,
+                                        py: 1.5,
+                                        textTransform: 'none',
+                                        fontSize: '1rem'
+                                    }}
                                 >
-                                    <div className="record-header">
-                                        <h3>{record.name} {record.surname}</h3>
-                                        <span className="employee-number">
-                                            {record.employeeNumber}
-                                        </span>
-                                    </div>
-                                    <div className="record-details">
-                                        <p>Start Date: {formatDate(record.startDate)}</p>
-                                        <p>Expected Return: {formatDate(record.endDate)}</p>
-                                        {record.reason && (
-                                            <p>Reason: {record.reason}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                ) : (
-                    <div className="update-section">
-                        <div className="selected-record-info">
-                            <h3>{selectedRecord.name} {selectedRecord.surname}</h3>
-                            <p>Employee #: {selectedRecord.employeeNumber}</p>
-                            <p>Start Date: {formatDate(selectedRecord.startDate)}</p>
-                            <p>Expected Return: {formatDate(selectedRecord.endDate)}</p>
-                            {selectedRecord.reason && (
-                                <p>Reason: {selectedRecord.reason}</p>
-                            )}
-                        </div>
+                                    Mark as Returned
+                                </Button>
+                            </Box>
+                        </>
+                    )}
+                </Box>
+            </DialogContent>
 
-                        <div className="return-form">
-                            <div className="form-group">
-                                <label htmlFor="returnDate">Return Date:</label>
-                                <input
-                                    id="returnDate"
-                                    type="date"
-                                    value={returnDate}
-                                    onChange={(e) => setReturnDate(e.target.value)}
-                                    min={selectedRecord.startDate.toISOString().split('T')[0]}
-                                    required
-                                    className="form-input"
-                                />
-                            </div>
+            {/* Supervisor Verification Modal */}
+            {showPasswordModal && (
+                <Dialog
+                    open={true}
+                    onClose={handleClose}
+                    maxWidth="xs"
+                    fullWidth
+                    PaperProps={{ sx: { borderRadius: 2, p: 1 } }}
+                >
+                    <DialogTitle sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                    }}>
+                        Supervisor Verification
+                        <IconButton onClick={handleClose} size="small">
+                            <CloseIcon />
+                        </IconButton>
+                    </DialogTitle>
 
-                            <div className="form-group">
-                                <label htmlFor="comments">Comments:</label>
-                                <textarea
-                                    id="comments"
-                                    value={comments}
-                                    onChange={(e) => setComments(e.target.value)}
-                                    placeholder="Add any comments about the return..."
-                                    className="form-textarea"
-                                />
-                            </div>
+                    <DialogContent>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
+                            {error && <Alert severity="error">{error}</Alert>}
 
-                            <button
-                                onClick={handleMarkReturned}
-                                className="return-button"
+                            <Select
+                                value={selectedSupervisorId}
+                                onChange={(e) => setSelectedSupervisorId(e.target.value)}
+                                displayEmpty
+                                fullWidth
+                                sx={{
+                                    borderRadius: 1,
+                                    '& .MuiSelect-select': { py: 1.5 }
+                                }}
                             >
-                                Mark as Returned
-                            </button>
-                        </div>
+                                <MenuItem value="" disabled>
+                                    Select supervisor
+                                </MenuItem>
+                                {supervisors.map((supervisor) => (
+                                    <MenuItem
+                                        key={supervisor.id}
+                                        value={supervisor.employeeNumber}
+                                    >
+                                        {`${supervisor.name} ${supervisor.surname}`}
+                                    </MenuItem>
+                                ))}
+                            </Select>
 
-                        <button
-                            onClick={() => setSelectedRecord(null)}
-                            className="back-button"
-                        >
-                            Back to List
-                        </button>
-                    </div>
-                )}
+                            <TextField
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="Enter password"
+                                fullWidth
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        borderRadius: 1,
+                                        '& input': { py: 1.5, px: 1.5 }
+                                    }
+                                }}
+                            />
 
-                {isConfirmModalOpen && selectedRecord && (
-                    <div className="confirmation-modal">
-                        <div className="confirmation-content">
-                            <h3>Confirm Return</h3>
-
-                            <div className="confirmation-details">
-                                <p>
-                                    <strong>Employee:</strong> {selectedRecord.name} {selectedRecord.surname}
-                                </p>
-                                <p>
-                                    <strong>Return Date:</strong> {formatDate(new Date(returnDate))}
-                                </p>
-                            </div>
-
-                            <div className="form-group">
-                                <label htmlFor="supervisorPassword">
-                                    Supervisor Password:
-                                </label>
-                                <input
-                                    id="supervisorPassword"
-                                    type="password"
-                                    value={supervisorPassword}
-                                    onChange={(e) => setSupervisorPassword(e.target.value)}
-                                    required
-                                    className="form-input"
-                                />
-                            </div>
-
-                            <div className="confirmation-buttons">
-                                <button
-                                    onClick={handleConfirm}
-                                    className="confirm-button"
-                                >
-                                    Confirm
-                                </button>
-                                <button
-                                    onClick={() => setIsConfirmModalOpen(false)}
-                                    className="cancel-button"
+                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', pt: 2 }}>
+                                <Button
+                                    onClick={handleClose}
+                                    variant="outlined"
+                                    sx={{ minWidth: 100, textTransform: 'none' }}
                                 >
                                     Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
+                                </Button>
+                                <Button
+                                    onClick={handlePasswordSubmit}
+                                    variant="contained"
+                                    sx={{ minWidth: 100, textTransform: 'none' }}
+                                >
+                                    Confirm
+                                </Button>
+                            </Box>
+                        </Box>
+                    </DialogContent>
+                </Dialog>
+            )}
+        </Dialog>
     );
 };
 

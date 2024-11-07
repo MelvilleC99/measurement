@@ -1,4 +1,4 @@
-// ProductionBoard.tsx
+// src/components/production/productionboard/ProductionBoard.tsx
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -14,12 +14,13 @@ import {
     increment,
 } from 'firebase/firestore';
 import { db } from '../../../firebase';
-import LoginManager from '../productionboard/components/LoginManager';
-import ProductionTracking from '../productionboard/components/ProductionTracking';
-import RecordEvents from '../productionboard/components/RecordEvents';
-import DowntimeTracking from '../productionboard/components/DowntimeTracking';
-import MetricsCounter from '../productionboard/components/MetricsCounter';
-import { SessionData } from '../../../types';
+import LoginManager from './components/LoginManager';
+import ProductionTracking from './components/ProductionTracking';
+import RecordEvents from './components/RecordEvents';
+import DowntimeTracking from './components/DowntimeTracking';
+import MetricsCounter from './components/MetricsCounter';
+import Overtime from './components/Overtime'; // Import Overtime component
+import { SessionData, OvertimeSchedule } from '../../../types';
 import './ProductionBoard.css';
 
 interface MetricsState {
@@ -49,10 +50,12 @@ const ProductionBoard: React.FC = () => {
         absent: 0,
     });
     const [error, setError] = useState<string>('');
+    const [overtimeSchedule, setOvertimeSchedule] = useState<OvertimeSchedule | null>(null);
+    const [isOvertimeModalOpen, setIsOvertimeModalOpen] = useState<boolean>(false);
 
-    // Fetch actual names when session data changes
+    // Fetch actual names and overtime schedule when session data changes
     useEffect(() => {
-        const fetchNames = async () => {
+        const fetchData = async () => {
             if (!sessionData) return;
 
             try {
@@ -82,14 +85,52 @@ const ProductionBoard: React.FC = () => {
                     supervisorName,
                     styleName,
                 });
+
+                // Fetch overtime schedule
+                await fetchOvertimeSchedule(sessionData.lineId);
             } catch (err) {
                 console.error('Error fetching names:', err);
                 setError('Failed to load detail names');
             }
         };
 
-        fetchNames();
+        fetchData();
     }, [sessionData]);
+
+    const fetchOvertimeSchedule = async (lineId: string) => {
+        try {
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+
+            console.log('Fetching overtime schedule for lineId:', lineId);
+            console.log("Today's date:", todayStr);
+
+            const overtimeQuery = query(
+                collection(db, 'overtimeSchedules'),
+                where('productionLineIds', 'array-contains', lineId),
+                where('startDate', '<=', todayStr),
+                where('endDate', '>=', todayStr)
+            );
+
+            const overtimeSnapshot = await getDocs(overtimeQuery);
+
+            if (!overtimeSnapshot.empty) {
+                const overtimeDoc = overtimeSnapshot.docs[0];
+                const overtimeData = overtimeDoc.data() as Omit<OvertimeSchedule, 'id'>;
+
+                setOvertimeSchedule({
+                    id: overtimeDoc.id,
+                    ...overtimeData,
+                });
+                console.log('Overtime schedule found:', overtimeData);
+            } else {
+                setOvertimeSchedule(null);
+                console.log('No overtime schedule for today.');
+            }
+        } catch (error) {
+            console.error('Error fetching overtime schedule:', error);
+        }
+    };
 
     const handleUnitProduced = async (
         slotId: string,
@@ -178,11 +219,60 @@ const ProductionBoard: React.FC = () => {
                 late: 0,
                 absent: 0,
             });
+            setOvertimeSchedule(null); // Reset overtime schedule
             console.log('Shift ended and state reset');
         } catch (error) {
             console.error('Error ending shift:', error);
             setError('Failed to end shift');
         }
+    };
+
+    const handleStartOvertime = () => {
+        setIsOvertimeModalOpen(true);
+    };
+
+    const handleOvertimeConfirm = async (newTarget: number) => {
+        setIsOvertimeModalOpen(false);
+
+        if (!sessionData || !overtimeSchedule) return;
+
+        try {
+            // Create new overtime session
+            const sessionRef = await addDoc(collection(db, 'activeSessions'), {
+                lineId: sessionData.lineId,
+                supervisorId: sessionData.supervisorId,
+                styleId: sessionData.styleId,
+                target: newTarget,
+                timeTableId: overtimeSchedule.timeTableId,
+                startTime: Timestamp.now(),
+                isActive: true,
+                isOvertime: true,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now(),
+            });
+
+            const newOvertimeSession: SessionData = {
+                sessionId: sessionRef.id,
+                lineId: sessionData.lineId,
+                supervisorId: sessionData.supervisorId,
+                styleId: sessionData.styleId,
+                target: newTarget,
+                timeTableId: overtimeSchedule.timeTableId,
+                startTime: Timestamp.now(),
+                isActive: true,
+                isOvertime: true,
+            };
+
+            setSessionData(newOvertimeSession);
+            console.log('Overtime session started with ID:', sessionRef.id);
+        } catch (error) {
+            console.error('Error starting overtime session:', error);
+            setError('Failed to start overtime session.');
+        }
+    };
+
+    const handleOvertimeCancel = () => {
+        setIsOvertimeModalOpen(false);
     };
 
     return (
@@ -210,6 +300,11 @@ const ProductionBoard: React.FC = () => {
                             <button className="end-shift-button" onClick={handleEndShift}>
                                 End Shift
                             </button>
+                            {overtimeSchedule && !sessionData.isOvertime && (
+                                <button className="start-overtime-button" onClick={handleStartOvertime}>
+                                    Start Overtime
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -258,6 +353,11 @@ const ProductionBoard: React.FC = () => {
                             {error}
                             <button onClick={() => setError('')}>✕</button>
                         </div>
+                    )}
+
+                    {/* Overtime Modal */}
+                    {isOvertimeModalOpen && (
+                        <Overtime onConfirm={handleOvertimeConfirm} onCancel={handleOvertimeCancel} />
                     )}
                 </div>
             )}
