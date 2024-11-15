@@ -1,8 +1,9 @@
-// src/components/dashboards/Dashboard.tsx
-
 import React from 'react';
-import { Link, useNavigate, Outlet } from 'react-router-dom';
+import { Link, useNavigate, Outlet, Routes, Route } from 'react-router-dom';
 import './Dashboard.css';
+import LiveProductionDashboard from './LiveProduction/LiveProductionDashboard';
+import FactoryDashboard from './Factory/factoryDashboard';
+import TestDash from './Factory/TestDash'; // Step 1: Import TestDash
 
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
@@ -13,7 +14,6 @@ const Dashboard: React.FC = () => {
 
     return (
         <div className="dashboard-container">
-            {/* Banner */}
             <header className="dashboard-banner">
                 <button className="return-button" onClick={handleReturn}>
                     &larr; Return
@@ -21,25 +21,46 @@ const Dashboard: React.FC = () => {
                 <h1 className="dashboard-heading">Analytics Dashboard</h1>
             </header>
 
-            {/* Sidebar and Main Content Area */}
             <div className="dashboard-sidebar">
-                {/* Sidebar */}
                 <aside>
                     <h2 className="sidebar-title">Dashboards</h2>
                     <ul className="sidebar-menu">
-                        <li className="sidebar-item"><Link to="/analytics/maintenance">Maintenance</Link></li>
-                        <li className="sidebar-item"><Link to="/analytics/quality">Quality</Link></li>
-                        <li className="sidebar-item"><Link to="/analytics/production">Production</Link></li>
-                        <li className="sidebar-item"><Link to="/analytics/downtime">Downtime</Link></li>
-                        <li className="sidebar-item"><Link to="/analytics/style-change-over">Style Change Over</Link></li>
-                        <li className="sidebar-item"><Link to="/analytics/financial">Financial</Link></li>
-                        <li className="sidebar-item"><Link to="/analytics/hr">HR</Link></li>
+                        <li className="sidebar-item">
+                            <Link to="/analytics/maintenance">Maintenance</Link>
+                        </li>
+                        <li className="sidebar-item">
+                            <Link to="/analytics/quality">Quality</Link>
+                        </li>
+                        <li className="sidebar-item">
+                            <Link to="/analytics/live-production">Live Production</Link>
+                        </li>
+                        <li className="sidebar-item">
+                            <Link to="/analytics/factory">Factory</Link>
+                        </li>
+                        <li className="sidebar-item">
+                            <Link to="/analytics/downtime">Downtime</Link>
+                        </li>
+                        <li className="sidebar-item">
+                            <Link to="/analytics/style-change-over">Style Change Over</Link>
+                        </li>
+                        <li className="sidebar-item">
+                            <Link to="/analytics/financial">Financial</Link>
+                        </li>
+                        <li className="sidebar-item">
+                            <Link to="/analytics/hr">HR</Link>
+                        </li>
+                        <li className="sidebar-item">
+                            <Link to="/analytics/test">Test Dashboard</Link> {/* Step 2: Add Test Dashboard link */}
+                        </li>
                     </ul>
                 </aside>
 
-                {/* Main Content Area */}
                 <main className="dashboard-main">
-                    <Outlet />
+                    <Routes>
+                        <Route path="live-production" element={<LiveProductionDashboard />} />
+                        <Route path="factory" element={<FactoryDashboard />} />
+                        <Route path="test" element={<TestDash />} /> {/* Step 3: Add route for TestDash */}
+                    </Routes>
                 </main>
             </div>
         </div>

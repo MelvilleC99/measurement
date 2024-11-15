@@ -1,5 +1,3 @@
-// src/components/ProductionSchedule.tsx
-
 import React, { useState, useEffect } from 'react';
 import './ProductionSchedule.css';
 import { db } from '../../firebase';
@@ -11,7 +9,11 @@ import {
     doc,
     addDoc,
 } from 'firebase/firestore';
-import { ScheduledStyle, Style, ProductionLine } from '../../types';
+import {
+    ScheduledStyle,
+    Style,
+    ProductionLine,
+} from '../../types';
 
 const ProductionSchedule: React.FC = () => {
     const [productionLines, setProductionLines] = useState<ProductionLine[]>([]);
@@ -24,34 +26,56 @@ const ProductionSchedule: React.FC = () => {
     const [selectedLine, setSelectedLine] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [showStyleSelector, setShowStyleSelector] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    // Fetch production lines and styles from Firestore
     useEffect(() => {
-        fetchProductionLines();
-        fetchScheduledStyles();
-        fetchStyles();
+        fetchInitialData();
     }, []);
+
+    const fetchInitialData = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            await Promise.all([
+                fetchProductionLines(),
+                fetchScheduledStyles(),
+                fetchStyles()
+            ]);
+        } catch (error) {
+            console.error('Error fetching initial data:', error);
+            setError('Failed to load initial data. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const fetchProductionLines = async () => {
         try {
             const linesSnapshot = await getDocs(collection(db, 'productionLines'));
-            // @ts-ignore
             const linesList: ProductionLine[] = linesSnapshot.docs.map((doc) => {
                 const data = doc.data();
                 return {
                     id: doc.id,
                     name: data.name,
-                    description: data.description,
+                    description: data.description || '',
                     active: data.active || false,
                     currentStyle: data.currentStyle,
                     createdAt: data.createdAt,
                     updatedAt: data.updatedAt,
-                    assignedTimeTable: data.assignedTimeTable || '',
+                    timeTableAssignments: (data.timeTableAssignments || []).map((assignment: any) => ({
+                        id: assignment.id,
+                        timeTableId: assignment.timeTableId,
+                        timeTableName: assignment.timeTableName,
+                        fromDate: assignment.fromDate,
+                        toDate: assignment.toDate
+                    }))
                 };
             });
             setProductionLines(linesList);
         } catch (error) {
             console.error('Error fetching production lines:', error);
+            throw error;
         }
     };
 
@@ -66,8 +90,8 @@ const ProductionSchedule: React.FC = () => {
                     styleNumber: data.styleNumber,
                     lineId: data.lineId,
                     onLineDate: data.onLineDate,
-                    offLineDate: data.offLineDate,
-                    expectedDeliveryDate: data.expectedDeliveryDate,
+                    offLineDate: data.offLineDate || '',
+                    expectedDeliveryDate: data.expectedDeliveryDate || '',
                     deliveryDate: data.deliveryDate,
                     status: data.status,
                 };
@@ -75,6 +99,7 @@ const ProductionSchedule: React.FC = () => {
             setScheduledStyles(stylesList);
         } catch (error) {
             console.error('Error fetching scheduled styles:', error);
+            throw error;
         }
     };
 
@@ -85,69 +110,110 @@ const ProductionSchedule: React.FC = () => {
                 const data = doc.data();
                 return {
                     id: doc.id,
-                    styleName: data.styleName,
                     styleNumber: data.styleNumber,
+                    styleName: data.styleName,
                     description: data.description,
                     unitsInOrder: data.unitsInOrder,
                     deliveryDate: data.deliveryDate,
-                    hourlyTarget: data.hourlyTarget || 0,
+                    hourlyTarget: data.hourlyTarget,
                     createdAt: data.createdAt,
                     updatedAt: data.updatedAt,
                     unitsProduced: data.unitsProduced || 0,
                     customer: data.customer || '',
                     smv: data.smv || 0,
-                    status: data.status,
+                    status: data.status
                 };
             });
             setStyles(stylesList);
         } catch (error) {
             console.error('Error fetching styles:', error);
+            throw error;
         }
     };
 
-    // Open modal to schedule a style
     const openModal = () => {
         setShowStyleSelector(true);
         setIsModalOpen(true);
+        setError(null);
     };
 
-    // Save the scheduled style to Firestore
+    const handleSelectStyle = (styleId: string) => {
+        const selected = styles.find((style) => style.id === styleId);
+        if (selected) {
+            const newScheduledStyle: ScheduledStyle = {
+                id: '',
+                styleName: selected.styleName,
+                styleNumber: selected.styleNumber,
+                lineId: '',
+                onLineDate: '',
+                offLineDate: '',
+                expectedDeliveryDate: '',
+                deliveryDate: selected.deliveryDate,
+                status: 'unscheduled'
+            };
+            setSelectedStyle(newScheduledStyle);
+            setShowStyleSelector(false);
+        }
+    };
+
     const handleSaveStyleToLine = async () => {
-        if (
-            !selectedLine ||
-            !onLineDate ||
-            !offLineDate ||
-            !expectedDeliveryDate ||
-            !selectedStyle
-        ) {
-            alert('Please fill out all fields.');
+        if (!selectedStyle || !selectedLine || !onLineDate) {
+            alert('Please fill out all required fields.');
             return;
         }
 
-        const updatedFields: Omit<ScheduledStyle, 'id'> = {
-            styleName: selectedStyle.styleName,
-            styleNumber: selectedStyle.styleNumber,
-            lineId: selectedLine,
-            onLineDate: onLineDate,
-            offLineDate: offLineDate,
-            expectedDeliveryDate: expectedDeliveryDate,
-            deliveryDate: selectedStyle.deliveryDate,
-            status: 'scheduled',
-        };
-
         try {
-            if (selectedStyle.status === 'unscheduled') {
-                // Add new scheduled style
-                await addDoc(collection(db, 'scheduledStyles'), updatedFields);
+            const scheduleData = {
+                deliveryDate: selectedStyle.deliveryDate,
+                lineId: selectedLine,
+                onLineDate: onLineDate,
+                status: "scheduled",
+                styleName: selectedStyle.styleName,
+                styleNumber: selectedStyle.styleNumber
+            };
+
+            if (!selectedStyle.id || selectedStyle.status === 'unscheduled') {
+                await addDoc(collection(db, 'scheduledStyles'), scheduleData);
             } else {
-                // Update existing scheduled style
-                await updateDoc(doc(db, 'scheduledStyles', selectedStyle.id), updatedFields);
+                await updateDoc(doc(db, 'scheduledStyles', selectedStyle.id), scheduleData);
             }
-            fetchScheduledStyles();
+
+            await fetchScheduledStyles();
             closeModal();
         } catch (error) {
-            console.error('Error updating the scheduled style:', error);
-            alert('An error occurred while updating the scheduled style.');
+            console.error('Error saving schedule:', error);
+            alert('Error saving schedule: ' + (error as Error).message);
+        }
+    };
+
+    const handleEditStyle = (style: ScheduledStyle) => {
+        setSelectedStyle(style);
+        setSelectedLine(style.lineId);
+        setOnLineDate(style.onLineDate);
+        setOffLineDate(style.offLineDate);
+        setExpectedDeliveryDate(style.expectedDeliveryDate);
+        setShowStyleSelector(false);
+        setIsModalOpen(true);
+        setError(null);
+    };
+
+    const handleDeleteStyle = async (styleId: string) => {
+        if (!window.confirm('Are you sure you want to remove this scheduled style?')) {
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            await deleteDoc(doc(db, 'scheduledStyles', styleId));
+            await fetchScheduledStyles();
+            closeModal();
+        } catch (error) {
+            console.error('Error deleting scheduled style:', error);
+            setError('Failed to delete the scheduled style. Please try again.');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -158,56 +224,25 @@ const ProductionSchedule: React.FC = () => {
         setOnLineDate('');
         setOffLineDate('');
         setExpectedDeliveryDate('');
+        setError(null);
     };
 
-    // Handle clicking on an existing scheduled style for editing
-    const handleEditStyle = (style: ScheduledStyle) => {
-        setSelectedStyle(style);
-        setSelectedLine(style.lineId);
-        setOnLineDate(style.onLineDate);
-        setOffLineDate(style.offLineDate);
-        setExpectedDeliveryDate(style.expectedDeliveryDate);
-        setShowStyleSelector(false); // Now switching to "edit" mode
-        setIsModalOpen(true);
-    };
-
-    // Handle selecting a new style to schedule
-    const handleSelectStyle = (styleId: string) => {
-        const selected = styles.find((style) => style.id === styleId);
-        if (selected) {
-            const newScheduledStyle: ScheduledStyle = {
-                id: '', // Will be set by Firestore when adding a new document
-                styleName: selected.styleName,
-                styleNumber: selected.styleNumber,
-                lineId: '',
-                onLineDate: '',
-                offLineDate: '',
-                expectedDeliveryDate: '',
-                deliveryDate: selected.deliveryDate,
-                status: 'unscheduled',
-            };
-            setSelectedStyle(newScheduledStyle);
-            setShowStyleSelector(false);
-        }
-    };
-
-    // Handle deleting a scheduled style
-    const handleDeleteStyle = async (styleId: string) => {
-        try {
-            await deleteDoc(doc(db, 'scheduledStyles', styleId));
-            fetchScheduledStyles(); // Refresh after delete
-            closeModal();
-        } catch (error) {
-            console.error('Error deleting scheduled style:', error);
-            alert('An error occurred while deleting the scheduled style.');
-        }
-    };
+    if (isLoading && !isModalOpen) {
+        return <div className="loading">Loading...</div>;
+    }
 
     return (
         <div className="production-schedule-container">
             <div className="toolbar">
-                <button onClick={openModal}>Schedule Style</button>
+                <button onClick={openModal} disabled={isLoading}>
+                    Schedule Style
+                </button>
             </div>
+
+            {error && !isModalOpen && (
+                <div className="error-message">{error}</div>
+            )}
+
             <div className="schedule-list">
                 <h2>Scheduled Styles</h2>
                 {productionLines.length === 0 ? (
@@ -225,7 +260,10 @@ const ProductionSchedule: React.FC = () => {
                                             className="style-block"
                                             onClick={() => handleEditStyle(style)}
                                         >
-                                            {style.styleNumber}
+                                            <span className="style-number">{style.styleNumber}</span>
+                                            <span className="style-dates">
+                                                {style.onLineDate}
+                                            </span>
                                         </div>
                                     ))}
                             </div>
@@ -237,12 +275,17 @@ const ProductionSchedule: React.FC = () => {
             {isModalOpen && (
                 <div className="modal-overlay">
                     <div className="modal-content">
+                        {error && (
+                            <div className="error-message">{error}</div>
+                        )}
+
                         {showStyleSelector ? (
                             <>
                                 <h2>Select Style to Schedule</h2>
                                 <select
                                     onChange={(e) => handleSelectStyle(e.target.value)}
                                     defaultValue=""
+                                    disabled={isLoading}
                                 >
                                     <option value="" disabled>
                                         Select a Style
@@ -253,7 +296,9 @@ const ProductionSchedule: React.FC = () => {
                                         </option>
                                     ))}
                                 </select>
-                                <button onClick={closeModal}>Cancel</button>
+                                <button onClick={closeModal} disabled={isLoading}>
+                                    Cancel
+                                </button>
                             </>
                         ) : (
                             <>
@@ -278,6 +323,7 @@ const ProductionSchedule: React.FC = () => {
                                     <select
                                         value={selectedLine || ''}
                                         onChange={(e) => setSelectedLine(e.target.value)}
+                                        disabled={isLoading}
                                     >
                                         <option value="">Select a Line</option>
                                         {productionLines.map((line) => (
@@ -292,33 +338,31 @@ const ProductionSchedule: React.FC = () => {
                                         type="date"
                                         value={onLineDate}
                                         onChange={(e) => setOnLineDate(e.target.value)}
+                                        disabled={isLoading}
                                     />
 
-                                    <label>Off Line Date:</label>
-                                    <input
-                                        type="date"
-                                        value={offLineDate}
-                                        onChange={(e) => setOffLineDate(e.target.value)}
-                                    />
-
-                                    <label>Expected Delivery Date:</label>
-                                    <input
-                                        type="date"
-                                        value={expectedDeliveryDate}
-                                        onChange={(e) => setExpectedDeliveryDate(e.target.value)}
-                                    />
-                                </div>
-
-                                <div className="modal-buttons">
-                                    <button onClick={handleSaveStyleToLine}>Save</button>
-                                    {selectedStyle?.status === 'scheduled' && selectedStyle.id && (
+                                    <div className="modal-buttons">
                                         <button
-                                            onClick={() => handleDeleteStyle(selectedStyle.id)}
+                                            onClick={handleSaveStyleToLine}
+                                            disabled={isLoading}
                                         >
-                                            Remove
+                                            {isLoading ? 'Saving...' : 'Save'}
                                         </button>
-                                    )}
-                                    <button onClick={closeModal}>Cancel</button>
+                                        {selectedStyle?.status === 'scheduled' && selectedStyle.id && (
+                                            <button
+                                                onClick={() => handleDeleteStyle(selectedStyle.id)}
+                                                disabled={isLoading}
+                                            >
+                                                {isLoading ? 'Removing...' : 'Remove'}
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={closeModal}
+                                            disabled={isLoading}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
                                 </div>
                             </>
                         )}

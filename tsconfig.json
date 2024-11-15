@@ -13,7 +13,9 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true, // Set to false if you need TypeScript to emit output files
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "types": ["recharts"] // Added to include Recharts types
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["node_modules"]
 }

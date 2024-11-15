@@ -13,31 +13,38 @@ import ProductionBoard from './components/production/productionboard/ProductionB
 import ProductionBoardViewer from './components/production/ProductionBoardViewer';
 import Dashboard from './components/dashboards/Dashboard';
 import DowntimeDashboard from './components/dashboards/DowntimeDashboard';
-import './App.css';
+import LiveProductionDashboard from './components/dashboards/LiveProduction/LiveProductionDashboard';
+import FactoryDashboard from "./components/dashboards/Factory/factoryDashboard";
+import TestDash from "./components/dashboards/Factory/TestDash"; // Step 1: Import TestDash
 
 const App: React.FC = () => {
     return (
         <Router>
-            <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/admin/timetables" element={<TimeTables />} />
-                <Route path="/admin/workdays" element={<WorkDays />} />
-                <Route path="/admin/add-lines" element={<ProductionLines />} />
-                <Route path="/admin/production-schedule" element={<ProductionSchedule />} />
-                <Route path="/admin/downtime" element={<DowntimePage />} />
-                <Route path="/admin/support-functions" element={<SupportFunctions />} />
-                <Route path="/admin/machine-list" element={<MachineList />} />
+            <div className="min-h-screen bg-background text-foreground">
+                <Routes>
+                    <Route path="/" element={<LandingPage />} />
+                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/admin/timetables" element={<TimeTables />} />
+                    <Route path="/admin/workdays" element={<WorkDays />} />
+                    <Route path="/admin/add-lines" element={<ProductionLines />} />
+                    <Route path="/admin/production-schedule" element={<ProductionSchedule />} />
+                    <Route path="/admin/downtime" element={<DowntimePage />} />
+                    <Route path="/admin/support-functions" element={<SupportFunctions />} />
+                    <Route path="/admin/machine-list" element={<MachineList />} />
 
-                {/* Updated Production routes */}
-                <Route path="/active-line" element={<ProductionBoard />} />
-                <Route path="/production-board" element={<ProductionBoardViewer />} />
+                    {/* Production routes */}
+                    <Route path="/active-line" element={<ProductionBoard />} />
+                    <Route path="/production-board" element={<ProductionBoardViewer />} />
 
-                {/* Dashboard routes */}
-                <Route path="/analytics" element={<Dashboard />}>
-                    <Route path="downtime" element={<DowntimeDashboard />} />
-                </Route>
-            </Routes>
+                    {/* Dashboard routes */}
+                    <Route path="/analytics" element={<Dashboard />}>
+                        <Route path="downtime" element={<DowntimeDashboard />} />
+                        <Route path="live-production" element={<LiveProductionDashboard />} />
+                        <Route path="factory" element={<FactoryDashboard />} />
+                        <Route path="test" element={<TestDash />} /> {/* Step 2: Add route for TestDash */}
+                    </Route>
+                </Routes>
+            </div>
         </Router>
     );
 };

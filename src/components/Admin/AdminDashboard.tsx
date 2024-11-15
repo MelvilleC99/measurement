@@ -1,7 +1,23 @@
-// src/components/Admin/AdminDashboard.tsx
-
 import React, { useState } from 'react';
-import './AdminDashboard.css';
+import {
+    AppBar,
+    Toolbar,
+    Typography,
+    List,
+    ListItem,
+    ListItemText,
+    IconButton,
+    CssBaseline,
+    Box,
+    ThemeProvider,
+    createTheme,
+    Paper,
+    Button as MuiButton,
+} from '@mui/material';
+import { styled } from '@mui/material/styles';
+import { ArrowBack as ArrowBackIcon, Close as CloseIcon } from '@mui/icons-material';
+
+// Import your components
 import ProductionLines from './ProductionLines';
 import TimeTables from './TimeTables';
 import WorkDays from './Workdays';
@@ -10,9 +26,79 @@ import MachineList from './MachineList';
 import ProductionSchedule from './ProductionSchedule';
 import Downtime from './DownTime';
 import StyleCard from './StyleCard';
-import ProductHierarchyList from './ProductHierarchyList'; // Import the existing component
-import ScheduleOvertime from './ScheduleOvertime'; // Import the ScheduleOvertime component
-import TestSchedule from './TestSchedule'; // Import the TestSchedule component
+import ProductHierarchyList from './ProductHierarchyList';
+import ScheduleOvertime from './ScheduleOvertime';
+import TestSchedule from './TestSchedule';
+import ComponentTest from './ComponentTest';
+import SubAssemblies from './SubAssemblies'; // Import SubAssemblies
+
+// Define your custom theme
+const theme = createTheme({
+    palette: {
+        primary: {
+            main: '#082f49',
+        },
+        background: {
+            default: '#f5f5f5',
+        },
+    },
+});
+
+// Styled components for layout
+const PageContainer = styled(Box)({
+    minHeight: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+});
+
+const ContentContainer = styled(Box)({
+    display: 'flex',
+    flex: 1,
+    overflow: 'hidden',
+});
+
+const MenuList = styled(List)({
+    width: '250px',
+    borderRight: '1px solid rgba(0, 0, 0, 0.12)',
+    overflowY: 'auto',
+    backgroundColor: '#f5f5f5',
+    padding: '16px 0',
+});
+
+const ContentArea = styled(Box)(({ theme }) => ({
+    flex: 1,
+    padding: theme.spacing(3),
+    overflowY: 'auto',
+}));
+
+const StyledPaper = styled(Paper)(({ theme }) => ({
+    height: '100%',
+    position: 'relative',
+    padding: theme.spacing(3),
+}));
+
+const CloseButton = styled(IconButton)({
+    position: 'absolute',
+    right: 8,
+    top: 8,
+});
+
+// Define your menu items (including SubAssemblies)
+const menuItems = [
+    { id: 'ProductionLines', label: 'Add Production Lines' },
+    { id: 'TimeTables', label: 'Time Tables' },
+    { id: 'WorkDays', label: 'Work Days' },
+    { id: 'SupportFunctions', label: 'Support Functions' },
+    { id: 'MachineList', label: 'Machine List' },
+    { id: 'ProductionSchedule', label: 'Production Schedule' },
+    { id: 'Downtime', label: 'Downtime' },
+    { id: 'StyleCard', label: 'Load Style' },
+    { id: 'ProductHierarchy', label: 'Product Hierarchy' },
+    { id: 'ScheduleOvertime', label: 'Schedule Overtime' },
+    { id: 'TestSchedule', label: 'Test Schedule' },
+    { id: 'ComponentTest', label: 'Test Components' },
+    { id: 'SubAssemblies', label: 'Sub-Assemblies' }, // New Menu Item
+];
 
 const AdminDashboard: React.FC = () => {
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -21,77 +107,117 @@ const AdminDashboard: React.FC = () => {
         setSelectedOption(option);
     };
 
+    const handleCloseContent = () => {
+        setSelectedOption(null);
+    };
+
+    const handleBackToHome = () => {
+        window.history.back();
+    };
+
+    const renderContent = () => {
+        switch (selectedOption) {
+            case 'ProductionLines':
+                return <ProductionLines />;
+            case 'TimeTables':
+                return <TimeTables />;
+            case 'WorkDays':
+                return <WorkDays />;
+            case 'SupportFunctions':
+                return <SupportFunctions />;
+            case 'MachineList':
+                return <MachineList />;
+            case 'ProductionSchedule':
+                return <ProductionSchedule />;
+            case 'Downtime':
+                return <Downtime />;
+            case 'StyleCard':
+                return <StyleCard />;
+            case 'ProductHierarchy':
+                return <ProductHierarchyList />;
+            case 'ScheduleOvertime':
+                return <ScheduleOvertime />;
+            case 'TestSchedule':
+                return <TestSchedule />;
+            case 'ComponentTest':
+                return <ComponentTest />;
+            case 'SubAssemblies': // Handle SubAssemblies
+                return <SubAssemblies />;
+            default:
+                return null;
+        }
+    };
+
     return (
-        <div className="dashboard-container">
-            <div className="header">
-                <button className="back-button" onClick={() => window.history.back()}>
-                    Back to Home
-                </button>
-                <h1 className="admin-title">Admin Dashboard</h1>
-            </div>
+        <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <PageContainer>
+                {/* Full-width AppBar */}
+                <AppBar position="sticky">
+                    <Toolbar>
+                        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+                            Admin Dashboard
+                        </Typography>
+                        <MuiButton
+                            variant="outlined"
+                            color="inherit"
+                            onClick={handleBackToHome}
+                            startIcon={<ArrowBackIcon />}
+                            sx={{
+                                color: '#fff',
+                                borderColor: '#fff',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255,255,255,0.1)',
+                                },
+                            }}
+                        >
+                            Back to Home
+                        </MuiButton>
+                    </Toolbar>
+                </AppBar>
 
-            <div className="dashboard-content">
-                <div className="toolbar">
-                    <button className="toolbar-button" onClick={() => handleOptionClick('ProductionLines')}>
-                        Add Production Lines
-                    </button>
-                    <button className="toolbar-button" onClick={() => handleOptionClick('TimeTables')}>
-                        Time Tables
-                    </button>
-                    <button className="toolbar-button" onClick={() => handleOptionClick('WorkDays')}>
-                        Work Days
-                    </button>
-                    <button className="toolbar-button" onClick={() => handleOptionClick('SupportFunctions')}>
-                        Support Functions
-                    </button>
-                    <button className="toolbar-button" onClick={() => handleOptionClick('MachineList')}>
-                        Machine List
-                    </button>
-                    <button className="toolbar-button" onClick={() => handleOptionClick('ProductionSchedule')}>
-                        Production Schedule
-                    </button>
-                    <button className="toolbar-button" onClick={() => handleOptionClick('Downtime')}>
-                        Downtime
-                    </button>
-                    <button className="toolbar-button" onClick={() => handleOptionClick('StyleCard')}>
-                        Load Style
-                    </button>
-                    {/* Add the new Product Hierarchy button */}
-                    <button className="toolbar-button" onClick={() => handleOptionClick('ProductHierarchy')}>
-                        Product Hierarchy
-                    </button>
-                    {/* Add the new Schedule Overtime button */}
-                    <button className="toolbar-button" onClick={() => handleOptionClick('ScheduleOvertime')}>
-                        Schedule Overtime
-                    </button>
-                    {/* Add the new Test Schedule button */}
-                    <button className="toolbar-button" onClick={() => handleOptionClick('TestSchedule')}>
-                        Test Schedule
-                    </button>
-                </div>
+                {/* Content Area with Menu and Main Content */}
+                <ContentContainer>
+                    {/* Left Menu */}
+                    <MenuList>
+                        {menuItems.map((item) => (
+                            <ListItem
+                                button
+                                key={item.id}
+                                onClick={() => handleOptionClick(item.id)}
+                                selected={selectedOption === item.id}
+                                sx={{
+                                    '&.Mui-selected': {
+                                        backgroundColor: 'rgba(8, 47, 73, 0.08)',
+                                        '&:hover': {
+                                            backgroundColor: 'rgba(8, 47, 73, 0.12)',
+                                        },
+                                    },
+                                    '&:hover': {
+                                        backgroundColor: 'rgba(8, 47, 73, 0.04)',
+                                    },
+                                }}
+                            >
+                                <ListItemText primary={item.label} />
+                            </ListItem>
+                        ))}
+                    </MenuList>
 
-                <div className="content-area">
-                    {/* Conditionally Render Components Based on Selected Option */}
-                    {!selectedOption && (
-                        <div className="default-message">Select an option from the toolbar to begin</div>
-                    )}
-
-                    {selectedOption === 'ProductionLines' && <ProductionLines />}
-                    {selectedOption === 'TimeTables' && <TimeTables />}
-                    {selectedOption === 'WorkDays' && <WorkDays />}
-                    {selectedOption === 'SupportFunctions' && <SupportFunctions />}
-                    {selectedOption === 'MachineList' && <MachineList />}
-                    {selectedOption === 'ProductionSchedule' && <ProductionSchedule />}
-                    {selectedOption === 'Downtime' && <Downtime />}
-                    {selectedOption === 'StyleCard' && <StyleCard />}
-                    {selectedOption === 'ProductHierarchy' && <ProductHierarchyList />}
-                    {selectedOption === 'ScheduleOvertime' && <ScheduleOvertime />}
-                    {selectedOption === 'TestSchedule' && <TestSchedule />} {/* Render TestSchedule Component */}
-                </div>
-            </div>
-        </div>
+                    {/* Main Content */}
+                    <ContentArea>
+                        {selectedOption && (
+                            <StyledPaper elevation={3}>
+                                <CloseButton onClick={handleCloseContent}>
+                                    <CloseIcon />
+                                </CloseButton>
+                                {renderContent()}
+                            </StyledPaper>
+                        )}
+                    </ContentArea>
+                </ContentContainer>
+            </PageContainer>
+        </ThemeProvider>
     );
-
 };
 
 export default AdminDashboard;

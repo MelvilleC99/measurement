@@ -1,47 +1,72 @@
+// src/components/Admin/ScheduleOvertime.tsx
+
 import React, { useState, useEffect } from 'react';
 import {
-    Grid,
-    Paper,
-    Typography,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    Checkbox,
+    Box,
     Button,
     Dialog,
-    DialogTitle,
     DialogContent,
-    DialogActions,
-    CircularProgress,
+    DialogTitle,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
+    TextField,
+    Typography,
+    useMediaQuery,
+    useTheme,
+    Paper,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
     Snackbar,
     Alert,
-    Box,
-    TextField,
+    IconButton,
+    Checkbox,
+    Grid, // Imported Grid
 } from '@mui/material';
-import { db } from '../../firebase';
+import { Add, Delete, Edit, Close, Visibility } from '@mui/icons-material'; // Imported Edit
 import {
     collection,
-    getDocs,
     addDoc,
+    getDocs,
+    updateDoc,
+    deleteDoc,
     doc,
-    arrayUnion,
+    Timestamp,
     writeBatch,
+    arrayUnion,
+    arrayRemove,
 } from 'firebase/firestore';
-import { TimeTable, TimeSlot, ProductionLine, OvertimeSchedule } from '../../types';
-import './ScheduleOvertime.css';
+import { db } from '../../firebase';
+import { ProductionLine, TimeTableAssignment, TimeTable } from '../../types';
 
 const ScheduleOvertime: React.FC = () => {
-    const [timeTables, setTimeTables] = useState<TimeTable[]>([]);
     const [productionLines, setProductionLines] = useState<ProductionLine[]>([]);
-    const [selectedTimeTable, setSelectedTimeTable] = useState<string>('');
-    const [selectedProductionLines, setSelectedProductionLines] = useState<string[]>([]);
-    const [selectedPeriod, setSelectedPeriod] = useState<[Date | null, Date | null]>([
-        null,
-        null,
-    ]);
-    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-    const [viewTimeTable, setViewTimeTable] = useState<TimeTable | null>(null);
+    const [timeTables, setTimeTables] = useState<TimeTable[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string>('');
+
+    // Modal States
+    const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+    const [isViewMode, setIsViewMode] = useState<boolean>(false);
+
+    // Form States
+    const [selectedTimeTableId, setSelectedTimeTableId] = useState<string>('');
+    const [selectedProductionLineIds, setSelectedProductionLineIds] = useState<string[]>([]);
+    const [startDate, setStartDate] = useState<string>(''); // 'YYYY-MM-DD'
+    const [endDate, setEndDate] = useState<string>('');     // 'YYYY-MM-DD'
+    const [currentAssignment, setCurrentAssignment] = useState<{
+        productionLineIds: string[];
+        timeTableId: string;
+        startDate: string;
+        endDate: string;
+    } | null>(null);
+
+    // Snackbar State
     const [snackbar, setSnackbar] = useState<{
         open: boolean;
         message: string;
@@ -52,341 +77,366 @@ const ScheduleOvertime: React.FC = () => {
         severity: 'success',
     });
 
-    // Fetch TimeTables and ProductionLines from Firestore on component mount
+    const theme = useTheme();
+    const fullScreen = useMediaQuery(theme.breakpoints.down('md'));
+
     useEffect(() => {
-        fetchTimeTables();
-        fetchProductionLines();
+        fetchData();
     }, []);
 
-    const fetchTimeTables = async () => {
+    const fetchData = async () => {
+        setIsLoading(true);
         try {
-            const timeTablesSnapshot = await getDocs(collection(db, 'timeTable')); // Updated collection name
-            const timeTablesData: TimeTable[] = timeTablesSnapshot.docs
-                .map((doc) => {
-                    const data = doc.data();
-                    return {
-                        id: doc.id,
-                        name: data.name || '',
-                        description: data.description || '',
-                        isOvertime: data.isOvertime || false,
-                        schedules: data.schedules || [],
-                    } as TimeTable;
-                })
-                .filter((tt) => tt.isOvertime)
-                .sort((a, b) => a.name.localeCompare(b.name));
-            setTimeTables(timeTablesData);
-        } catch (error) {
-            console.error('Error fetching time tables:', error);
-            setSnackbar({
-                open: true,
-                message: 'Failed to load time tables. Please try again later.',
-                severity: 'error',
-            });
-        }
-    };
-
-    const fetchProductionLines = async () => {
-        try {
-            const linesSnapshot = await getDocs(collection(db, 'productionLines'));
-            const linesData: ProductionLine[] = linesSnapshot.docs.map((doc) => ({
-                id: doc.id,
-                name: doc.data().name || '',
-                description: doc.data().description || '',
-                active: doc.data().active || false,
-                currentStyle: doc.data().currentStyle || null,
-                createdAt: doc.data().createdAt,
-                updatedAt: doc.data().updatedAt,
-                timeTableAssignments: doc.data().timeTableAssignments || [],
-                overtimeScheduleIds: doc.data().overtimeScheduleIds || [],
-            }));
+            // Fetch Production Lines
+            const linesSnap = await getDocs(collection(db, 'productionLines'));
+            const linesData = linesSnap.docs.map(docSnap => ({
+                id: docSnap.id,
+                ...docSnap.data(),
+            })) as ProductionLine[];
             setProductionLines(linesData);
-        } catch (error) {
-            console.error('Error fetching production lines:', error);
-            setSnackbar({
-                open: true,
-                message: 'Failed to load production lines. Please try again later.',
-                severity: 'error',
-            });
+
+            // Fetch Time Tables (including overtime)
+            const ttSnap = await getDocs(collection(db, 'timeTable'));
+            const ttData = ttSnap.docs.map(docSnap => ({
+                id: docSnap.id,
+                ...docSnap.data(),
+            })) as TimeTable[];
+            setTimeTables(ttData);
+        } catch (err) {
+            console.error('Error fetching data:', err);
+            setError('Failed to load data.');
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const handleScheduleOvertime = async () => {
-        if (
-            !selectedTimeTable ||
-            selectedProductionLines.length === 0 ||
-            !selectedPeriod[0] ||
-            !selectedPeriod[1]
-        ) {
-            setSnackbar({
-                open: true,
-                message: 'Please fill out all required fields.',
-                severity: 'error',
-            });
+    // Open Modal for Creating or Viewing Assignments
+    const openModal = (assignment?: {
+        productionLineIds: string[];
+        timeTableId: string;
+        startDate: string;
+        endDate: string;
+    }, viewMode: boolean = false) => {
+        if (assignment) {
+            setSelectedTimeTableId(assignment.timeTableId);
+            setSelectedProductionLineIds(assignment.productionLineIds);
+            setStartDate(assignment.startDate);
+            setEndDate(assignment.endDate);
+            setCurrentAssignment(assignment);
+        } else {
+            // Reset form for creating new assignment
+            setSelectedTimeTableId('');
+            setSelectedProductionLineIds([]);
+            setStartDate('');
+            setEndDate('');
+            setCurrentAssignment(null);
+        }
+        setIsViewMode(viewMode);
+        setError('');
+        setIsModalOpen(true);
+    };
+
+    // Close Modal
+    const closeModal = () => {
+        setIsModalOpen(false);
+    };
+
+    // Handle Assigning Overtime Schedule
+    const handleAssignOvertime = async () => {
+        // Basic Validation
+        if (!selectedTimeTableId) {
+            setError('Please select a Time Table.');
+            return;
+        }
+        if (selectedProductionLineIds.length === 0) {
+            setError('Please select at least one Production Line.');
+            return;
+        }
+        if (!startDate || !endDate) {
+            setError('Please select Start Date and End Date.');
+            return;
+        }
+        if (startDate > endDate) {
+            setError('Start Date must be before End Date.');
             return;
         }
 
-        const [startDate, endDate] = selectedPeriod;
-        const startDateStr = startDate.toISOString().split('T')[0];
-        const endDateStr = endDate.toISOString().split('T')[0];
-
-        setIsSubmitting(true);
-
-        const overtimeSchedule: Omit<OvertimeSchedule, 'id'> = {
-            timeTableId: selectedTimeTable,
-            productionLineIds: selectedProductionLines,
-            startDate: startDateStr,
-            endDate: endDateStr,
-            isOvertime: true,
-            createdAt: new Date().toISOString(),
+        // Create the new assignment object without 'updatedAt'
+        const newAssignment: TimeTableAssignment = {
+            fromDate: startDate,
+            id: Date.now().toString(),
+            timeTableId: selectedTimeTableId,
+            timeTableName: timeTables.find(tt => tt.id === selectedTimeTableId)?.isOvertime ? 'Overtime' : 'Regular',
+            toDate: endDate,
         };
 
         try {
-            const docRef = await addDoc(collection(db, 'overtimeSchedules'), overtimeSchedule);
-            const overtimeScheduleId = docRef.id;
-
-            // Update each ProductionLine with the new overtime schedule reference using a batch
             const batch = writeBatch(db);
-            selectedProductionLines.forEach((lineId) => {
+            selectedProductionLineIds.forEach(lineId => {
                 const lineRef = doc(db, 'productionLines', lineId);
-                batch.update(lineRef, {
-                    overtimeScheduleIds: arrayUnion(overtimeScheduleId),
-                });
+                const line = productionLines.find(pl => pl.id === lineId);
+                if (line) {
+                    const updatedAssignments = [...line.timeTableAssignments, newAssignment];
+                    batch.update(lineRef, {timeTableAssignments: updatedAssignments});
+                }
             });
-
             await batch.commit();
 
             setSnackbar({
                 open: true,
-                message: 'Overtime schedule successfully created!',
+                message: 'Overtime assigned successfully!',
                 severity: 'success',
             });
-
-            // Reset form
-            setSelectedTimeTable('');
-            setSelectedProductionLines([]);
-            setSelectedPeriod([null, null]);
-        } catch (error) {
-            console.error('Error scheduling overtime:', error);
-            setSnackbar({
-                open: true,
-                message: 'An error occurred while scheduling overtime.',
-                severity: 'error',
-            });
-        } finally {
-            setIsSubmitting(false);
+            fetchData();
+            closeModal();
+        } catch (err) {
+            console.error('Error assigning overtime:', err);
+            setError('Failed to assign overtime.');
         }
     };
 
-    const handleViewTimeTable = (timeTableId: string) => {
-        const timeTable = timeTables.find((tt) => tt.id === timeTableId) || null;
-        setViewTimeTable(timeTable);
+    // Handle Deleting Overtime Assignment
+    const handleDeleteAssignment = async (lineId: string, assignmentId: string) => {
+        if (window.confirm('Are you sure you want to delete this overtime assignment?')) {
+            try {
+                const lineRef = doc(db, 'productionLines', lineId);
+                const line = productionLines.find(pl => pl.id === lineId);
+                if (line) {
+                    const updatedAssignments = line.timeTableAssignments.filter(a => a.id !== assignmentId);
+                    await updateDoc(lineRef, {timeTableAssignments: updatedAssignments});
+                    setSnackbar({
+                        open: true,
+                        message: 'Overtime assignment deleted successfully!',
+                        severity: 'success',
+                    });
+                    fetchData();
+                }
+            } catch (err) {
+                console.error('Error deleting assignment:', err);
+                setError('Failed to delete assignment.');
+            }
+        }
     };
 
+    // Handle Snackbar Close
     const handleCloseSnackbar = () => {
-        setSnackbar((prev) => ({ ...prev, open: false }));
+        setSnackbar(prev => ({...prev, open: false}));
     };
 
     return (
-        <Grid container justifyContent="center" className="schedule-overtime-wrapper">
-            <Grid item xs={12} md={8}>
-                <Paper elevation={3} className="schedule-overtime-container">
-                    <Typography variant="h4" align="center" gutterBottom>
-                        Schedule Overtime
-                    </Typography>
-
-                    <Grid container spacing={3}>
-                        {/* Select Time Table */}
-                        <Grid item xs={12}>
-                            <FormControl fullWidth required className="form-control">
-                                <InputLabel id="time-table-label">Select Time Table</InputLabel>
-                                <Select
-                                    labelId="time-table-label"
-                                    id="timeTable"
-                                    value={selectedTimeTable}
-                                    label="Select Time Table"
-                                    onChange={(e) => setSelectedTimeTable(e.target.value)}
-                                    className="select-dropdown"
-                                >
-                                    {timeTables.map((tt) => (
-                                        <MenuItem key={tt.id} value={tt.id}>
-                                            {tt.name} - {tt.description}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Grid>
-
-                        {/* View Time Table Button */}
-                        <Grid item xs={12} className="view-button-container">
-                            <Button
-                                variant="outlined"
-                                color="primary"
-                                onClick={() =>
-                                    selectedTimeTable && handleViewTimeTable(selectedTimeTable)
-                                }
-                                disabled={!selectedTimeTable}
-                                className="view-button"
-                            >
-                                View Time Table
-                            </Button>
-                        </Grid>
-
-                        {/* Select Production Lines */}
-                        <Grid item xs={12}>
-                            <FormControl fullWidth required className="form-control">
-                                <InputLabel id="production-lines-label">
-                                    Select Production Lines
-                                </InputLabel>
-                                <Select
-                                    labelId="production-lines-label"
-                                    id="productionLines"
-                                    multiple
-                                    value={selectedProductionLines}
-                                    onChange={(e) =>
-                                        setSelectedProductionLines(
-                                            typeof e.target.value === 'string'
-                                                ? e.target.value.split(',')
-                                                : e.target.value
-                                        )
-                                    }
-                                    label="Select Production Lines"
-                                    className="select-dropdown"
-                                    renderValue={(selected) => {
-                                        const selectedNames = productionLines
-                                            .filter((line) => selected.includes(line.id))
-                                            .map((line) => line.name)
-                                            .join(', ');
-                                        return selectedNames;
-                                    }}
-                                >
-                                    {productionLines.map((line) => (
-                                        <MenuItem key={line.id} value={line.id}>
-                                            <Checkbox checked={selectedProductionLines.indexOf(line.id) > -1} />
-                                            <Typography variant="body1">{line.name}</Typography>
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Grid>
-
-                        {/* Select Overtime Period */}
-                        <Grid item xs={12}>
-                            <Typography variant="body1" gutterBottom>
-                                Select Overtime Period
-                            </Typography>
-                            <Box className="calendar-container">
-                                <TextField
-                                    id="startDate"
-                                    type="date"
-                                    label="Start Date"
-                                    InputLabelProps={{
-                                        shrink: true,
-                                    }}
-                                    value={
-                                        selectedPeriod[0]
-                                            ? selectedPeriod[0].toISOString().split('T')[0]
-                                            : ''
-                                    }
-                                    onChange={(e) => {
-                                        const newStart = e.target.value ? new Date(e.target.value) : null;
-                                        setSelectedPeriod([newStart, selectedPeriod[1]]);
-                                    }}
-                                    className="date-input"
-                                />
-                                <Typography variant="body1" className="date-separator">
-                                    to
-                                </Typography>
-                                <TextField
-                                    id="endDate"
-                                    type="date"
-                                    label="End Date"
-                                    InputLabelProps={{
-                                        shrink: true,
-                                    }}
-                                    value={
-                                        selectedPeriod[1]
-                                            ? selectedPeriod[1].toISOString().split('T')[0]
-                                            : ''
-                                    }
-                                    onChange={(e) => {
-                                        const newEnd = e.target.value ? new Date(e.target.value) : null;
-                                        setSelectedPeriod([selectedPeriod[0], newEnd]);
-                                    }}
-                                    className="date-input"
-                                />
-                            </Box>
-                        </Grid>
-
-                        {/* Submit Button */}
-                        <Grid item xs={12} className="submit-button-container">
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={handleScheduleOvertime}
-                                disabled={isSubmitting}
-                                size="large"
-                                startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
-                                className="submit-button"
-                            >
-                                {isSubmitting ? 'Scheduling...' : 'Schedule Overtime'}
-                            </Button>
-                        </Grid>
-                    </Grid>
-                </Paper>
+        <Box sx={{padding: 4}}>
+            <Grid container justifyContent="space-between" alignItems="center">
+                <Typography variant="h4">Overtime Schedules</Typography>
+                <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<Add/>}
+                    onClick={() => openModal()}
+                >
+                    Create Overtime Schedule
+                </Button>
             </Grid>
 
-            {/* Time Table Details Dialog */}
+            <Grid container spacing={4} sx={{marginTop: 2}}>
+                <Grid item xs={12}>
+                    <Typography variant="h5" gutterBottom>
+                        Existing Overtime Assignments
+                    </Typography>
+                    {isLoading ? (
+                        <Typography>Loading overtime assignments...</Typography>
+                    ) : (
+                        <TableContainer component={Paper}>
+                            <Table>
+                                <TableHead sx={{backgroundColor: theme.palette.primary.main}}>
+                                    <TableRow>
+                                        <TableCell sx={{color: '#fff'}}>Production Line</TableCell>
+                                        <TableCell sx={{color: '#fff'}}>Time Table</TableCell>
+                                        <TableCell sx={{color: '#fff'}}>Start Date</TableCell>
+                                        <TableCell sx={{color: '#fff'}}>End Date</TableCell>
+                                        <TableCell align="right" sx={{color: '#fff'}}>Actions</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {productionLines.map(line => (
+                                        line.timeTableAssignments
+                                            .filter(a => a.timeTableName === 'Overtime')
+                                            .map(a => (
+                                                <TableRow key={`${line.id}-${a.id}`}>
+                                                    <TableCell>{line.name}</TableCell>
+                                                    <TableCell>{a.timeTableName}</TableCell>
+                                                    <TableCell>{a.fromDate}</TableCell>
+                                                    <TableCell>{a.toDate}</TableCell>
+                                                    <TableCell align="right">
+                                                        <IconButton onClick={() => openModal({
+                                                            productionLineIds: [line.id],
+                                                            timeTableId: a.timeTableId,
+                                                            startDate: a.fromDate,
+                                                            endDate: a.toDate,
+                                                        }, true)}>
+                                                            <Visibility/>
+                                                        </IconButton>
+                                                        <IconButton onClick={() => openModal({
+                                                            productionLineIds: [line.id],
+                                                            timeTableId: a.timeTableId,
+                                                            startDate: a.fromDate,
+                                                            endDate: a.toDate,
+                                                        }, false)}>
+                                                            <Edit/>
+                                                        </IconButton>
+                                                        <IconButton
+                                                            onClick={() => handleDeleteAssignment(line.id, a.id)}>
+                                                            <Delete/>
+                                                        </IconButton>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                    ))}
+                                    {productionLines.every(line => line.timeTableAssignments.filter(a => a.timeTableName === 'Overtime').length === 0) && (
+                                        <TableRow>
+                                            <TableCell colSpan={5} align="center">
+                                                No overtime assignments available.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    )}
+                </Grid>
+            </Grid>
+
+            {/* Overtime Assignment Modal */}
             <Dialog
-                open={!!viewTimeTable}
-                onClose={() => setViewTimeTable(null)}
-                maxWidth="sm"
+                open={isModalOpen}
+                onClose={closeModal}
+                fullScreen={fullScreen}
+                maxWidth="md"
                 fullWidth
-                className="time-table-dialog"
             >
-                <DialogTitle>Time Table Details</DialogTitle>
-                <DialogContent dividers className="time-table-details">
-                    {viewTimeTable && (
-                        <>
-                            <Typography variant="h6">{viewTimeTable.name}</Typography>
-                            <Typography variant="body1" gutterBottom>
-                                {viewTimeTable.description}
-                            </Typography>
-                            <Typography variant="subtitle1">Schedules:</Typography>
-                            {viewTimeTable.schedules.map((schedule, scheduleIndex) => (
-                                <div key={schedule.id}>
-                                    <Typography variant="subtitle2">
-                                        Schedule {scheduleIndex + 1} - Days: {schedule.daysOfWeek.join(', ')}
-                                    </Typography>
-                                    <table className="time-slots-table">
-                                        <thead>
-                                        <tr>
-                                            <th>#</th>
-                                            <th>Start Time</th>
-                                            <th>End Time</th>
-                                            <th>Break</th>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        {schedule.slots.map((slot, index) => (
-                                            <tr key={slot.id}>
-                                                <td>{index + 1}</td>
-                                                <td>{slot.startTime}</td>
-                                                <td>{slot.endTime}</td>
-                                                <td>{slot.breakId ? 'Yes' : 'No'}</td>
-                                            </tr>
+                <DialogTitle>
+                    {isViewMode ? 'View Overtime Assignment' : 'Create Overtime Assignment'}
+                    <IconButton
+                        aria-label="close"
+                        onClick={closeModal}
+                        sx={{position: 'absolute', right: 8, top: 8}}
+                    >
+                        <Close/>
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent>
+                    {error && (
+                        <Typography color="error" sx={{mb: 2}}>
+                            {error}
+                        </Typography>
+                    )}
+
+                    {!isViewMode && (
+                        <Grid container spacing={2}>
+                            <Grid item xs={12}>
+                                <Typography variant="h6">
+                                    Assign Overtime Schedule
+                                </Typography>
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <FormControl fullWidth size="small">
+                                    <InputLabel id="time-table-select-label">Select Time Table</InputLabel>
+                                    <Select
+                                        labelId="time-table-select-label"
+                                        value={selectedTimeTableId}
+                                        label="Select Time Table"
+                                        onChange={(e) => setSelectedTimeTableId(e.target.value)}
+                                    >
+                                        {timeTables.map(tt => (
+                                            <MenuItem key={tt.id} value={tt.id}>
+                                                {tt.name} {tt.isOvertime ? '(Overtime)' : ''}
+                                            </MenuItem>
                                         ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            ))}
-                        </>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <FormControl fullWidth size="small">
+                                    <InputLabel id="production-lines-select-label">Select Production Lines</InputLabel>
+                                    <Select
+                                        labelId="production-lines-select-label"
+                                        multiple
+                                        value={selectedProductionLineIds}
+                                        onChange={(e) =>
+                                            setSelectedProductionLineIds(
+                                                typeof e.target.value === 'string'
+                                                    ? e.target.value.split(',')
+                                                    : e.target.value
+                                            )
+                                        }
+                                        label="Select Production Lines"
+                                        renderValue={(selected) => {
+                                            const selectedNames = productionLines
+                                                .filter(pl => selected.includes(pl.id))
+                                                .map(pl => pl.name)
+                                                .join(', ');
+                                            return selectedNames;
+                                        }}
+                                    >
+                                        {productionLines.map(pl => (
+                                            <MenuItem key={pl.id} value={pl.id}>
+                                                <Checkbox checked={selectedProductionLineIds.indexOf(pl.id) > -1}/>
+                                                <Typography variant="body1">{pl.name}</Typography>
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <TextField
+                                    label="Start Date"
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    fullWidth
+                                    size="small"
+                                    InputLabelProps={{shrink: true}}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <TextField
+                                    label="End Date"
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    fullWidth
+                                    size="small"
+                                    InputLabelProps={{shrink: true}}
+                                />
+                            </Grid>
+                        </Grid>
+                    )}
+
+                    {isViewMode && currentAssignment && (
+                        <Box>
+                            <Typography variant="subtitle1">
+                                <strong>Time
+                                    Table:</strong> {timeTables.find(tt => tt.id === currentAssignment.timeTableId)?.name || 'N/A'}
+                            </Typography>
+                            <Typography variant="subtitle1">
+                                <strong>Start Date:</strong> {currentAssignment.startDate}
+                            </Typography>
+                            <Typography variant="subtitle1">
+                                <strong>End Date:</strong> {currentAssignment.endDate}
+                            </Typography>
+                            <Typography variant="subtitle1">
+                                <strong>Production
+                                    Lines:</strong> {currentAssignment.productionLineIds.map(id => productionLines.find(pl => pl.id === id)?.name).join(', ')}
+                            </Typography>
+                        </Box>
                     )}
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setViewTimeTable(null)} color="secondary">
-                        Close
-                    </Button>
-                </DialogActions>
+                {!isViewMode && (
+                    <Box sx={{display: 'flex', justifyContent: 'flex-end', p: 2}}>
+                        <Button variant="contained" color="primary" onClick={handleAssignOvertime}>
+                            {currentAssignment ? 'Update' : 'Assign'}
+                        </Button>
+                    </Box>
+                )}
             </Dialog>
 
             {/* Snackbar for Notifications */}
@@ -394,18 +444,17 @@ const ScheduleOvertime: React.FC = () => {
                 open={snackbar.open}
                 autoHideDuration={6000}
                 onClose={handleCloseSnackbar}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                anchorOrigin={{vertical: 'bottom', horizontal: 'center'}}
             >
                 <Alert
                     onClose={handleCloseSnackbar}
                     severity={snackbar.severity}
-                    sx={{ width: '100%' }}
+                    sx={{width: '100%'}}
                 >
                     {snackbar.message}
                 </Alert>
             </Snackbar>
-        </Grid>
+        </Box>
     );
-};
-
-export default ScheduleOvertime;
+}
+    export default ScheduleOvertime;

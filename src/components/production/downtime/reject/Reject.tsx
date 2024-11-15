@@ -11,14 +11,40 @@ import {
     Alert,
     Box,
     IconButton,
-    Typography
+    Typography,
+    CircularProgress
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../../firebase';
-import { RejectFormData } from '../types';
-import { SupportFunction } from '../../../../types';
-import './Reject.css';
+
+// Types
+interface RejectFormData {
+    reason: string;
+    operation: string;
+    comments: string;
+    qcId: string;
+    count: number;
+    productionLineId: string;
+    supervisorId: string;
+    sessionId: string;
+    styleNumber: string;
+    status: 'Open' | 'Closed';
+    recordedAsProduced: boolean;
+}
+
+interface SupportFunction {
+    id: string;
+    name: string;
+    surname: string;
+    employeeNumber?: string;
+    role: string;
+}
+
+interface Operation {
+    id: string;
+    name: string;
+}
 
 interface RejectProps {
     onClose: () => void;
@@ -37,25 +63,32 @@ const Reject: React.FC<RejectProps> = ({
                                            sessionId,
                                            qcs
                                        }) => {
-    const [reason, setReason] = useState<string>('');
-    const [operation, setOperation] = useState<string>('');
-    const [comments, setComments] = useState<string>('');
-    const [count, setCount] = useState<number>(1);
-    const [selectedQc, setSelectedQc] = useState<string>('');
+    const [formData, setFormData] = useState<Partial<RejectFormData>>({
+        reason: '',
+        operation: '',
+        comments: '',
+        count: 1,
+        qcId: '',
+        status: 'Open',
+        recordedAsProduced: false
+    });
     const [qcPassword, setQcPassword] = useState<string>('');
     const [reasonsList, setReasonsList] = useState<string[]>([]);
-    const [operationsList, setOperationsList] = useState<{ id: string; name: string; }[]>([]);
+    const [operationsList, setOperationsList] = useState<Operation[]>([]);
     const [error, setError] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const [styleNumber, setStyleNumber] = useState<string>('');
+    const [loadingMessage, setLoadingMessage] = useState<string>('Loading...');
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setIsLoading(true);
+                setError('');
 
-                // Fetch active session to get the current styleId
+                // Step 1: Fetch session and style details
+                setLoadingMessage('Fetching style details...');
                 const sessionDoc = await getDoc(doc(db, 'activeSessions', sessionId));
                 const styleId = sessionDoc.data()?.styleId;
 
@@ -63,16 +96,19 @@ const Reject: React.FC<RejectProps> = ({
                     throw new Error('Style ID not found in the active session');
                 }
 
-                // Fetch the specific style details
+                // Step 2: Get style information
                 const styleDoc = await getDoc(doc(db, 'styles', styleId));
-                const styleNumber = styleDoc.data()?.styleNumber || '';
-                setStyleNumber(styleNumber);
+                const styleData = styleDoc.data();
+                const currentStyleNumber = styleData?.styleNumber || '';
 
-                if (!styleNumber) {
-                    throw new Error('Style number not found');
+                setStyleNumber(currentStyleNumber);
+
+                if (!currentStyleNumber) {
+                    throw new Error('Style details incomplete or missing');
                 }
 
-                // Fetch reject reasons
+                // Step 3: Fetch reject reasons
+                setLoadingMessage('Loading reject reasons...');
                 const reasonsQuery = query(
                     collection(db, 'downtimeCategories'),
                     where('name', '==', 'Reject')
@@ -83,35 +119,48 @@ const Reject: React.FC<RejectProps> = ({
                 );
                 setReasonsList(fetchedReasons);
 
-                // Fetch operations based on productCategory from productHierarchy
-                const productCategory = styleDoc.data()?.productCategory;
-                if (!productCategory) {
-                    throw new Error('Product category not found in the style');
-                }
+                // Step 4: Fetch operations from product hierarchy
+                setLoadingMessage('Loading operations...');
+                const hierarchySnapshot = await getDocs(collection(db, 'productHierarchy'));
+                const fetchedOperations: Operation[] = [];
 
-                const operationsSnapshot = await getDocs(collection(db, 'productHierarchy'));
-                const fetchedOperations: { id: string; name: string; }[] = [];
-
-                operationsSnapshot.docs.forEach(doc => {
+                hierarchySnapshot.docs.forEach(doc => {
                     const data = doc.data();
-                    if (data.name === productCategory && data.subCategories) {
-                        data.subCategories.forEach((subCategory: any) => {
-                            if (subCategory.operations) {
-                                subCategory.operations.forEach((operation: any) => {
-                                    fetchedOperations.push({
-                                        id: `${doc.id}-${operation.name}`,
-                                        name: operation.name
+                    console.log('Product Hierarchy doc:', data);
+
+                    if (data.name === "Shirt") {
+                        if (data.subCategories && Array.isArray(data.subCategories)) {
+                            data.subCategories.forEach((subCategory: any) => {
+                                console.log('Processing subcategory:', subCategory);
+
+                                if (subCategory.operations && Array.isArray(subCategory.operations)) {
+                                    subCategory.operations.forEach((operation: any) => {
+                                        console.log('Found operation:', operation);
+
+                                        if (!fetchedOperations.some(op => op.name === operation.name)) {
+                                            fetchedOperations.push({
+                                                id: operation.id || `${subCategory.id}-${operation.name}`,
+                                                name: operation.name
+                                            });
+                                        }
                                     });
-                                });
-                            }
-                        });
+                                }
+                            });
+                        }
                     }
                 });
 
+                console.log('Final operations list:', fetchedOperations);
+
+                if (fetchedOperations.length === 0) {
+                    console.warn('No operations found in the product hierarchy');
+                }
+
                 setOperationsList(fetchedOperations);
+
             } catch (err) {
                 console.error('Error fetching data:', err);
-                setError('Failed to load data');
+                setError('Failed to load data. Please try again.');
             } finally {
                 setIsLoading(false);
             }
@@ -120,18 +169,39 @@ const Reject: React.FC<RejectProps> = ({
         fetchData();
     }, [sessionId]);
 
+    const handleInputChange = (field: keyof RejectFormData, value: any) => {
+        setFormData(prev => ({
+            ...prev,
+            [field]: value
+        }));
+        setError('');
+    };
+
+    const validateForm = (): boolean => {
+        if (!formData.reason) {
+            setError('Please select a reason for rejection');
+            return false;
+        }
+        if (!formData.qcId) {
+            setError('Please select a Quality Controller');
+            return false;
+        }
+        if (!qcPassword) {
+            setError('QC password is required');
+            return false;
+        }
+        if (!formData.count || formData.count < 1) {
+            setError('Count must be at least 1');
+            return false;
+        }
+        return true;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
-        if (isSubmitting) return;
-
-        // Ensure count is a valid number
-        const validatedCount = parseInt(count.toString(), 10);
-        if (isNaN(validatedCount) || validatedCount < 1) {
-            setError('Count must be a valid number greater than zero');
-            return;
-        }
+        if (isSubmitting || !validateForm()) return;
 
         setIsSubmitting(true);
 
@@ -139,7 +209,7 @@ const Reject: React.FC<RejectProps> = ({
             // Verify QC credentials
             const qcSnapshot = await getDocs(query(
                 collection(db, 'supportFunctions'),
-                where('employeeNumber', '==', selectedQc),
+                where('employeeNumber', '==', formData.qcId),
                 where('password', '==', qcPassword),
                 where('role', '==', 'QC')
             ));
@@ -151,32 +221,25 @@ const Reject: React.FC<RejectProps> = ({
             }
 
             const rejectData: RejectFormData = {
-                reason,
-                operation,
-                comments,
-                qcId: selectedQc,
-                count: validatedCount,
+                reason: formData.reason!,
+                operation: formData.operation || '',
+                comments: formData.comments || '',
+                qcId: formData.qcId!,
+                count: formData.count!,
                 productionLineId,
                 supervisorId,
                 sessionId,
                 styleNumber,
                 status: 'Open',
-                recordedAsProduced: false // Added missing field
+                recordedAsProduced: false
             };
 
             await onSubmit(rejectData);
-
-            // Reset form and close
-            setReason('');
-            setOperation('');
-            setComments('');
-            setSelectedQc('');
-            setQcPassword('');
-            setCount(1);
             onClose();
+
         } catch (err) {
             console.error('Error submitting reject:', err);
-            setError('Failed to submit reject.');
+            setError('Failed to submit reject. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -186,8 +249,9 @@ const Reject: React.FC<RejectProps> = ({
         return (
             <Dialog open={true} maxWidth="sm" fullWidth>
                 <DialogContent>
-                    <Box display="flex" justifyContent="center" p={3}>
-                        <div className="loading-spinner">Loading...</div>
+                    <Box display="flex" flexDirection="column" alignItems="center" gap={2} p={3}>
+                        <CircularProgress />
+                        <Typography>{loadingMessage}</Typography>
                     </Box>
                 </DialogContent>
             </Dialog>
@@ -218,7 +282,11 @@ const Reject: React.FC<RejectProps> = ({
                 <Typography variant="h6" component="h2">
                     Log Reject
                 </Typography>
-                <IconButton onClick={onClose} size="small" aria-label="close">
+                <IconButton
+                    onClick={onClose}
+                    size="small"
+                    aria-label="close"
+                >
                     <CloseIcon />
                 </IconButton>
             </DialogTitle>
@@ -232,11 +300,19 @@ const Reject: React.FC<RejectProps> = ({
             <form onSubmit={handleSubmit}>
                 <DialogContent>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                        {error && (
+                            <Alert
+                                severity="error"
+                                sx={{ mb: 2 }}
+                                onClose={() => setError('')}
+                            >
+                                {error}
+                            </Alert>
+                        )}
 
                         <Select
-                            value={reason}
-                            onChange={(e) => setReason(e.target.value)}
+                            value={formData.reason}
+                            onChange={(e) => handleInputChange('reason', e.target.value)}
                             displayEmpty
                             required
                             sx={{ '& .MuiSelect-select': { py: 1.5 } }}
@@ -244,14 +320,16 @@ const Reject: React.FC<RejectProps> = ({
                             <MenuItem value="" disabled>
                                 Select reason for rejection *
                             </MenuItem>
-                            {reasonsList.map((r, index) => (
-                                <MenuItem key={index} value={r}>{r}</MenuItem>
+                            {reasonsList.map((reason, index) => (
+                                <MenuItem key={index} value={reason}>
+                                    {reason}
+                                </MenuItem>
                             ))}
                         </Select>
 
                         <Select
-                            value={operation}
-                            onChange={(e) => setOperation(e.target.value)}
+                            value={formData.operation}
+                            onChange={(e) => handleInputChange('operation', e.target.value)}
                             displayEmpty
                             sx={{ '& .MuiSelect-select': { py: 1.5 } }}
                         >
@@ -259,23 +337,25 @@ const Reject: React.FC<RejectProps> = ({
                                 Select operation (optional)
                             </MenuItem>
                             {operationsList.map((op) => (
-                                <MenuItem key={op.id} value={op.name}>{op.name}</MenuItem>
+                                <MenuItem key={op.id} value={op.name}>
+                                    {op.name}
+                                </MenuItem>
                             ))}
                         </Select>
 
                         <TextField
                             type="number"
                             label="Count *"
-                            value={count}
-                            onChange={(e) => setCount(parseInt(e.target.value) || 1)}
+                            value={formData.count}
+                            onChange={(e) => handleInputChange('count', parseInt(e.target.value) || 1)}
                             required
                             fullWidth
                             inputProps={{ min: 1 }}
                         />
 
                         <Select
-                            value={selectedQc}
-                            onChange={(e) => setSelectedQc(e.target.value)}
+                            value={formData.qcId}
+                            onChange={(e) => handleInputChange('qcId', e.target.value)}
                             displayEmpty
                             required
                             sx={{ '& .MuiSelect-select': { py: 1.5 } }}
@@ -302,8 +382,8 @@ const Reject: React.FC<RejectProps> = ({
                         <TextField
                             multiline
                             rows={4}
-                            value={comments}
-                            onChange={(e) => setComments(e.target.value)}
+                            value={formData.comments}
+                            onChange={(e) => handleInputChange('comments', e.target.value)}
                             placeholder="Add comments (optional)"
                             fullWidth
                         />

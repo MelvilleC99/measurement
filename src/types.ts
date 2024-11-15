@@ -12,6 +12,7 @@ export interface TimeTableAssignment {
     timeTableName: string; // For easier display
     fromDate: string;
     toDate: string;
+
 }
 
 export interface ProductionLine {
@@ -73,6 +74,7 @@ export interface TimeTable {
     description: string;
     isOvertime: boolean;
     schedules: Schedule[];
+    createdAt : Timestamp; // Made optional
 }
 
 export interface Break {
@@ -86,10 +88,12 @@ export interface OvertimeSchedule {
     id: string;
     timeTableId: string;
     productionLineIds: string[];
-    startDate: string; // in 'YYYY-MM-DD' format
-    endDate: string;   // in 'YYYY-MM-DD' format
+    startDate: string; // 'YYYY-MM-DD'
+    endDate: string;   // 'YYYY-MM-DD'
     isOvertime: boolean;
-    createdAt: string; // ISO string
+    createdAt : Timestamp; // Made optional
+    name: string;
+    description: string;
 }
 
 export interface Employee {
@@ -125,6 +129,60 @@ export interface ScheduledStyle {
     deliveryDate: string;
     status: string;
 }
+
+
+// Define ActiveSession interface similar to SessionData
+export interface ActiveSession {
+    id: string;
+    lineId: string;
+    supervisorId: string;
+    startTime: Timestamp;
+    endTime?: Timestamp;
+    isActive: boolean;
+    styleId: string;
+    target: number;
+    timeTableId: string;
+    isOvertime?: boolean;
+    unitsProduced: number; // Added property
+
+}
+
+// SubAssembly Interface
+// ------------------------
+
+
+    export interface SubAssembly {
+        id: string;
+        name: string;
+        description?: string;
+        createdAt: Timestamp;
+        updatedAt: Timestamp;
+    }
+
+    export interface Process {
+        id: string;
+        name: string;
+        description?: string;
+        sequence: number; // Order in the production workflow
+        createdAt: Timestamp;
+        updatedAt: Timestamp;
+        subAssemblyIds: string[]; // Linked SubAssemblies}
+
+    }
+
+// Measure points
+
+export interface MeasurementPoint {
+    id: string;
+    name: string;
+    description?: string;
+    type: 'Bottleneck' | 'Input' | 'QualityControl' | 'Other';
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+    processId: string; // Linked Process
+    productionLineId: string; // Linked Production Line
+}
+
 
 // ------------------------
 // Helper Functions

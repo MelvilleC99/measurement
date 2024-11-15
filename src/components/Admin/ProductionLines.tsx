@@ -36,7 +36,18 @@ import {
     Box,
 } from '@mui/material';
 import { Add, Edit, Delete, Close } from '@mui/icons-material';
-import './ProductionLines.css';
+import { styled } from '@mui/material/styles';
+
+const HeaderBanner = styled('div')(({ theme }) => ({
+    backgroundColor: theme.palette.primary.main,
+    color: theme.palette.primary.contrastText,
+    padding: theme.spacing(2),
+    marginBottom: theme.spacing(2),
+}));
+
+const ContentSection = styled('div')(({ theme }) => ({
+    padding: theme.spacing(2),
+}));
 
 const ProductionLines: React.FC = () => {
     const [lineName, setLineName] = useState('');
@@ -240,175 +251,172 @@ const ProductionLines: React.FC = () => {
     };
 
     return (
-        <div className="admin-dashboard-content">
-            <div className="production-lines-container">
-                <div className="header-banner">
-                    <Typography variant="h4">Production Lines</Typography>
-                </div>
-                <div className="content-section">
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        startIcon={<Add />}
-                        onClick={() => openModal()}
-                    >
-                        Add Production Line
-                    </Button>
-                    <Paper sx={{ mt: 2 }}>
-                        <List>
-                            {productionLines.map((line) => (
-                                <React.Fragment key={line.id}>
-                                    <ListItem>
-                                        <ListItemText
-                                            primary={line.name}
-                                            secondary={line.description}
-                                        />
-                                        <ListItemSecondaryAction>
-                                            <IconButton edge="end" onClick={() => openModal(line)}>
-                                                <Edit />
-                                            </IconButton>
-                                        </ListItemSecondaryAction>
-                                    </ListItem>
-                                    <Divider />
-                                </React.Fragment>
-                            ))}
-                        </List>
-                    </Paper>
-                </div>
-
-                {/* Modal for adding or editing production line */}
-                <Dialog
-                    open={isModalOpen}
-                    onClose={() => setIsModalOpen(false)}
-                    maxWidth="md"
-                    fullWidth
+        <div>
+            <HeaderBanner>
+                <Typography variant="h4">Production Lines</Typography>
+            </HeaderBanner>
+            <ContentSection>
+                <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<Add />}
+                    onClick={() => openModal()}
                 >
-                    <DialogTitle>
-                        {isEditMode ? 'Edit Production Line' : 'Add Production Line'}
-                        <IconButton
-                            aria-label="close"
-                            onClick={() => setIsModalOpen(false)}
-                            sx={{ position: 'absolute', right: 8, top: 8 }}
-                        >
-                            <Close />
-                        </IconButton>
-                    </DialogTitle>
-                    <DialogContent>
-                        {error && <Typography color="error">{error}</Typography>}
-                        <Grid container spacing={2}>
-                            <Grid item xs={12}>
-                                <TextField
-                                    label="Line Name"
-                                    value={lineName}
-                                    onChange={(e) => setLineName(e.target.value)}
-                                    fullWidth
-                                    required
-                                />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    label="Description"
-                                    value={lineDescription}
-                                    onChange={(e) => setLineDescription(e.target.value)}
-                                    fullWidth
-                                    required
-                                />
-                            </Grid>
-                        </Grid>
-
-                        <Typography variant="h6" sx={{ mt: 4 }}>
-                            Time Table Assignments
-                        </Typography>
-                        <Button
-                            variant="outlined"
-                            startIcon={<Add />}
-                            onClick={addTimeTableAssignment}
-                            sx={{ mt: 1, mb: 2 }}
-                        >
-                            Add Time Table Assignment
-                        </Button>
-
-                        {timeTableAssignments.map((assignment, index) => (
-                            <Paper key={assignment.id} sx={{ p: 2, mb: 2 }}>
-                                <Grid container spacing={2} alignItems="center">
-                                    <Grid item xs={12} md={4}>
-                                        <FormControl fullWidth required>
-                                            <InputLabel>Time Table</InputLabel>
-                                            <Select
-                                                value={assignment.timeTableId}
-                                                onChange={(e) =>
-                                                    updateTimeTableAssignment(index, 'timeTableId', e.target.value)
-                                                }
-                                                label="Time Table"
-                                            >
-                                                <MenuItem value="">
-                                                    <em>Select a Time Table</em>
-                                                </MenuItem>
-                                                {timeTables.map((tt) => (
-                                                    <MenuItem key={tt.id} value={tt.id}>
-                                                        {tt.name}
-                                                    </MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-                                    </Grid>
-                                    <Grid item xs={12} md={3}>
-                                        <TextField
-                                            label="From Date"
-                                            type="date"
-                                            value={assignment.fromDate}
-                                            onChange={(e) =>
-                                                updateTimeTableAssignment(index, 'fromDate', e.target.value)
-                                            }
-                                            InputLabelProps={{ shrink: true }}
-                                            fullWidth
-                                            required
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12} md={3}>
-                                        <TextField
-                                            label="To Date"
-                                            type="date"
-                                            value={assignment.toDate}
-                                            onChange={(e) =>
-                                                updateTimeTableAssignment(index, 'toDate', e.target.value)
-                                            }
-                                            InputLabelProps={{ shrink: true }}
-                                            fullWidth
-                                            required
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12} md={2}>
-                                        <IconButton
-                                            color="error"
-                                            onClick={() => removeTimeTableAssignment(index)}
-                                        >
-                                            <Delete />
+                    Add Production Line
+                </Button>
+                <Paper sx={{ mt: 2 }}>
+                    <List>
+                        {productionLines.map((line) => (
+                            <React.Fragment key={line.id}>
+                                <ListItem>
+                                    <ListItemText
+                                        primary={line.name}
+                                        secondary={line.description}
+                                    />
+                                    <ListItemSecondaryAction>
+                                        <IconButton edge="end" onClick={() => openModal(line)}>
+                                            <Edit />
                                         </IconButton>
-                                    </Grid>
-                                </Grid>
-                            </Paper>
+                                    </ListItemSecondaryAction>
+                                </ListItem>
+                                <Divider />
+                            </React.Fragment>
                         ))}
+                    </List>
+                </Paper>
+            </ContentSection>
 
-                        <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
-                            {isEditMode && selectedLineId && (
-                                <Button
-                                    variant="contained"
-                                    color="secondary"
-                                    onClick={() => deleteProductionLine(selectedLineId)}
-                                    startIcon={<Delete />}
-                                    sx={{ mr: 2 }}
-                                >
-                                    Delete
-                                </Button>
-                            )}
-                            <Button variant="contained" color="primary" onClick={saveProductionLine}>
-                                {isEditMode ? 'Save Changes' : 'Save'}
+            <Dialog
+                open={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>
+                    {isEditMode ? 'Edit Production Line' : 'Add Production Line'}
+                    <IconButton
+                        aria-label="close"
+                        onClick={() => setIsModalOpen(false)}
+                        sx={{ position: 'absolute', right: 8, top: 8 }}
+                    >
+                        <Close />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent>
+                    {error && <Typography color="error">{error}</Typography>}
+                    <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                            <TextField
+                                label="Line Name"
+                                value={lineName}
+                                onChange={(e) => setLineName(e.target.value)}
+                                fullWidth
+                                required
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                label="Description"
+                                value={lineDescription}
+                                onChange={(e) => setLineDescription(e.target.value)}
+                                fullWidth
+                                required
+                            />
+                        </Grid>
+                    </Grid>
+
+                    <Typography variant="h6" sx={{ mt: 4 }}>
+                        Time Table Assignments
+                    </Typography>
+                    <Button
+                        variant="outlined"
+                        startIcon={<Add />}
+                        onClick={addTimeTableAssignment}
+                        sx={{ mt: 1, mb: 2 }}
+                    >
+                        Add Time Table Assignment
+                    </Button>
+
+                    {timeTableAssignments.map((assignment, index) => (
+                        <Paper key={assignment.id} sx={{ p: 2, mb: 2 }}>
+                            <Grid container spacing={2} alignItems="center">
+                                <Grid item xs={12} md={4}>
+                                    <FormControl fullWidth required>
+                                        <InputLabel>Time Table</InputLabel>
+                                        <Select
+                                            value={assignment.timeTableId}
+                                            onChange={(e) =>
+                                                updateTimeTableAssignment(index, 'timeTableId', e.target.value as string)
+                                            }
+                                            label="Time Table"
+                                        >
+                                            <MenuItem value="">
+                                                <em>Select a Time Table</em>
+                                            </MenuItem>
+                                            {timeTables.map((tt) => (
+                                                <MenuItem key={tt.id} value={tt.id}>
+                                                    {tt.name}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12} md={3}>
+                                    <TextField
+                                        label="From Date"
+                                        type="date"
+                                        value={assignment.fromDate}
+                                        onChange={(e) =>
+                                            updateTimeTableAssignment(index, 'fromDate', e.target.value)
+                                        }
+                                        InputLabelProps={{ shrink: true }}
+                                        fullWidth
+                                        required
+                                    />
+                                </Grid>
+                                <Grid item xs={12} md={3}>
+                                    <TextField
+                                        label="To Date"
+                                        type="date"
+                                        value={assignment.toDate}
+                                        onChange={(e) =>
+                                            updateTimeTableAssignment(index, 'toDate', e.target.value)
+                                        }
+                                        InputLabelProps={{ shrink: true }}
+                                        fullWidth
+                                        required
+                                    />
+                                </Grid>
+                                <Grid item xs={12} md={2}>
+                                    <IconButton
+                                        color="error"
+                                        onClick={() => removeTimeTableAssignment(index)}
+                                    >
+                                        <Delete />
+                                    </IconButton>
+                                </Grid>
+                            </Grid>
+                        </Paper>
+                    ))}
+
+                    <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+                        {isEditMode && selectedLineId && (
+                            <Button
+                                variant="contained"
+                                color="error"
+                                onClick={() => deleteProductionLine(selectedLineId)}
+                                startIcon={<Delete />}
+                                sx={{ mr: 2 }}
+                            >
+                                Delete
                             </Button>
-                        </Box>
-                    </DialogContent>
-                </Dialog>
-            </div>
+                        )}
+                        <Button variant="contained" color="primary" onClick={saveProductionLine}>
+                            {isEditMode ? 'Save Changes' : 'Save'}
+                        </Button>
+                    </Box>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };
